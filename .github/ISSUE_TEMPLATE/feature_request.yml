@@ -1,0 +1,32 @@
+name: Feature request
+description: Suggest a change consistent with the project charter.
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please review the [roadmap and charter](https://github.com/imwyvern/agent-guard/blob/main/docs/roadmap.md) before proposing a feature. Report security vulnerabilities [privately](https://github.com/imwyvern/agent-guard/security/advisories/new).
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or use case
+      description: Who needs this, and what are they trying to do?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior
+      description: Describe the change and how it preserves the charter's safety constraints.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+  - type: textarea
+    id: validation
+    attributes:
+      label: Acceptance criteria
+      description: How could this behavior be verified locally?
+    validations:
+      required: true

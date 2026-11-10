@@ -1,8 +1,12 @@
 # agent-guard
 
+[![CI](https://github.com/imwyvern/agent-guard/actions/workflows/ci.yml/badge.svg)](https://github.com/imwyvern/agent-guard/actions/workflows/ci.yml)
+
 HTTP middleware for Node ≥20: five isolated decoy routes and inert canary credentials detect credential replay and exploratory scanning. It records events and sends asynchronous alerts. Zero runtime dependencies; optional Express peer. Apache-2.0, copyright 2026 Wesley Wang.
 
-This is a private, local research project. No registry release or deployment is provided. The working package name is `@imwyvern/agent-guard`.
+This is an open-source research project, not yet published to npm. Install from source or create a local tarball with `npm pack`. The working package name is `@imwyvern/agent-guard`.
+
+See the [security policy](SECURITY.md), [contributing guide](CONTRIBUTING.md), and [roadmap](docs/roadmap.md).
 
 ## Install and validate locally
 

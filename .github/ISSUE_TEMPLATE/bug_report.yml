@@ -1,0 +1,42 @@
+name: Bug report
+description: Report a reproducible problem with agent-guard.
+body:
+  - type: markdown
+    attributes:
+      value: |
+        For security vulnerabilities, use [private vulnerability reporting](https://github.com/imwyvern/agent-guard/security/advisories/new) instead of a public issue. See [SECURITY.md](https://github.com/imwyvern/agent-guard/blob/main/SECURITY.md).
+        Remove secrets, personal data, and real credentials from all examples and logs.
+  - type: input
+    id: version
+    attributes:
+      label: Version or commit
+      description: Include the agent-guard version or source commit SHA.
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: Node.js version, OS, and adapter/framework versions.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to reproduce
+      description: Include a minimal reproduction using inert sample data.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: Include relevant sanitized errors or logs.
+    validations:
+      required: true
