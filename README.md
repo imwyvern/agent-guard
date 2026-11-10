@@ -191,6 +191,7 @@ PORT=3001 npm run demo:node
 AGENT_GUARD=off npm run demo:express
 npm run bench:simulate
 npm run bench:latency
+npm run bench:latency:hr
 npm run lhci
 npm run bench
 ```
@@ -209,6 +210,8 @@ curl -s -H "Authorization: Bearer $TOKEN" http://127.0.0.1:3000/api/internal/adm
 ```
 
 The demo terminal prints one-line JSON events and console alerts. All tokens are inert `AG-CANARY-` strings that unlock nothing.
+
+From v0.2, `npm run bench:latency:hr` is the primary AC-10 measurement for Express, Node and Hono: isolated keep-alive clients/servers, µs-resolution timing, three interleaved runs at 100/10 connections, and core inspect ns/op (about 3 minutes). Thresholds remain Δp50 ≤200 µs, Δp99 ≤1000 µs, and 50k-client heap ≤10 MB; only the 100-connection row decides latency. See [v0.2 results and configuration](docs/bench-v0.2.md); raw JSON is `bench/results/latency-hr.json`, including historical autocannon secondary evidence. The original `bench` command retains its v0.1 autocannon gate.
 
 Measured gate failures produce a nonzero benchmark exit. `bench:latency` runs each demo server in its own child process and drives it with autocannon (100 connections, 30 s, median of 3 runs); it also records a non-gating fixed-rate run and a throughput-derived per-request overhead estimate. Lighthouse needs about 35 minutes for the full matrix. If a sandbox forbids local sockets, the research harness uses actual HTTP request/response objects over in-memory Duplex streams; TCP latency remains **unvalidated**. Chrome startup failures are **skipped**, not passed. See [benchmark report](docs/bench-v0.1.md) and [implementation notes](docs/implementation-notes.md) for the exact environment limitations. The library does not include this harness.
 

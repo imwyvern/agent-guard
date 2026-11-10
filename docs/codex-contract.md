@@ -105,7 +105,7 @@ export function wrap(guard, handler: http.RequestListener): http.RequestListener
 | AC-7 诱饵 noindex | D1–D5 | `X-Robots-Tag: noindex, nofollow, noarchive, nosnippet`、`Cache-Control: no-store`；HTML 带 robots meta；无 `Set-Cookie` |
 | AC-8 robots/sitemap | append 模式 | 原内容保留 + 全部 decoy Disallow；sitemap 与 decoy 交集为空；真实页面不在 Disallow |
 | AC-9 SEO/Lighthouse | 无 cloaking：真实页面浏览器 UA vs Googlebot（verified/spoofed）逐字节一致；Lighthouse on/off（kpi.md §3） | 一致；分数差 ≤ 2（无 Chrome 则标 skipped，并在 notes 说明） |
-| AC-10 延迟预算 | `bench/latency.ts`，demo 首页 | p99 增量 ≤ 1 ms，p50 ≤ 0.2 ms；50k client_key 时内存增量 ≤ 10 MB |
+| AC-10 延迟预算 | `bench/latency.ts`，demo 首页；v0.2 起以 `bench/latency-hr.ts`（µs-resolution hrtime）为 primary，autocannon 保留为 secondary | p99 增量 ≤ 1 ms，p50 ≤ 0.2 ms；50k client_key 时内存增量 ≤ 10 MB |
 | AC-11 无副作用 | 全部测试期间 stub `globalThis.fetch` 与 `node:dns` | 除本地 webhook 与注入 resolver 外 0 出站 |
 | AC-12 mode 校验 | `mode` ≠ `"detect"` | 抛 `AgentGuardConfigError` |
 | AC-13 告警不阻塞 | webhook 接收端挂起 30 s | 诱饵响应 < 50 ms；记录 `alert_failed` |

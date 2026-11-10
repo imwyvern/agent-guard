@@ -102,6 +102,7 @@
     "bench": "node --import tsx bench/run.ts",
     "bench:simulate": "node --import tsx bench/simulate.ts",
     "bench:latency": "node --import tsx bench/latency.ts",
+    "bench:latency:hr": "node --import tsx bench/latency-hr.ts",
     "lhci": "node --import tsx bench/lighthouse.ts",
     "demo:express": "node --import tsx examples/express-demo/server.ts",
     "demo:node": "node --import tsx examples/node-http-demo/server.ts",
