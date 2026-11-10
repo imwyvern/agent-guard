@@ -1,0 +1,197 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "agent-guard/event.v1.json",
+  "type": "object",
+  "required": [
+    "v",
+    "ts",
+    "event_id",
+    "event",
+    "severity",
+    "project",
+    "env",
+    "req"
+  ],
+  "properties": {
+    "v": {
+      "const": 1
+    },
+    "ts": {
+      "type": "string",
+      "format": "date-time",
+      "description": "UTC ISO-8601"
+    },
+    "event_id": {
+      "type": "string",
+      "description": "ULID",
+      "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$"
+    },
+    "event": {
+      "enum": [
+        "decoy_hit",
+        "canary_replay",
+        "probe",
+        "ai_discovery",
+        "crawler_bypass",
+        "alert_sent",
+        "alert_failed"
+      ]
+    },
+    "severity": {
+      "enum": [
+        "debug",
+        "info",
+        "medium",
+        "high",
+        "critical"
+      ]
+    },
+    "project": {
+      "type": "string"
+    },
+    "env": {
+      "type": "string"
+    },
+    "req": {
+      "type": "object",
+      "required": [
+        "method",
+        "path",
+        "client_key"
+      ],
+      "properties": {
+        "method": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string",
+          "description": "不含 query"
+        },
+        "query_keys": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "ip": {
+          "type": "string",
+          "description": "可配置是否记录"
+        },
+        "client_key": {
+          "type": "string"
+        },
+        "ua": {
+          "type": "string",
+          "maxLength": 512
+        },
+        "ua_class": {
+          "enum": [
+            "browser",
+            "automation",
+            "verified_crawler",
+            "spoofed_crawler",
+            "declared_ai_crawler",
+            "unknown"
+          ]
+        },
+        "referer": {
+          "type": "string"
+        },
+        "has_session": {
+          "type": "boolean",
+          "description": "是否带真实 session cookie（仅判断存在，不记录值）"
+        },
+        "country": {
+          "type": "string",
+          "description": "可选，由调用方 clientMeta 提供，可空"
+        }
+      }
+    },
+    "decoy": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "enum": [
+            "D1",
+            "D2",
+            "D3",
+            "D4",
+            "D5"
+          ]
+        },
+        "status": {
+          "type": "integer"
+        }
+      }
+    },
+    "canary": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "placement": {
+          "type": "string"
+        },
+        "env": {
+          "type": "string"
+        },
+        "found_in": {
+          "enum": [
+            "header",
+            "query",
+            "body",
+            "path"
+          ]
+        },
+        "field": {
+          "type": "string"
+        }
+      }
+    },
+    "score": {
+      "type": "integer"
+    },
+    "signals": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "crawler": {
+      "type": "object",
+      "properties": {
+        "claimed": {
+          "type": "string"
+        },
+        "verified": {
+          "type": "boolean"
+        },
+        "rdns": {
+          "type": "string"
+        },
+        "cache": {
+          "type": "boolean"
+        }
+      }
+    },
+    "alert": {
+      "type": "object",
+      "properties": {
+        "channel": {
+          "type": "string"
+        },
+        "latency_ms": {
+          "type": "integer"
+        },
+        "status": {
+          "type": "integer"
+        },
+        "deduped": {
+          "type": "boolean"
+        }
+      }
+    }
+  },
+  "additionalProperties": false
+}

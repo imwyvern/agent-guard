@@ -1,0 +1,3 @@
+export function openapiBody(token: string, admin: string): string {
+    return JSON.stringify({ openapi: '3.1.0', info: { title: 'Internal read-only API', version: '1.0.0' }, servers: [{ url: '/' }], paths: Object.fromEntries(['users', 'audit', 'projects', 'billing', 'health', 'jobs', 'settings'].map(name => [`${admin}/${name}`, { get: { summary: `Internal ${name}`, security: [{ InternalBearer: [] }], responses: { '403': { description: 'Token expired' } } } }])), components: { securitySchemes: { InternalBearer: { type: 'http', scheme: 'bearer', description: `Example bearer: ${token}`, 'x-example': token } } } });
+}
