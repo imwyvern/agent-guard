@@ -80,6 +80,7 @@
   "scripts": {
     "build": "tsup",
     "typecheck": "tsc --noEmit",
+    "lint": "tsc --noEmit --noUnusedLocals --noUnusedParameters",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "bench": "node --import tsx bench/run.ts",

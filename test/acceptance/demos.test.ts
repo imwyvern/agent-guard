@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { mkdtempSync, writeFileSync, mkdirSync, rmSync, openSync, closeSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -157,14 +157,54 @@ for (const kind of ['express', 'node'] as const)
                 await r.close();
             }
         });
-        it('AC-14: 100 decoy hits produce <=1 alert per client; summary is verified in unit tests', async () => {
-            const r = await receiver();
+        it('AC-13: default webhook timeout keeps consecutive decoys and a normal page under 50ms while pending', async () => {
+            const r = await receiver([], true);
             try {
-                await using({ alerts: { adapters: [webhookAdapter({ url: r.url, secret: 'webhook-test-secret' })] } }, async (on, _off, events) => { for (let i = 0; i < 100; i++)
-                    await fetch(on.url + '/.env'); await on.guard!.close(); expect(r.deliveries).toHaveLength(1); expect(events.filter(e => e.event === 'decoy_hit')).toHaveLength(100); });
+                await using({ alerts: { adapters: [webhookAdapter({ url: r.url, secret: 'webhook-test-secret' })] } }, async (on, _off, events) => {
+                    try {
+                        for (const [index, path] of ['/.env', '/internal/ops-notes', '/'].entries()) {
+                            const start = performance.now();
+                            const response = await fetch(on.url + path);
+                            await response.text();
+                            expect(performance.now() - start).toBeLessThan(50);
+                            expect(response.status).toBe(200);
+                            await vi.waitFor(() => expect(r.deliveries).toHaveLength(Math.min(index + 1, 2)), { timeout: 1000, interval: 5 });
+                            expect(events.filter(e => e.event === 'alert_sent' || e.event === 'alert_failed')).toHaveLength(0);
+                        }
+                    }
+                    finally {
+                        // Release the simulated >=30s hang; retries also fail immediately.
+                        r.failPending();
+                        await on.guard!.close();
+                    }
+                    expect(events.filter(e => e.event === 'alert_failed')).toHaveLength(2);
+                });
             }
             finally {
                 await r.close();
+            }
+        }, 5000);
+        it('AC-14: 100 decoy hits produce one alert per client and the next delivery reports 99 deduplicated hits', async () => {
+            vi.useFakeTimers({ toFake: ['Date'] });
+            const r = await receiver();
+            try {
+                await using({ alerts: { adapters: [webhookAdapter({ url: r.url, secret: 'webhook-test-secret' })] } }, async (on, _off, events) => {
+                    for (let i = 0; i < 100; i++) await fetch(on.url + '/.env');
+                    await vi.waitFor(() => expect(r.deliveries).toHaveLength(1));
+                    expect(events.filter(e => e.event === 'decoy_hit')).toHaveLength(100);
+                    expect(r.deliveries[0]?.payload.summary).toEqual({ deduped: 0, rate_limited: 0 });
+                    // Expire the default 600s dedup window without faking HTTP/retry timers.
+                    vi.setSystemTime(Date.now() + 600001);
+                    await fetch(on.url + '/.env');
+                    await on.guard!.close();
+                    expect(r.deliveries).toHaveLength(2);
+                    expect(r.deliveries[1]?.payload.summary).toEqual({ deduped: 99, rate_limited: 0 });
+                    expect(r.deliveries.every(d => d.valid)).toBe(true);
+                });
+            }
+            finally {
+                await r.close();
+                vi.useRealTimers();
             }
         });
         it('AC-15: built CLI scan exits nonzero with file:line; registry/templates whitelisted', () => {
