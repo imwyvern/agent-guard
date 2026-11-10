@@ -58,6 +58,8 @@ Memory 使用原有 `bench/memory.ts`，独立 child + `--expose-gc`：guard 创
 | node | +147 | -447 | 8.322 MB | **PASS** |
 | hono | -125 | +690 | 8.322 MB | **PASS** |
 
+> **维护者注（置信度）**：100 connections 下同一 mode 三次 run 的 p50 自身波动约 200–430 µs（例如 express off：3418–3844 µs），已经和 200 µs gate 同量级，所以这里的 PASS 只说明"观测值没有超过阈值"，**统计功效不足以单独证明** Δp50 ≤ 200 µs；负 delta 就是噪声的直接证据。更有说服力的证据是两条互相印证的低噪声数据：10 connections 下 Δp50 只有 +7 ～ +20 µs，以及 in-process hot path ≈ 2.6 µs/op。后续（roadmap v0.3）计划：更长窗口、更多 run、paired bootstrap 置信区间，以及固定 CPU affinity 的专用 runner，再把 AC-10 从"观测 PASS"升级为"有置信区间的 PASS"。
+
 ## Hot path microbenchmark
 
 同一进程中直接 `await guard.inspect()`，human homepage request、固定 IP/UA，20,000 次 warmup，之后每次 100,000 ops，三次测量；计入 await、decision assertion、bounds、canary scan、client state 和 metrics，排除 adapter、socket 与 HTTP。三次 **2856.36, 2267.76, 2564.13 ns/op**，median **2564.13 ns/op**。这是 warmed repeated-client 路径，不能代替 AC-10 end-to-end percentile，亦不能将 ns/op 直接等同于 saturated latency delta。
