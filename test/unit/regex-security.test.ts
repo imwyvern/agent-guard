@@ -27,7 +27,7 @@ describe('every regex in src stays below 50ms on adversarial 100k input', () => 
     }
     it('keeps the findings table in sync with all source literals', () => {
         expect(inventory.length).toBeGreaterThan(20);
-        const review = readFileSync('docs/security-review.md', 'utf8');
+        const review = ['docs/security-review.md', 'docs/scenarios/mcp.md'].map(path => readFileSync(path, 'utf8')).join('\n');
         for (const { file, literal } of inventory) {
             expect(review).toContain(file);
             expect(review).toContain(literal.replaceAll('|', '\\|'));

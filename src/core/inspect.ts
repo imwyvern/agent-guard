@@ -1,5 +1,7 @@
 import type { AGDecision, AgentGuard, AgentGuardConfig, AgentGuardEvent, Severity, UAClass } from '../types.js';
 import { validateConfig, guardConfigs } from '../config.js';
+import { mcpDecoyTools } from '../scenarios/mcp.js';
+import { decoyHeaders } from '../decoys/headers.js';
 import { Registry } from '../canary/registry.js';
 import { matchesPath, scanRequest } from '../canary/scan.js';
 import { Decoys } from '../decoys/index.js';
@@ -58,7 +60,7 @@ export function createAgentGuard(config: AgentGuardConfig): AgentGuard {
     let lastIp: string | undefined, lastUa: string | undefined, lastKey = '', lastClass: UAClass = 'unknown';
     let closed = false;
     const guard: AgentGuard = {
-        async inspect(input): Promise<AGDecision> {
+        async inspect(input, context): Promise<AGDecision> {
             const start = process.hrtime.bigint();
             try {
                 if (closed)
@@ -83,8 +85,9 @@ export function createAgentGuard(config: AgentGuardConfig): AgentGuard {
                 let uaClass = lastClass;
                 if (uaClass === 'automation')
                     signals.push('ua_automation');
-                const id = pathTruncated ? undefined : decoys.match(req.path, req.method), probe = pathSignal(req.path);
-                const scanBody = id === 'D5' || (config.canaryScan?.bodyPaths ?? ['/login', '/api/auth/*']).some(p => matchesPath(req.path, p));
+                const id = context?.mcp ? 'MCP' : pathTruncated ? undefined : decoys.match(req.path, req.method), probe = pathSignal(req.path);
+                const decoyHit = id && (id !== 'MCP' || mcpDecoyTools.some(tool => tool.name === context?.mcp.toolName));
+                const scanBody = id === 'MCP' || id === 'D5' || (config.canaryScan?.bodyPaths ?? ['/login', '/api/auth/*']).some(p => matchesPath(req.path, p));
                 const hits = scanRequest(req, registry, config, scanBody);
                 if (hits.length)
                     signals.push('canary_replay');
@@ -101,7 +104,7 @@ export function createAgentGuard(config: AgentGuardConfig): AgentGuard {
                         if (!verified.verified)
                             signals.push('ua_spoof_crawler');
                     }
-                    if (!verified?.verified) {
+                    if (decoyHit && !verified?.verified) {
                         signals.push('decoy_path');
                         if (state.robots)
                             signals.push('robots_then_disallowed');
@@ -121,11 +124,11 @@ export function createAgentGuard(config: AgentGuardConfig): AgentGuard {
                     push({ ...make('crawler_bypass', 'debug'), crawler: verified });
                     return { action: 'respond', response: { status: 404, headers: { 'Content-Type': 'text/plain; charset=utf-8' }, body: 'Not Found\n' }, events };
                 }
-                if (id) {
+                if (decoyHit) {
                     // Log and enqueue before the fixed D5 login delay, so delivery latency stays low.
                     const status = id === 'D2' ? (/^Bearer\s+/i.test(String(headers.authorization ?? '')) ? 403 : 401) : id === 'D5' ? (req.method === 'POST' ? 401 : 405) : 200;
                     push({ ...make('decoy_hit', uaClass === 'declared_ai_crawler' ? 'info' : id === 'D1' || id === 'D3' ? 'high' : 'medium'), decoy: { id, status }, ...(verified ? { crawler: verified } : {}) });
-                    const response = await decoys.respond(id, req);
+                    const response = id === 'MCP' ? { status: 200, headers: decoyHeaders('application/json'), body: JSON.stringify({ error: 'permission denied' }) } : await decoys.respond(id, req);
                     if (req.method === 'HEAD')
                         response.body = '';
                     return { action: 'respond', response, events };

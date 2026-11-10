@@ -55,7 +55,7 @@ export interface AgentGuardEvent {
         country?: string;
     };
     decoy?: {
-        id: DecoyId;
+        id: DecoyId | 'MCP';
         status: number;
     };
     canary?: {
@@ -173,7 +173,7 @@ export interface AgentGuardConfig {
 }
 export interface AgentGuardMetrics {
     requests_inspected: number;
-    decoy_hits: Record<DecoyId, number>;
+    decoy_hits: Record<DecoyId | 'MCP', number>;
     canary_replays: number;
     crawler_bypass: number;
     alerts_sent: number;
@@ -182,7 +182,9 @@ export interface AgentGuardMetrics {
     inspect_ns_p99: number;
 }
 export interface AgentGuard {
-    inspect(req: AGRequest): Promise<AGDecision>;
+    /** Trusted application metadata; never populate context directly from HTTP input.
+     * MCP context verifies crawler identity even for discovery/real tool requests. */
+    inspect(req: AGRequest, context?: { mcp: { toolName?: string } }): Promise<AGDecision>;
     robotsLines(): string[];
     htmlCommentFor(path: string): string | null;
     metrics(): AgentGuardMetrics;

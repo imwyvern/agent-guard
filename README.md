@@ -77,6 +77,42 @@ const listener = wrap(guard, (_req, res) => res.end('Hello'));
 
 Opt-in robots/HTML/llms transformations buffer at most 1 MiB on selected paths; ordinary streams pass through. Install before compression. Transformations apply only to successful, uncompressed responses. Only the login HTML comment changes a real HTML page, when explicitly enabled.
 
+## Hono (Node runtime)
+
+The v0.2 Hono adapter is available as `@imwyvern/agent-guard/hono`, with an optional `hono` peer. It requires Node ≥20: the shared core still uses `node:crypto` and Node DNS. Edge runtimes and a WebCrypto core are roadmap v0.3 work.
+
+```ts
+import { Hono } from 'hono';
+import { serve } from '@hono/node-server';
+import { agentGuard } from '@imwyvern/agent-guard/hono';
+
+// Reuse the guard configured in the Express example.
+const app = new Hono();
+app.use('*', agentGuard(guard));
+app.post('/login', async c => c.json(await c.req.json()));
+app.get('/', c => c.text('Local catalog'));
+app.notFound(c => c.text('Not Found\n', 404));
+serve({ fetch: app.fetch, hostname: '127.0.0.1', port: 3000 });
+```
+
+Install Hono and your Node server integration in the consuming app. This repository installs both only as dev dependencies; the adapter adds no runtime dependencies. `agentGuard` accepts a guard or config, scans eligible bodies from a cloned request up to the configured body cap (default 16 KiB), and leaves the original body available to downstream handlers. JSON and form bodies are supported; malformed/truncated input is scanned as bounded text. The host remains responsible for wire-size limits and body-read deadlines. `@hono/node-server` supplies the socket IP; forwarded headers require an explicit trusted `clientIp` callback.
+
+Detection remains alert-only: canary replay continues to the host, decoys have noindex/no-store headers, and verified crawlers reach the host's native missing-route handler. Opt-in robots/HTML/llms transforms preserve the existing 1 MiB buffer limit. Run `npm run demo:hono` (`PORT` and `AGENT_GUARD=off` work as in the other catalog demos). Hono runs the same shared acceptance suite as Express and Node.
+
+## MCP / LLM tool endpoint decoy
+
+```sh
+npm run demo:mcp
+curl -s http://127.0.0.1:3000/mcp -H 'Content-Type: application/json' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
+curl -s http://127.0.0.1:3000/mcp -H 'Content-Type: application/json' \
+  -d '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"export_customer_records","arguments":{}}}'
+```
+
+The local Node HTTP example implements minimal JSON-RPC `initialize`, `tools/list` and `tools/call` at `POST /mcp`. `echo` and `get_time` are harmless real tools. Calling the listed `export_customer_records` decoy emits `decoy_hit` with `decoy.id: "MCP"` through the normal alert pipeline and returns a JSON-RPC permission error. It executes no business operation and returns no records, secrets or canaries. Real tool calls remain alert-only, including normal inert canary replay detection in tool arguments.
+
+The root exports `mcpDecoyTools`, `inspectMcpRequest(guard, request, toolName?)` and `lintMcpDecoyDescription`. Call the helper once after bounded parsing, passing a tool name only for `tools/call`; handle `crawler_bypass` as the host's native 404. The example applies this to discovery too, so verified crawlers never see decoy tools. All MCP JSON responses are noindex/no-store. Built-in descriptions are neutral data, with tests rejecting imperative language, URLs and hidden characters. This example is a limited HTTP scenario, without full MCP Streamable HTTP, sessions or SSE support. See [MCP scenario and safety rules（中文）](docs/scenarios/mcp.md) for OWASP MCP01/MCP08 threat mapping, schema details and integration boundaries.
+
 ## Configuration
 
 Every public field has defaults documented in [src/types.ts](src/types.ts). Required fields: `project`, `env`, `mode: 'detect'`, `projectSeed`, and `canary.secret`/`canary.registry`.

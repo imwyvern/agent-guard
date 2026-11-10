@@ -1,6 +1,6 @@
 import { createServer, type Server, type IncomingMessage, type ServerResponse } from 'node:http';
 import { listenLocal } from './loopback.js';
-import { createAgentGuard, consoleAdapter, webhookAdapter, type AgentGuard, type AgentGuardConfig } from '../../src/index.js';
+import { createAgentGuard, consoleAdapter, webhookAdapter, type AgentGuard, type AgentGuardConfig, type AGResponse } from '../../src/index.js';
 import { agentGuardNode, type ParsedRequest } from '../../src/adapters/node.js';
 export const realPaths = ['/', '/list', '/item/1', '/login', '/pricing'];
 export const browserUA = 'Mozilla/5.0 Chrome/130.0.0.0 Safari/537.36';
@@ -14,8 +14,8 @@ export function demoConfig(overrides: Partial<AgentGuardConfig> = {}): AgentGuar
 function page(title: string, content: string): string {
     return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="description" content="A local demonstration catalog for agent-guard research."><title>${title} — Local catalog</title><link rel="stylesheet" href="/static/site.css"></head><body><header><nav aria-label="Main"><a href="/">Home</a> <a href="/list">Catalog</a> <a href="/pricing">Pricing</a> <a href="/login">Login</a></nav></header><main><h1>${title}</h1>${content}</main><footer>Local research demonstration</footer></body></html>`;
 }
-export function site(req: ParsedRequest, res: ServerResponse): void {
-    const path = new URL(req.url ?? '/', 'http://local.invalid').pathname, method = req.method ?? 'GET';
+export function siteResponse(path: string, method: string, data?: unknown): AGResponse {
+    const headers: Record<string, string> = {};
     let status = 200, type = 'text/html; charset=utf-8', body = '';
     if (path === '/' && method === 'GET')
         body = page('Local catalog', '<p>Browse a small collection of sample items.</p><a href="/list">Browse items</a>');
@@ -28,17 +28,17 @@ export function site(req: ParsedRequest, res: ServerResponse): void {
     else if (path === '/login' && method === 'GET')
         body = page('Login', '<form method="post" action="/login"><label>Email <input name="email" type="email" autocomplete="username"></label><label>Password <input name="password" type="password" autocomplete="current-password"></label><button type="submit">Sign in</button></form>');
     else if (path === '/login' && method === 'POST') {
-        const data = req.body as Record<string, unknown> | undefined, ok = data?.email === 'demo@example.invalid' && data.password === 'demo-password';
+        const login = data as Record<string, unknown> | undefined, ok = login?.email === 'demo@example.invalid' && login.password === 'demo-password';
         status = ok ? 200 : 401;
         type = 'application/json; charset=utf-8';
         body = JSON.stringify({ ok });
         if (ok)
-            res.setHeader('Set-Cookie', 'demo_session=local-only; HttpOnly; SameSite=Lax; Path=/');
+            headers['Set-Cookie'] = 'demo_session=local-only; HttpOnly; SameSite=Lax; Path=/';
     }
     else if (path === '/logout' && method === 'POST') {
         type = 'application/json; charset=utf-8';
         body = '{"ok":true}';
-        res.setHeader('Set-Cookie', 'demo_session=; Max-Age=0; Path=/; HttpOnly; SameSite=Lax');
+        headers['Set-Cookie'] = 'demo_session=; Max-Age=0; Path=/; HttpOnly; SameSite=Lax';
     }
     else if (path === '/robots.txt') {
         type = 'text/plain; charset=utf-8';
@@ -61,10 +61,12 @@ export function site(req: ParsedRequest, res: ServerResponse): void {
         type = 'text/plain; charset=utf-8';
         body = 'Not Found\n';
     }
-    res.statusCode = status;
-    res.setHeader('Content-Type', type);
-    res.setHeader('Content-Length', Buffer.byteLength(body));
-    res.end(method === 'HEAD' ? '' : body);
+    return { status, headers: { ...headers, 'Content-Type': type, 'Content-Length': String(Buffer.byteLength(body)) }, body };
+}
+export function site(req: ParsedRequest, res: ServerResponse): void {
+    const response = siteResponse(new URL(req.url ?? '/', 'http://local.invalid').pathname, req.method ?? 'GET', req.body);
+    res.writeHead(response.status, response.headers);
+    res.end(req.method === 'HEAD' ? '' : response.body);
 }
 /** Demo-only bounded parser, installed before either middleware. */
 export async function parseBody(req: IncomingMessage): Promise<unknown> {
@@ -93,7 +95,7 @@ export interface Demo {
     url: string;
     close(): Promise<void>;
 }
-export async function startDemo(kind: 'express' | 'node', config: AgentGuardConfig | false = demoConfig(), port = 0): Promise<Demo> {
+export async function startDemo(kind: 'express' | 'node' | 'hono', config: AgentGuardConfig | false = demoConfig(), port = 0): Promise<Demo> {
     const guard = config ? createAgentGuard(config) : undefined;
     let server: Server;
     if (kind === 'express') {
@@ -107,6 +109,26 @@ export async function startDemo(kind: 'express' | 'node', config: AgentGuardConf
             app.use(agentGuard(guard));
         app.use(site);
         server = createServer(app);
+    }
+    else if (kind === 'hono') {
+        const { Hono } = await import('hono');
+        const { getRequestListener } = await import('@hono/node-server');
+        const { agentGuard } = await import('../../src/adapters/hono.js');
+        const app = new Hono();
+        if (guard) app.use('*', agentGuard(guard));
+        app.all('*', async c => {
+            let data: unknown;
+            try {
+                if (['POST', 'PUT', 'PATCH'].includes(c.req.method)) {
+                    const text = await c.req.text();
+                    if (Buffer.byteLength(text) > 16384) throw new Error('body too large');
+                    data = c.req.header('content-type')?.includes('application/json') ? JSON.parse(text || 'null') as unknown : Object.fromEntries(new URLSearchParams(text));
+                }
+            } catch { return new Response('Bad Request\n', { status: 400 }); }
+            const response = siteResponse(c.req.path, c.req.method, data);
+            return new Response(c.req.method === 'HEAD' ? null : response.body, { status: response.status, headers: response.headers });
+        });
+        server = createServer(getRequestListener(app.fetch));
     }
     else {
         const middleware = guard ? agentGuardNode(guard) : undefined;

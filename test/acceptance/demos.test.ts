@@ -7,7 +7,7 @@ import { startDemo, browserUA, realPaths, type Demo } from '../../examples/share
 import { createAgentGuard, generateCanary, webhookAdapter, AgentGuardConfigError, type AgentGuardConfig, type AgentGuardEvent } from '../../src/index.js';
 import { config, request, receiver, verifiedResolver, spoofResolver, decoyPaths } from '../helpers.js';
 async function snapshot(demo: Demo, path: string, init?: RequestInit) { const r = await fetch(demo.url + path, { headers: { 'user-agent': browserUA }, ...init }); return { status: r.status, body: await r.text(), headers: Object.fromEntries([...r.headers].filter(([k]) => !['date', 'connection', 'keep-alive'].includes(k))) }; }
-for (const kind of ['express', 'node'] as const)
+for (const kind of ['express', 'node', 'hono'] as const)
     describe(`${kind} acceptance`, () => {
         async function using(overrides: Partial<AgentGuardConfig>, fn: (on: Demo, off: Demo, events: AgentGuardEvent[]) => Promise<void>) {
             const events: AgentGuardEvent[] = [], on = await startDemo(kind, config({ ...overrides, onEvent: e => events.push(e) })), off = await startDemo(kind, false);
