@@ -11,6 +11,7 @@ Development tools are already installed in this workspace. Do not install additi
 ```sh
 npm run build
 npm run typecheck
+npm run lint          # strict-compiler lint (tsc --noUnusedLocals --noUnusedParameters)
 npm test
 npm run test:coverage
 npm run bench
@@ -158,7 +159,18 @@ Demos default to `PORT=3000`, `AGENT_GUARD=on`, console alerts, and offline inje
 
 Both demos share `/`, `/list`, `/item/:id`, `/login`, `/logout`, `/pricing`, robots/sitemap/static content, and the native 404. Demo login uses `demo@example.invalid` / `demo-password`. The benchmark runs S1–S5 on both demos with the specified session counts and a fixed seed, validates signed alert arrival, runs latency warmup + median of three runs, and checks 50k client memory. With TCP available it runs autocannon for 30 seconds / 100 connections per run. Lighthouse uses local Chrome, `--headless --no-sandbox`, both form factors, five URLs, and five runs per URL/mode/demo.
 
-Measured gate failures produce a nonzero benchmark exit. If this managed sandbox forbids local sockets, the research harness uses actual HTTP request/response objects over in-memory Duplex streams; TCP latency remains **unvalidated**. Chrome startup failures are **skipped**, not passed. See [benchmark report](docs/bench-v0.1.md) and [implementation notes](docs/implementation-notes.md) for the exact environment limitations. The library does not include this harness.
+Quick manual check against a running demo (second terminal):
+
+```sh
+PORT=3000 npm run demo:express          # or: npm run demo:node
+curl -s -A 'Mozilla/5.0 Chrome/130' http://127.0.0.1:3000/   # real page, no event
+TOKEN=$(curl -s http://127.0.0.1:3000/.env | sed -n 's/^ADMIN_API_TOKEN=//p')   # decoy_hit (high)
+curl -s -H "Authorization: Bearer $TOKEN" http://127.0.0.1:3000/api/internal/admin/users   # canary_replay (critical)
+```
+
+The demo terminal prints one-line JSON events and console alerts. All tokens are inert `AG-CANARY-` strings that unlock nothing.
+
+Measured gate failures produce a nonzero benchmark exit. `bench:latency` runs each demo server in its own child process and drives it with autocannon (100 connections, 30 s, median of 3 runs); it also records a non-gating fixed-rate run and a throughput-derived per-request overhead estimate. Lighthouse needs about 35 minutes for the full matrix. If a sandbox forbids local sockets, the research harness uses actual HTTP request/response objects over in-memory Duplex streams; TCP latency remains **unvalidated**. Chrome startup failures are **skipped**, not passed. See [benchmark report](docs/bench-v0.1.md) and [implementation notes](docs/implementation-notes.md) for the exact environment limitations. The library does not include this harness.
 
 ## What it is NOT
 
