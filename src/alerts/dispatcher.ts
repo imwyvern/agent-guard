@@ -16,6 +16,7 @@ export class Dispatcher {
     private active = new Set<Promise<void>>();
     private queue: Array<() => Promise<void>> = [];
     private closed = false;
+    private scheduled = false;
     constructor(private config: AgentGuardConfig['alerts'], private emit: (event: AgentGuardEvent) => void) {
         this.channels = (config?.adapters ?? []).map(adapter => ({ adapter, count: 0, start: Date.now(), deduped: 0, limited: 0 }));
     }
@@ -47,7 +48,10 @@ export class Dispatcher {
             this.queue.push(() => this.deliver(channel.adapter, payload));
         }
         // Delivery starts in a microtask, after inspect has constructed its decision.
-        queueMicrotask(() => this.pump());
+        if (this.queue.length && !this.scheduled) {
+            this.scheduled = true;
+            queueMicrotask(() => { this.scheduled = false; this.pump(); });
+        }
     }
     private pump(): void {
         while (this.active.size < 8 && this.queue.length) {

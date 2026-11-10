@@ -98,7 +98,19 @@ export interface Resolver {
     reverse(ip: string): Promise<string[]>;
     resolve(host: string): Promise<string[]>;
 }
+/** Limits (all optional, finite nonnegative integers). Exhaustion skips/truncates inspection;
+ * it never denies a request. Byte budgets count UTF-8 bytes. */
+export interface InspectionLimits {
+    /** Default 8192 UTF-16 code units, before URL parsing. */ maxUrlLength?: number;
+    /** Default 100 header fields and 100 total value visits. */ maxHeaders?: number;
+    /** Default 16384 total header name/value bytes. */ maxHeaderBytes?: number;
+    /** Default 16384 body bytes/work units; overrides canaryScan.maxBodyBytes. */ maxBodyBytes?: number;
+    /** Default 64 candidate occurrences, including invalid and repeated tokens. */ maxCanaryCandidates?: number;
+    /** Default 100 query entries, including repeated parameters in URL parsing. */ maxQueryParams?: number;
+    /** Default 16384 total query name/value bytes. */ maxQueryBytes?: number;
+}
 export interface AgentGuardConfig {
+    /** Limits: safe defaults are documented on InspectionLimits. */ limits?: InspectionLimits;
     /** Required project label; no default. */ project: string;
     /** Required environment label; no default. */ env: string;
     /** Required; v0.1 only accepts detect. */ mode: 'detect';
@@ -125,7 +137,7 @@ export interface AgentGuardConfig {
         /** Default true. */ headers?: boolean;
         /** Default true. */ query?: boolean;
         /** Default /login and /api/auth/*; D5 is always scanned. */ bodyPaths?: string[];
-        /** Default 16384; larger parsed bodies are skipped. */ maxBodyBytes?: number;
+        /** Default 16384; bounds body traversal and UTF-8 bytes; limits.maxBodyBytes takes precedence. */ maxBodyBytes?: number;
     };
     crawler?: {
         /** Default true. */ verify?: boolean;
@@ -138,7 +150,7 @@ export interface AgentGuardConfig {
     allowlist?: {
         /** Default empty. */ ips?: string[];
         /** Default empty; IPv4 and IPv6 CIDRs. */ cidrs?: string[];
-        /** Default empty. */ uaPatterns?: RegExp[];
+        /** Default empty. Patterns outside the bounded subset (literal alternatives/groups, at most one repeated atom) are skipped. */ uaPatterns?: RegExp[];
         /** Default absent; exact match, never logged. */ headerToken?: {
             name: string;
             value: string;

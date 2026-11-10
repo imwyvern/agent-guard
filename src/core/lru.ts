@@ -5,7 +5,7 @@ export class LRU<K, V> {
         expires: number;
     }>();
     constructor(readonly capacity: number, private now: () => number = Date.now) {
-        if (capacity < 1)
+        if (!Number.isSafeInteger(capacity) || capacity < 1)
             throw new RangeError('capacity must be positive');
     }
     get size(): number { return this.entries.size; }

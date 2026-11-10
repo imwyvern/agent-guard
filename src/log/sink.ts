@@ -1,7 +1,8 @@
+import { sanitizeEvent } from '../core/security.js';
 import type { AgentGuardConfig, AgentGuardEvent } from '../types.js';
 import { severityRank } from '../alerts/dispatcher.js';
 export function logEvent(event: AgentGuardEvent, config: AgentGuardConfig): void {
-    const local = structuredClone(event);
+    const local = sanitizeEvent(event);
     if (config.log?.keepIp === false)
         delete local.req.ip;
     try {

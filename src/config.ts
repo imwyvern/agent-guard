@@ -19,6 +19,9 @@ export function validateConfig(c: AgentGuardConfig): void {
             throw new AgentGuardConfigError('decoy paths must be absolute paths without query/fragment');
     if (c.decoys?.basePath && !/^\/[a-zA-Z0-9/_-]+$/.test(c.decoys.basePath))
         throw new AgentGuardConfigError('invalid decoy basePath');
+    for (const n of Object.values(c.limits ?? {}))
+        if (n !== undefined && (!Number.isSafeInteger(n) || n < 0))
+            throw new AgentGuardConfigError('inspection limits must be nonnegative safe integers');
     for (const n of [c.crawler?.timeoutMs, c.canaryScan?.maxBodyBytes, c.alerts?.dedupeWindowSec, c.alerts?.ratePerMinute])
         if (n !== undefined && (!Number.isFinite(n) || n < 0))
             throw new AgentGuardConfigError('limits must be finite and nonnegative');

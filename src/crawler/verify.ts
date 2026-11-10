@@ -21,6 +21,7 @@ export const defaultResolver: Resolver = {
 };
 export class CrawlerVerifier {
     private cache = new LRU<string, CrawlerResult>(10000);
+    private dnsActive = 0;
     private pending = new Map<string, Promise<CrawlerResult>>();
     private ranges: Record<string, string[]>;
     constructor(private options: NonNullable<AgentGuardConfig['crawler']> = {}) {
@@ -33,6 +34,8 @@ export class CrawlerVerifier {
         const active = this.pending.get(key);
         if (active)
             return active;
+        if (this.pending.size >= 128)
+            return { claimed, verified: this.options.verify !== false && (this.options.failOpen ?? true), cache: false };
         const work = this.run(ip, claimed).then(result => { this.cache.set(key, result, result.verified ? 86400000 : 3600000); return result; }).finally(() => this.pending.delete(key));
         this.pending.set(key, work);
         return work;
@@ -43,6 +46,9 @@ export class CrawlerVerifier {
             return { ...base, verified: false };
         if ((this.ranges[claimed] ?? []).some(range => inCidr(ip, range)))
             return { ...base, verified: true };
+        if (this.dnsActive >= 128)
+            return { ...base, verified: this.options.failOpen ?? true };
+        this.dnsActive++;
         let timer: ReturnType<typeof setTimeout> | undefined;
         try {
             const resolver = this.options.resolver ?? defaultResolver;
@@ -50,16 +56,17 @@ export class CrawlerVerifier {
                 (async () => {
                     const hosts = await resolver.reverse(ip);
                     const suffixes = [...(crawlerPatterns.find(([name]) => name === claimed)?.[2] ?? []), ...(this.options.extraSuffixes?.[claimed] ?? [])];
-                    for (const host of hosts) {
+                    for (const host of hosts.slice(0, 16)) {
+                        if (host.length > 253) continue;
                         const normalized = host.toLowerCase().replace(/\.$/, '');
                         if (!suffixes.some(s => normalized === s || normalized.endsWith('.' + s)))
                             continue;
                         const addresses = await resolver.resolve(host), original = ipNumber(ip);
-                        if (original && addresses.some(a => { const parsed = ipNumber(a); return parsed?.bits === original.bits && parsed.value === original.value; }))
+                        if (original && addresses.slice(0, 64).some(a => { const parsed = ipNumber(a); return parsed?.bits === original.bits && parsed.value === original.value; }))
                             return { ...base, verified: true, rdns: normalized };
                     }
                     return { ...base, verified: false };
-                })(),
+                })().finally(() => { this.dnsActive--; }),
                 new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error('DNS timeout')), this.options.timeoutMs ?? 300); }),
             ]);
         }

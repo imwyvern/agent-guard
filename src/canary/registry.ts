@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto';
+import { secretEqual } from '../core/security.js';
 import { readFileSync } from 'node:fs';
 import { generateCanary, validatePrefix } from './format.js';
 import type { CanaryEntry, CanaryRegistry } from '../types.js';
@@ -18,25 +20,84 @@ export function loadRegistry(input: CanaryRegistry | string): CanaryRegistry {
 export class Registry {
     readonly data: CanaryRegistry;
     private tokens = new Map<string, CanaryEntry>();
-    private otherTokens: string[];
+    private nodes: Array<{ next: Map<string, number>; fail: number; output?: string; suffix: number }> = [
+        { next: new Map(), fail: 0, suffix: 0 },
+    ];
+    private fingerprint(token: string): string { return createHash('sha256').update(token).digest('hex'); }
+    private index(entry: CanaryEntry): void {
+        this.tokens.set(this.fingerprint(entry.token), entry);
+        // Modern candidates are parsed by fixed prefix/length, including rotated tokens.
+        const rest = entry.token.slice(this.data.prefix.length);
+        if (entry.token.startsWith(this.data.prefix) && rest.length === 19 && /^[0-9A-HJKMNP-TV-Z]{12}-[0-9A-HJKMNP-TV-Z]{6}$/.test(rest)) return;
+        let node = 0;
+        for (const char of entry.token) {
+            let child = this.nodes[node]!.next.get(char);
+            if (child === undefined) {
+                child = this.nodes.length;
+                this.nodes[node]!.next.set(char, child);
+                this.nodes.push({ next: new Map(), fail: 0, suffix: 0 });
+            }
+            node = child;
+        }
+        this.nodes[node]!.output = entry.token;
+    }
+    private link(): void {
+        const queue = [...this.nodes[0]!.next.values()];
+        for (let i = 0; i < queue.length; i++) {
+            const node = queue[i]!;
+            for (const [char, child] of this.nodes[node]!.next) {
+                let failure = this.nodes[node]!.fail;
+                while (failure && !this.nodes[failure]!.next.has(char)) failure = this.nodes[failure]!.fail;
+                failure = this.nodes[failure]!.next.get(char) ?? 0;
+                this.nodes[child]!.fail = failure;
+                this.nodes[child]!.suffix = this.nodes[failure]!.output ? failure : this.nodes[failure]!.suffix;
+                queue.push(child);
+            }
+        }
+    }
+    /** Aho–Corasick legacy matching: linear input traversal, bounded outputs. */
+    *candidates(text: string, budget: number): Generator<string> {
+        let offset = 0;
+        while (budget > 0) {
+            const at = text.indexOf(this.data.prefix, offset);
+            if (at < 0) break;
+            yield text.slice(at, at + this.data.prefix.length + 19);
+            budget--;
+            offset = at + this.data.prefix.length;
+        }
+        if (this.nodes.length === 1 || budget <= 0) return;
+        let node = 0;
+        for (const char of text) {
+            while (node && !this.nodes[node]!.next.has(char)) node = this.nodes[node]!.fail;
+            node = this.nodes[node]!.next.get(char) ?? 0;
+            let output = this.nodes[node]!.output ? node : this.nodes[node]!.suffix;
+            while (output) {
+                if (budget-- <= 0) return;
+                yield this.nodes[output]!.output!;
+                output = this.nodes[output]!.suffix;
+            }
+        }
+    }
     constructor(input: CanaryRegistry | string, private secret: string, prefix: string) {
         this.data = loadRegistry(input);
         if (this.data.prefix !== prefix)
             throw new Error('registry prefix does not match config');
         for (const entry of this.data.canaries)
-            this.tokens.set(entry.token, entry);
-        // Imported registries may contain legacy tokens without the current prefix.
-        this.otherTokens = this.data.canaries.filter(e => !e.token.includes(prefix)).map(e => e.token);
+            this.index(entry);
+        this.link();
     }
-    hasCandidate(text: string): boolean { return text.includes(this.data.prefix) || this.otherTokens.some(token => text.includes(token)); }
-    find(token: string): CanaryEntry | undefined { return this.tokens.get(token); }
+    hasCandidate(text: string): boolean { return !this.candidates(text, 1).next().done; }
+    find(token: string): CanaryEntry | undefined {
+        const entry = this.tokens.get(this.fingerprint(token));
+        return entry && secretEqual(token, entry.token) ? entry : undefined;
+    }
     placement(placement: string, env: string): CanaryEntry {
         const found = this.data.canaries.find(e => e.placement === placement && e.env === env);
         if (found)
             return found;
         const entry = { ...generateCanary({ secret: this.secret, prefix: this.data.prefix }), env, placement, createdAt: new Date().toISOString() };
         this.data.canaries.push(entry);
-        this.tokens.set(entry.token, entry);
+        this.index(entry);
         return entry;
     }
 }

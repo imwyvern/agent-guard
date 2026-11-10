@@ -1,4 +1,5 @@
-import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
+import { createHmac, randomBytes } from 'node:crypto';
+import { secretEqual } from '../core/security.js';
 import { base32 } from '../core/ulid.js';
 export const DEFAULT_PREFIX = 'AG-CANARY-';
 export function validatePrefix(prefix: string): void {
@@ -30,13 +31,14 @@ export function verifyCanary(token: string, o: {
     id?: string;
 } {
     const prefix = o.prefix ?? DEFAULT_PREFIX;
-    validatePrefix(prefix);
-    if (!token.startsWith(prefix))
+    if (typeof token !== 'string' || typeof prefix !== 'string' || typeof o.secret !== 'string') return { valid: false };
+    try { validatePrefix(prefix); } catch { return { valid: false }; }
+    if (token.length !== prefix.length + 19 || !token.startsWith(prefix))
         return { valid: false };
     const rest = token.slice(prefix.length);
     if (!/^[0-9A-HJKMNP-TV-Z]{12}-[0-9A-HJKMNP-TV-Z]{6}$/.test(rest))
         return { valid: false };
     const id = rest.slice(0, 12);
-    const valid = timingSafeEqual(Buffer.from(rest.slice(13)), Buffer.from(checksum(prefix, id, o.secret)));
+    const valid = secretEqual(rest.slice(13), checksum(prefix, id, o.secret));
     return valid ? { valid, id } : { valid };
 }
