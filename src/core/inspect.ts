@@ -1,4 +1,4 @@
-import type { AGDecision, AGRequest, AgentGuard, AgentGuardConfig, AgentGuardEvent, Severity } from '../types.js';
+import type { AGDecision, AgentGuard, AgentGuardConfig, AgentGuardEvent, Severity, UAClass } from '../types.js';
 import { validateConfig, guardConfigs } from '../config.js';
 import { Registry } from '../canary/registry.js';
 import { matchesPath, scanRequest } from '../canary/scan.js';
@@ -48,6 +48,9 @@ export function createAgentGuard(config: AgentGuardConfig): AgentGuard {
     const decoys = new Decoys(config, registry), crawler = new CrawlerVerifier(config.crawler), clients = new Clients(), metrics = new Metrics();
     const emit = (e: AgentGuardEvent): void => { metrics.event(e); logEvent(e, config); };
     const alerts = new Dispatcher(config.alerts, emit);
+    // A single-entry memo avoids repeated IP parsing/hash/UA classification on keep-alive
+    // traffic, without retaining another per-client cache alongside Clients.
+    let lastIp: string | undefined, lastUa: string | undefined, lastKey = '', lastClass: UAClass = 'unknown';
     let closed = false;
     const guard: AgentGuard = {
         async inspect(input): Promise<AGDecision> {
@@ -55,16 +58,27 @@ export function createAgentGuard(config: AgentGuardConfig): AgentGuard {
             try {
                 if (closed)
                     throw new Error('agent-guard is closed');
-                const headers: AGRequest['headers'] = {};
-                for (const [key, value] of Object.entries(input.headers))
-                    headers[key.toLowerCase()] = value;
-                const req = { ...input, path: input.path.split('?')[0]!, method: input.method.toUpperCase(), headers, ip: config.clientIp?.(input) ?? input.ip };
+                let headers = input.headers;
+                const headerNames = Object.keys(headers);
+                if (headerNames.some(key => key !== key.toLowerCase())) {
+                    headers = {};
+                    for (const key of headerNames)
+                        headers[key.toLowerCase()] = input.headers[key];
+                }
+                const queryAt = input.path.indexOf('?');
+                const req = { ...input, path: queryAt < 0 ? input.path : input.path.slice(0, queryAt), method: input.method.toUpperCase(), headers, ip: config.clientIp?.(input) ?? input.ip };
                 const ua = String(headers['user-agent'] ?? '').slice(0, 512), allow = config.allowlist;
                 const token = allow?.headerToken;
                 if (allow?.ips?.includes(req.ip) || allow?.cidrs?.some(c => inCidr(req.ip, c)) || allow?.uaPatterns?.some(p => { p.lastIndex = 0; return p.test(ua); }) || (token && headers[token.name.toLowerCase()] === token.value))
                     return { action: 'pass', events: [] };
-                const key = clientKey(req.ip, ua), state = clients.get(key), signals: string[] = [], events: AgentGuardEvent[] = [];
-                let uaClass = classifyUA(ua);
+                if (req.ip !== lastIp || ua !== lastUa) {
+                    lastKey = clientKey(req.ip, ua);
+                    lastClass = classifyUA(ua);
+                    lastIp = req.ip;
+                    lastUa = ua;
+                }
+                const key = lastKey, state = clients.get(key), signals: string[] = [], events: AgentGuardEvent[] = [];
+                let uaClass = lastClass;
                 if (uaClass === 'automation')
                     signals.push('ua_automation');
                 const id = decoys.match(req.path, req.method), probe = pathSignal(req.path);
@@ -72,12 +86,14 @@ export function createAgentGuard(config: AgentGuardConfig): AgentGuard {
                 const hits = scanRequest(req, registry, config, scanBody);
                 if (hits.length)
                     signals.push('canary_replay');
-                const make = (event: AgentGuardEvent['event'], severity: Severity): AgentGuardEvent => ({ v: 1, ts: new Date().toISOString(), event_id: ulid(), event, severity, project: config.project, env: config.env, req: { method: req.method, path: req.path, query_keys: Object.keys(req.query), ip: req.ip, client_key: key, ua, ua_class: uaClass, has_session: headers.cookie !== undefined }, score: state.score, signals: [...signals] });
-                const push = (event: AgentGuardEvent): void => { events.push(event); emit(event); alerts.enqueue(event); };
                 let verified: Awaited<ReturnType<CrawlerVerifier['verify']>> | undefined;
                 if (id) {
                     const claimed = claimedCrawler(ua);
                     if (claimed) {
+                        // Preserve the header snapshot across the only inspection await
+                        // that precedes use of request headers in a decoy response.
+                        headers = { ...headers };
+                        req.headers = headers;
                         verified = await crawler.verify(req.ip, claimed);
                         uaClass = verified.verified ? 'verified_crawler' : 'spoofed_crawler';
                         if (!verified.verified)
@@ -93,6 +109,10 @@ export function createAgentGuard(config: AgentGuardConfig): AgentGuard {
                     signals.push(probe === 'probe' ? 'probe_path' : 'ai_discovery_path');
                 state.score = Math.min(1023, state.score + signals.reduce((n, s) => n + (weights[s] ?? 0), 0));
                 clients.set(key, state.score, req.path === '/robots.txt', state.robots);
+                if (!id && signals.length === 0)
+                    return { action: 'pass', events };
+                const make = (event: AgentGuardEvent['event'], severity: Severity): AgentGuardEvent => ({ v: 1, ts: new Date().toISOString(), event_id: ulid(), event, severity, project: config.project, env: config.env, req: { method: req.method, path: req.path, query_keys: Object.keys(req.query), ip: req.ip, client_key: key, ua, ua_class: uaClass, has_session: headers.cookie !== undefined }, score: state.score, signals: [...signals] });
+                const push = (event: AgentGuardEvent): void => { events.push(event); emit(event); alerts.enqueue(event); };
                 for (const hit of hits)
                     push({ ...make('canary_replay', 'critical'), canary: { id: hit.entry.id, placement: hit.entry.placement, env: hit.entry.env, found_in: hit.found_in, field: hit.field } });
                 if (id && verified?.verified) {

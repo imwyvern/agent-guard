@@ -65,6 +65,12 @@ describe('bounded request scan', () => {
         expect(scanRequest(request('/', { headers: { x: invalid } }), r, c, false)).toEqual([]);
         expect(scanRequest(request('/', { headers: { x: entry.token } }), r, { ...c, canary: { ...c.canary, secret: 'rotated' } }, false)).toHaveLength(1);
     });
+    it('keeps exact legacy registry matches when the current prefix is absent', () => {
+        const legacy = { ...entry, token: 'LEGACY-ISSUED-TOKEN' };
+        const registry = new Registry({ ...r.data, canaries: [legacy] }, c.canary.secret, r.data.prefix);
+        expect(scanRequest(request('/', { headers: { ordinary: 'browser', secret: legacy.token } }), registry, c, false)[0]?.entry).toEqual(legacy);
+        expect(scanRequest(request('/AG-CANARY-malformed'), registry, c, false)).toEqual([]);
+    });
     it('honors disabled and bounded scans, cycles, undefined and non-string JSON', () => {
         const token = entry.token, cycle: Record<string, unknown> = {};
         cycle.self = cycle;

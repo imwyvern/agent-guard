@@ -36,6 +36,23 @@ it('client keys coarsen networks and support IPv4/IPv6 and CIDRs', () => {
     expect(redactIp('bad')).toBe('unknown');
     expect(clientKey('bad', 'a')).toHaveLength(16);
 });
+it('preserves client history across quiet passes and changes in the memoized IP/UA', async () => {
+    const guard = createAgentGuard(config());
+    const browser = 'Mozilla/5.0 Chrome/130.0.0.0 Safari/537.36';
+    const headers = { 'User-Agent': browser };
+    await guard.inspect(request('/robots.txt', { headers }));
+    expect(await guard.inspect(request('/?x=1', { headers }))).toEqual({ action: 'pass', events: [] });
+    await guard.inspect(request('/', { headers, ip: '198.51.100.2' }));
+    const hit = await guard.inspect(request('/.env', { headers }));
+    expect(hit.events[0]?.signals).toContain('robots_then_disallowed');
+    expect(hit.events[0]?.req.client_key).toBe(clientKey('192.0.2.1', browser));
+    expect(hit.events[0]?.req.ua_class).toBe('browser');
+    const curl = await guard.inspect(request('/.env'));
+    expect(curl.events[0]?.req.ua_class).toBe('automation');
+    expect(curl.events[0]?.signals).not.toContain('robots_then_disallowed');
+    expect(headers).toEqual({ 'User-Agent': browser });
+    await guard.close();
+});
 it('ULID, deterministic fake data, bounded lures', () => {
     expect(ulid()).toMatch(/^[0-9A-HJKMNP-TV-Z]{26}$/);
     expect(base32(new Uint8Array([255, 0]))).toBe('ZW00');

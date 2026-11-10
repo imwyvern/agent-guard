@@ -18,13 +18,17 @@ export function loadRegistry(input: CanaryRegistry | string): CanaryRegistry {
 export class Registry {
     readonly data: CanaryRegistry;
     private tokens = new Map<string, CanaryEntry>();
+    private otherTokens: string[];
     constructor(input: CanaryRegistry | string, private secret: string, prefix: string) {
         this.data = loadRegistry(input);
         if (this.data.prefix !== prefix)
             throw new Error('registry prefix does not match config');
         for (const entry of this.data.canaries)
             this.tokens.set(entry.token, entry);
+        // Imported registries may contain legacy tokens without the current prefix.
+        this.otherTokens = this.data.canaries.filter(e => !e.token.includes(prefix)).map(e => e.token);
     }
+    hasCandidate(text: string): boolean { return text.includes(this.data.prefix) || this.otherTokens.some(token => text.includes(token)); }
     find(token: string): CanaryEntry | undefined { return this.tokens.get(token); }
     placement(placement: string, env: string): CanaryEntry {
         const found = this.data.canaries.find(e => e.placement === placement && e.env === env);

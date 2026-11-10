@@ -1,6 +1,6 @@
 # agent-guard v0.1 local benchmark
 
-Generated 2026-11-10T10:20:43.835Z. Node v24.22.1; linux 6.12.113+ x64; Intel(R) Xeon(R) Processor; 8 logical CPUs.
+Generated 2026-11-10T10:58:25.234Z. Node v24.22.1; linux 6.12.113+ x64; Intel(R) Xeon(R) Processor; 8 logical CPUs.
 
 All requests target local demo listeners and a local signed webhook receiver; DNS is injected. No external sites are contacted. Raw results: bench/results/ (ignored). Medians use three runs.
 
@@ -20,7 +20,7 @@ All requests target local demo listeners and a local signed webhook receiver; DN
         "S4": 50,
         "S5": 50
       },
-      "requests": 6979,
+      "requests": 7223,
       "humanFalsePositives": 0,
       "verifiedFalsePositives": 0,
       "verified404": 100,
@@ -33,9 +33,9 @@ All requests target local demo listeners and a local signed webhook receiver; DN
       "invalidSignatures": 0,
       "alerts": 600,
       "alertLatencyMs": {
-        "p50": 2.3099739999997837,
-        "p95": 7.617757999999867,
-        "p99": 32.224678999999924
+        "p50": 1.8743949999998222,
+        "p95": 9.025605999999698,
+        "p99": 12.323093999999855
       }
     },
     {
@@ -48,7 +48,7 @@ All requests target local demo listeners and a local signed webhook receiver; DN
         "S4": 50,
         "S5": 50
       },
-      "requests": 7105,
+      "requests": 7094,
       "humanFalsePositives": 0,
       "verifiedFalsePositives": 0,
       "verified404": 100,
@@ -61,9 +61,9 @@ All requests target local demo listeners and a local signed webhook receiver; DN
       "invalidSignatures": 0,
       "alerts": 600,
       "alertLatencyMs": {
-        "p50": 1.650589000000764,
-        "p95": 5.042928999999276,
-        "p99": 8.86595699999998
+        "p50": 2.184473999999682,
+        "p95": 5.961912000000666,
+        "p99": 11.901676999999836
       }
     }
   ]
@@ -87,43 +87,43 @@ All requests target local demo listeners and a local signed webhook receiver; DN
         "on": [
           {
             "p50": 4,
-            "p99": 8
+            "p99": 9
           },
           {
             "p50": 4,
-            "p99": 8
+            "p99": 9
           },
           {
-            "p50": 4,
-            "p99": 7
+            "p50": 5,
+            "p99": 9
           }
         ],
         "off": [
           {
             "p50": 3,
-            "p99": 5
+            "p99": 7
           },
           {
             "p50": 3,
-            "p99": 5
+            "p99": 7
           },
           {
             "p50": 3,
-            "p99": 5
+            "p99": 7
           }
         ]
       },
       "off": {
         "p50": 3,
-        "p99": 5
+        "p99": 7
       },
       "on": {
         "p50": 4,
-        "p99": 8
+        "p99": 9
       },
       "delta": {
         "p50": 1,
-        "p99": 3
+        "p99": 2
       }
     },
     {
@@ -132,43 +132,43 @@ All requests target local demo listeners and a local signed webhook receiver; DN
         "on": [
           {
             "p50": 4,
-            "p99": 7
+            "p99": 10
+          },
+          {
+            "p50": 4,
+            "p99": 9
           },
           {
             "p50": 4,
             "p99": 8
-          },
-          {
-            "p50": 4,
-            "p99": 7
           }
         ],
         "off": [
           {
-            "p50": 2,
-            "p99": 4
+            "p50": 3,
+            "p99": 7
           },
           {
-            "p50": 2,
-            "p99": 4
+            "p50": 3,
+            "p99": 7
           },
           {
-            "p50": 2,
-            "p99": 4
+            "p50": 3,
+            "p99": 7
           }
         ]
       },
       "off": {
-        "p50": 2,
-        "p99": 4
+        "p50": 3,
+        "p99": 7
       },
       "on": {
         "p50": 4,
-        "p99": 7
+        "p99": 9
       },
       "delta": {
-        "p50": 2,
-        "p99": 3
+        "p50": 1,
+        "p99": 2
       }
     }
   ],
@@ -185,7 +185,7 @@ All requests target local demo listeners and a local signed webhook receiver; DN
 
 ```json
 {
-  "status": "skipped",
-  "reason": "Chrome cannot start in sandbox: [46:46:1110/020902.162651:ERROR:third_party/crashpad/crashpad/util/linux/socket.cc:45] setsockopt: Operation not permitted (1)"
+  "status": "failed",
+  "error": "expected five Lighthouse reports per URL"
 }
 ```

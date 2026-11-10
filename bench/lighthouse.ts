@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process';
-import { existsSync, openSync, closeSync, readFileSync, readdirSync, mkdirSync, writeFileSync } from 'node:fs';
+import { existsSync, openSync, closeSync, readFileSync, readdirSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { startDemo, demoConfig, realPaths } from '../examples/shared/site.js';
 import { socketFallback } from '../examples/shared/loopback.js';
@@ -65,6 +65,7 @@ export async function lighthouse() {
                             blockedUrlPatterns: ['https://*'], ...(form === 'desktop' ? { preset: 'desktop' } : { formFactor: 'mobile' }) }
                     } } }));
                     // Async child execution keeps the local demo event loop available to Chrome.
+                    rmSync('.lighthouseci', { recursive: true, force: true });
                     const result = await execute([process.execPath, 'node_modules/@lhci/cli/src/cli.js', 'collect', '--config=' + configuration], `bench/results/lhci-${kind}-${form}-${mode}.log`);
                     if (result.status !== 0 || result.error)
                         throw new Error('LHCI collect failed; see bench/results logs');
@@ -79,7 +80,8 @@ export async function lighthouse() {
                     });
                     scores[mode] = {};
                     for (const path of realPaths) {
-                        const selected = reports.filter(r => new URL(r.requestedUrl).pathname === path);
+                        const requestedUrl = new URL(path, url).href;
+                        const selected = reports.filter(r => new URL(r.requestedUrl).href === requestedUrl);
                         if (selected.length !== 5)
                             throw new Error('expected five Lighthouse reports per URL');
                         scores[mode][path] = Object.fromEntries(['performance', 'accessibility', 'best-practices', 'seo', 'lcp', 'tbt', 'cls'].map(key => [key, median(selected.map(r => key === 'lcp' ? r.audits['largest-contentful-paint']!.numericValue : key === 'tbt' ? r.audits['total-blocking-time']!.numericValue : key === 'cls' ? r.audits['cumulative-layout-shift']!.numericValue : r.categories[key]!.score * 100))])) as unknown as Scores;

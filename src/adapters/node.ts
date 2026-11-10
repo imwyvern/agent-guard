@@ -6,7 +6,12 @@ import { appendRobots } from '../lures/robots.js';
 export type ParsedRequest = IncomingMessage & {
     body?: unknown;
 };
+const plainPath = /^\/[A-Za-z0-9/_-]*$/;
 export function toRequest(req: ParsedRequest): AGRequest {
+    // Plain origin-form paths need neither URL normalization nor query parsing.
+    const target = req.url ?? '/';
+    if (plainPath.test(target) && !target.startsWith('//'))
+        return { method: req.method ?? 'GET', path: target, query: {}, headers: req.headers, ip: req.socket.remoteAddress ?? '', body: req.body };
     const url = new URL(req.url ?? '/', 'http://local.invalid'), query: AGRequest['query'] = {};
     for (const key of new Set(url.searchParams.keys())) {
         const values = url.searchParams.getAll(key);
@@ -17,7 +22,8 @@ export function toRequest(req: ParsedRequest): AGRequest {
 function isGuard(value: AgentGuard | AgentGuardConfig): value is AgentGuard { return 'inspect' in value; }
 /** Transform only explicitly opted-in response paths. Streaming is untouched elsewhere. */
 export function installLures(req: ParsedRequest, res: ServerResponse, guard: AgentGuard, config?: AgentGuardConfig): void {
-    const path = (req.url ?? '/').split('?')[0]!;
+    const url = req.url ?? '/', queryAt = url.indexOf('?');
+    const path = queryAt < 0 ? url : url.slice(0, queryAt);
     const robots = path === '/robots.txt' && config?.lures?.robots === 'append';
     const llms = path === '/llms.txt' && config?.lures?.llmsTxt;
     const comment = guard.htmlCommentFor(path);
@@ -109,19 +115,21 @@ export function agentGuardNode(configOrGuard: AgentGuardConfig | AgentGuard): (r
     const config = isGuard(configOrGuard) ? guardConfigs.get(configOrGuard) : configOrGuard, guard = isGuard(configOrGuard) ? configOrGuard : createAgentGuard(configOrGuard);
     return (req, res, next) => {
         void guard.inspect(toRequest(req)).then(decision => {
-            if (decision.action === 'pass') {
-                installLures(req, res, guard, config);
-                next();
-                return;
-            }
-            // Delegate a verified crawler to the host's native not-found handler.
-            if (decision.events.some(e => e.event === 'crawler_bypass')) {
-                next();
-                return;
-            }
-            res.writeHead(decision.response.status, decision.response.headers);
-            res.end(decision.response.body);
-        }).catch(() => next());
+            try {
+                if (decision.action === 'pass') {
+                    installLures(req, res, guard, config);
+                    next();
+                    return;
+                }
+                // Delegate a verified crawler to the host's native not-found handler.
+                if (decision.events.some(e => e.event === 'crawler_bypass')) {
+                    next();
+                    return;
+                }
+                res.writeHead(decision.response.status, decision.response.headers);
+                res.end(decision.response.body);
+            } catch { next(); }
+        }, () => next());
     };
 }
 /** Body parsing belongs to the host; wrap accepts req.body without consuming its stream. */
