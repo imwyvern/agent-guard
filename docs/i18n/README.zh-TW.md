@@ -1,6 +1,19 @@
 # agent-guard
 
+An AI-agent honeypot middleware for Node and the edge.
+
+（面向 Node 與邊緣執行環境的 AI agent 蜜罐中介軟體。）
+
 [English](../../README.md) | [简体中文](README.zh-CN.md) | [繁體中文](README.zh-TW.md) | [日本語](README.ja.md) | [한국어](README.ko.md) | [Español](README.es.md)
+
+## 為什麼需要它
+
+- AI agent 和掃描器會探測 API、讀取 `.env`，並重放它們找到的憑證。
+- 隔離的誘餌路由和惰性金絲雀憑證用於偵測這類探測與重放。
+- 預設僅偵測並警示：中介軟體記錄事件並傳送非同步警示，不會阻擋、節流或反擊。
+- 零執行期相依；Express 與 Hono 為可選 peer。目前面向 Node ≥20；邊緣執行環境已列入路線圖。
+
+**它是什麼 / 不是什麼。** agent-guard 用於偵測、誘捕並觀察針對你的 API 的敵對或探測性 AI agent 流量。它不會反擊或攻擊任何人。完整的非目標清單見[它不是什麼](#它不是什麼)。
 
 面向 Node ≥20 的 HTTP 中介軟體：五條隔離的誘餌路由與惰性金絲雀憑證，用於偵測憑證重放與探索式掃描。它會記錄事件並發送非同步警示。執行期相依套件為零；Express 為可選 peer。Apache-2.0，著作權 2026 Wesley Wang。
 
@@ -221,10 +234,11 @@ curl -s -H "Authorization: Bearer $TOKEN" http://127.0.0.1:3000/api/internal/adm
 
 ## 它不是什麼
 
-它不是 WAF、DDoS 防禦、驗證系統、機器人封鎖器、正式環境部署，也不保證搜尋引擎行為。沒有自動封鎖、流量節流、trap 模式、迷宮、反向提示注入、出站探測、真實廠商憑證，或第三方回呼 honeytoken。Slack/Telegram/Feishu/email 以及 Edge/Fastify/Hono 轉接器仍屬後續工作。機械計時和 Prometheus 端點是可選的設計構想，在 v0.1 中未啟用。
+它不是 WAF、DDoS 防禦、驗證系統、機器人封鎖器、正式環境部署，也不保證搜尋引擎行為。沒有自動封鎖、流量節流、trap 模式、迷宮、反向提示注入、出站探測、真實廠商憑證，或第三方回呼 honeytoken。Slack/Telegram/Feishu/email 以及 Edge/Fastify 轉接器仍屬後續工作。Hono 轉接器已面向 Node ≥20 提供。機械計時和 Prometheus 端點是可選的設計構想，在 v0.1 中未啟用。
 
 ## 路線圖與設計文件
 
+- [社群參與](../community.md) — 如何貢獻轉接器、偵測特徵、譯本和 RFC。
 - [路線圖](../roadmap.md) — 規劃中的 v0.3/v0.4 工作。Exhaust 與 Deception 目前是設計草案，預設關閉。
 - [Exhaust](../exhaust.md) — 對已確認惡意工作階段的有界成本施加（延遲、迷宮、上下文消耗）。
 - [Deception](../deception.md) — 提高誘餌資料的可信度，讓攻擊者的 agent 可能把它當成真實資料。

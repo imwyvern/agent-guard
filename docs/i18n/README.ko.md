@@ -1,6 +1,19 @@
 # agent-guard
 
+An AI-agent honeypot middleware for Node and the edge.
+
+(Node와 엣지를 위한 AI 에이전트 허니팟 미들웨어.)
+
 [English](../../README.md) | [简体中文](README.zh-CN.md) | [繁體中文](README.zh-TW.md) | [日本語](README.ja.md) | [한국어](README.ko.md) | [Español](README.es.md)
+
+## 왜 필요한가
+
+- AI agent와 스캐너는 API를 탐색하고, `.env`를 읽으며, 발견한 자격 증명을 재사용합니다.
+- 격리된 디코이 라우트와 비활성 카나리아 자격 증명이 그러한 탐색과 재사용을 탐지합니다.
+- 기본값은 탐지와 알림뿐입니다. 미들웨어는 이벤트를 기록하고 비동기 알림을 보내며, 차단하거나 제한하거나 보복하지 않습니다.
+- 런타임 의존성은 없습니다. Express와 Hono는 선택적 peer입니다. 현재는 Node ≥20를 지원하며, 엣지 런타임은 로드맵에 있습니다.
+
+**이것이 하는 일 / 하지 않는 일.** agent-guard는 API를 향한 적대적이거나 탐색적인 AI agent 트래픽을 탐지하고, 유인하며, 관찰합니다. 역공하거나 누구를 공격하지 않습니다. 자세한 내용은 [이것이 아닌 것](#이것이-아닌-것)을 참고하세요.
 
 Node ≥20용 HTTP 미들웨어입니다. 격리된 다섯 개의 디코이 라우트와 비활성 카나리아 자격 증명으로 자격 증명 재사용(replay)과 탐색적 스캔을 탐지합니다. 이벤트를 기록하고 비동기로 알림을 보냅니다. 런타임 의존성은 없으며, Express는 선택적 peer입니다. Apache-2.0, 저작권 2026 Wesley Wang.
 
@@ -221,10 +234,11 @@ v0.3b부터 `npm run bench:exhaust-sim`은 스크립트화된 탐욕 agent를 �
 
 ## 이것이 아닌 것
 
-WAF, DDoS 방어, 인증 시스템, 봇 차단기, 프로덕션 배포, 검색 엔진 동작에 대한 보장이 아닙니다. 자동 차단, 트래픽 제한, trap 모드, 미로, 리버스 프롬프트 인젝션, 외부 프로빙, 실제 벤더 자격 증명, 제3자 콜백 honeytoken은 없습니다. Slack/Telegram/Feishu/email과 Edge/Fastify/Hono 어댑터는 이후 작업으로 남아 있습니다. 기계적 타이밍과 Prometheus 엔드포인트는 선택적 설계 아이디어이며 v0.1에서는 활성화되어 있지 않습니다.
+WAF, DDoS 방어, 인증 시스템, 봇 차단기, 프로덕션 배포, 검색 엔진 동작에 대한 보장이 아닙니다. 자동 차단, 트래픽 제한, trap 모드, 미로, 리버스 프롬프트 인젝션, 외부 프로빙, 실제 벤더 자격 증명, 제3자 콜백 honeytoken은 없습니다. Slack/Telegram/Feishu/email과 Edge/Fastify 어댑터는 이후 작업으로 남아 있습니다. Hono 어댑터는 이미 Node ≥20용으로 제공됩니다. 기계적 타이밍과 Prometheus 엔드포인트는 선택적 설계 아이디어이며 v0.1에서는 활성화되어 있지 않습니다.
 
 ## 로드맵 및 설계 문서
 
+- [커뮤니티](../community.md) — 어댑터, 탐지 시그니처, 번역, RFC 기여 방법.
 - [로드맵](../roadmap.md) — 계획 중인 v0.3/v0.4 작업입니다. Exhaust와 Deception은 설계 초안이며 기본값은 꺼짐입니다.
 - [Exhaust](../exhaust.md) — 확인된 악성 세션에 대한 유계 비용 부과(지연, 미로, 컨텍스트 소모).
 - [Deception](../deception.md) — 디코이 데이터의 신뢰도를 높여 공격자의 agent가 이를 실제 데이터로 여길 수 있게 합니다.

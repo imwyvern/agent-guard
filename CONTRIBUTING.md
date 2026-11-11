@@ -2,9 +2,11 @@
 
 agent-guard is an open-source research project. Discuss substantial changes in an issue before implementation, and review the [roadmap](docs/roadmap.md), its [charter and non-goals](docs/roadmap.md#6-明确不做non-goals延续-charter), and the [design](docs/design.md). Report vulnerabilities through the [security policy](SECURITY.md).
 
+The [community guide](docs/community.md) describes contribution paths (adapters, signatures, translations, roadmap persona packs), the RFC process for core or safety-line changes, labels, and the review checklist.
+
 ## Development setup
 
-Use Node.js **20 or newer** and npm. CI checks Node.js 20 and 22.
+Use Node.js **20 or newer** and npm. Validate locally with `npm run build`, `npm run typecheck`, `npm run lint`, and `npm test`.
 
 ```sh
 git clone https://github.com/imwyvern/agent-guard.git
@@ -15,7 +17,7 @@ npm run lint
 npm test
 ```
 
-Add focused tests for behavior changes and update relevant documentation and `CHANGELOG.md`. Translations live in `docs/i18n/` and should be updated when `README.md` changes. Keep changes small enough to review. Benchmarks and Lighthouse are separate local research tools and are not part of the regular CI checks.
+Add focused tests for behavior changes and update relevant documentation and `CHANGELOG.md`. Translations live in `docs/i18n/` and should be updated when `README.md` changes. Keep changes small enough to review. Benchmarks and Lighthouse are optional local research tools and are not required for every change.
 
 Open a pull request describing the problem, the resulting behavior, and the validation performed. Use concise imperative commit subjects in the existing `type: description` style, for example `fix: reject forged canary checksums`, `test: cover crawler bypass`, or `docs: clarify setup`.
 
@@ -31,7 +33,7 @@ Open a pull request describing the problem, the resulting behavior, and the vali
 
 ## Original work and licensing
 
-The project is licensed under [Apache-2.0](LICENSE). By contributing, you agree to license your contributions under the same terms and confirm you have the right to submit them. A DCO sign-off (`git commit -s`) is welcome but optional.
+The project is licensed under [Apache-2.0](LICENSE). By contributing, you agree to license your contributions under the same terms and confirm you have the right to submit them. A DCO sign-off (`git commit -s`) is welcome but optional; there is no DCO requirement or check.
 
 Write original code. Do not copy, vendor, or fork code from other projects, including GPL projects such as Beelzebub. Prior art may inform concepts; cite it when useful and implement independently. Do not submit code or assets with incompatible licensing or without permission to contribute them.
 

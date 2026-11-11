@@ -1,6 +1,19 @@
 # agent-guard
 
+An AI-agent honeypot middleware for Node and the edge.
+
+(Un middleware honeypot para agentes de IA en Node y el edge.)
+
 [English](../../README.md) | [简体中文](README.zh-CN.md) | [繁體中文](README.zh-TW.md) | [日本語](README.ja.md) | [한국어](README.ko.md) | [Español](README.es.md)
+
+## Por qué
+
+- Los agentes de IA y los escáneres exploran las API, leen archivos `.env` y reutilizan las credenciales que encuentran.
+- Las rutas señuelo aisladas y las credenciales canario inertes detectan esa exploración y reutilización.
+- Por defecto solo detecta y alerta: el middleware registra eventos y envía alertas de forma asíncrona; no bloquea, limita ni toma represalias.
+- Cero dependencias de tiempo de ejecución; Express y Hono son peers opcionales. Hoy funciona en Node ≥20; los runtimes de edge están en la hoja de ruta.
+
+**Qué es y qué no es.** agent-guard detecta, atrae y observa el tráfico de agentes de IA hostiles o exploratorios que llegan a tus API. No contraataca ni ataca a nadie. La lista completa de no objetivos está en [Lo que NO es](#lo-que-no-es).
 
 Middleware HTTP para Node ≥20: cinco rutas señuelo aisladas y credenciales canario inertes detectan la reutilización de credenciales y el escaneo exploratorio. Registra eventos y envía alertas asíncronas. Cero dependencias de runtime; Express es un peer opcional. Apache-2.0, copyright 2026 Wesley Wang.
 
@@ -221,10 +234,11 @@ Desde v0.3b, `npm run bench:exhaust-sim` ejecuta en memoria una simulación de r
 
 ## Lo que NO es
 
-Un WAF, una defensa DDoS, un sistema de autenticación, un bloqueador de bots, un despliegue en producción ni una garantía del comportamiento de los buscadores. No hay bloqueo automático, limitación de tráfico, modo trap, laberinto, inyección inversa de indicaciones, sondeo de salida, credencial real de un proveedor ni honeytoken de devolución de llamada de terceros. Slack/Telegram/Feishu/email y los adaptadores Edge/Fastify/Hono siguen siendo trabajo futuro. El temporizado mecánico y un endpoint de Prometheus son ideas de diseño opcionales y no están habilitados en v0.1.
+Un WAF, una defensa DDoS, un sistema de autenticación, un bloqueador de bots, un despliegue en producción ni una garantía del comportamiento de los buscadores. No hay bloqueo automático, limitación de tráfico, modo trap, laberinto, inyección inversa de indicaciones, sondeo de salida, credencial real de un proveedor ni honeytoken de devolución de llamada de terceros. Slack/Telegram/Feishu/email y los adaptadores Edge/Fastify siguen siendo trabajo futuro. Un adaptador de Hono ya se distribuye para Node ≥20. El temporizado mecánico y un endpoint de Prometheus son ideas de diseño opcionales y no están habilitados en v0.1.
 
 ## Hoja de ruta y documentos de diseño
 
+- [Comunidad](../community.md) — cómo contribuir adaptadores, firmas de detección, traducciones y RFC.
 - [Hoja de ruta](../roadmap.md) — trabajo previsto para v0.3/v0.4. Exhaust y Deception son borradores de diseño y permanecen desactivados por defecto.
 - [Exhaust](../exhaust.md) — imposición de coste acotada (retraso, laberinto, consumo de contexto) sobre sesiones maliciosas confirmadas.
 - [Deception](../deception.md) — hacer que los datos señuelo resulten creíbles para que el agente del atacante pueda tratarlos como reales.

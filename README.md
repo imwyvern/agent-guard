@@ -1,6 +1,17 @@
 # agent-guard
 
+An AI-agent honeypot middleware for Node and the edge.
+
 [English](README.md) | [简体中文](docs/i18n/README.zh-CN.md) | [繁體中文](docs/i18n/README.zh-TW.md) | [日本語](docs/i18n/README.ja.md) | [한국어](docs/i18n/README.ko.md) | [Español](docs/i18n/README.es.md)
+
+## Why
+
+- AI agents and scanners probe APIs, read `.env` files, and replay credentials they find.
+- Isolated decoy routes and inert canary credentials detect that exploration and replay.
+- Detection is alert-only by default: the middleware records events and sends asynchronous alerts; it does not block, throttle, or retaliate.
+- Zero runtime dependencies, with optional Express and Hono peers. It ships for Node ≥20 today; edge runtimes are on the roadmap.
+
+**What it is / is not.** agent-guard detects, traps, and observes hostile or exploratory AI-agent traffic on your APIs. It does not hack back or attack anyone. See [What it is NOT](#what-it-is-not) for the full list of non-goals.
 
 HTTP middleware for Node ≥20: five isolated decoy routes and inert canary credentials detect credential replay and exploratory scanning. It records events and sends asynchronous alerts. Zero runtime dependencies; optional Express peer. Apache-2.0, copyright 2026 Wesley Wang.
 
@@ -221,10 +232,11 @@ From v0.3b, `npm run bench:exhaust-sim` runs an in-memory cost-ratio simulation 
 
 ## What it is NOT
 
-A WAF, DDoS defense, authentication system, bot blocker, production deployment, or guarantee of search-engine behavior. There is no auto-block, traffic throttling, trap mode, maze, reverse prompt injection, outbound probing, real vendor credential, or third-party callback honeytoken. Slack/Telegram/Feishu/email and Edge/Fastify/Hono adapters remain future work. Mechanical timing and a Prometheus endpoint are optional design ideas and are not enabled in v0.1.
+A WAF, DDoS defense, authentication system, bot blocker, production deployment, or guarantee of search-engine behavior. There is no auto-block, traffic throttling, trap mode, maze, reverse prompt injection, outbound probing, real vendor credential, or third-party callback honeytoken. Slack/Telegram/Feishu/email and Edge/Fastify adapters remain future work. A Hono adapter already ships for Node ≥20. Mechanical timing and a Prometheus endpoint are optional design ideas and are not enabled in v0.1.
 
 ## Roadmap & design docs
 
+- [Community](docs/community.md) — how to contribute adapters, signatures, translations, and RFCs.
 - [Roadmap](docs/roadmap.md) — planned v0.3/v0.4 work. Exhaust and Deception are design drafts and stay off by default.
 - [Exhaust](docs/exhaust.md) — bounded cost imposition (delay, maze, context burn) for confirmed-malicious sessions.
 - [Deception](docs/deception.md) — making decoy data believable so an attacker’s agent may treat it as real.
