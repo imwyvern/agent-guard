@@ -91,7 +91,6 @@ agent-guard/
 ├─ test/{unit,integration,acceptance,fixtures,bench}/
 ├─ examples/{express-basic,fastify-basic,hono-basic}/
 ├─ docs/{threat-model,kpi,design,codex-contract,repo-proposal}.md
-├─ .github/workflows/ci.yml        # 首次公开前加：lint/typecheck/test/canary scan
 ├─ README.md  CHANGELOG.md  LICENSE  NOTICE  SECURITY.md  CONTRIBUTING.md
 └─ package.json  tsconfig.json  tsup.config.ts  vitest.config.ts
 ```

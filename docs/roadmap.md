@@ -36,7 +36,7 @@
 | 2.3 | **ReDoS audit** | UA / path / canary 正则全在 hot path | 改写正则改变匹配语义 → 回归测试 | `docs/security-review.md` 列出每个 RegExp 的风险与处理；100k 字符对抗输入 < 50 ms |
 | 2.4 | **Header / log injection 安全** | path、UA、canary id 会进日志、告警和响应头 | 过度清洗影响取证 → 只去控制字符 + 截断，原值长度记录 | CR/LF/控制字符被剥离；单测 |
 | 2.5 | **Property / fuzz tests**（canary parser、request inspector、sanitizer） | 覆盖手写用例想不到的输入 | 测试时间变长 → 固定 seed、限制迭代数 | 永不 throw、round-trip、篡改必拒、时间有上界 |
-| 2.6 | **Repo hygiene**：`SECURITY.md`、`CONTRIBUTING.md`、issue/PR templates、GitHub Actions CI（build/lint/test，Node 20/22）、CodeQL、Dependabot（npm + actions） | 公开仓库的基本盘；OpenSSF Scorecard 的前置条件 | Actions 权限过大 → `permissions: contents: read`，actions 固定 SHA | main 上 CI 绿；CodeQL 有结果；Dependabot 配置生效 |
+| 2.6 | **Repo hygiene**：`SECURITY.md`、`CONTRIBUTING.md`、issue/PR templates、Dependabot（npm）；不使用 GitHub Actions CI/CodeQL（Dan 决定，改为本地 `npm test`/lint 验证） | 公开仓库的基本盘；OpenSSF Scorecard 的前置条件 | — | 本地测试全绿；Dependabot 配置生效 |
 | 2.7 | **Hono adapter**（Node 上验证，`@imwyvern/agent-guard/hono`） | Hono 基于 Web 标准，是走向 Workers / Bun / Deno 的跳板 | core 仍依赖 `node:crypto` → v0.2 先限定 Node runtime，v0.3 再做 WebCrypto core | AC 主要用例（真人不触发、curl replay 必告警、Googlebot 不进 decoy）在 Hono 上通过 |
 | 2.8 | **MCP / LLM tool endpoint decoy 示例** | MCP over HTTP 是 2026 年 agent 扫描的新热点 | decoy tool description 自身成为 tool poisoning → description 必须是中性描述、无 imperative、无隐藏字符，并有测试守护 | 示例 app 暴露一个 JSON-RPC `/mcp`：`tools/list` 含 decoy tool，调用即告警，返回 plausible permission error；canary inert；verified crawler 不进入 |
 | 2.9 | **AC-10 测量修正** | autocannon 只给整数毫秒 percentile，p50 ≤ 0.2 ms 的门槛无法被它判定 | 换测量方法可能被视为"放水" → 原 autocannon 数据照常记录，新方法另列，诚实写清 | 新增 `process.hrtime.bigint()` 级别的高分辨率测量（in-process 和 loopback 两种），报告 µs 级 p50/p99 增量并写入 `docs/bench-v0.2.md` |
