@@ -11,7 +11,7 @@ An AI-agent honeypot middleware for Node and the edge.
 - AI エージェントとスキャナは API を探索し、`.env` を読み、見つけた認証情報をリプレイします。
 - 隔離されたデコイルートと不活性なカナリア認証情報により、そのような探索とリプレイを検出します。
 - 既定は検出とアラートのみです。ミドルウェアはイベントを記録し、非同期でアラートを送りますが、遮断・制限・反撃はしません。
-- ランタイム依存関係はゼロです。Express と Hono はオプションの peer です。現在は Node ≥20 向けで、エッジランタイムはロードマップ上にあります。
+- ランタイム依存関係はゼロです。Express、Hono、Fastify、Koa はオプションの peer です。現在は Node ≥20 向けで、エッジランタイムはロードマップ上にあります。
 
 **対象と非対象。** agent-guard は、API に向かう敵対的または探索的な AI エージェントのトラフィックを検出・誘捕・観測します。反撃したり、誰かを攻撃したりはしません。詳細は[対象外であること](#対象外であること)を参照してください。
 
@@ -112,6 +112,10 @@ serve({ fetch: app.fetch, hostname: '127.0.0.1', port: 3000 });
 
 検出は引き続きアラートのみです。カナリアリプレイはホストへ進み、デコイには noindex/no-store ヘッダーが付き、検証済みクローラーはホスト固有の欠落ルートハンドラーに到達します。オプトインの robots/HTML/llms 変換は、既存の 1 MiB バッファ上限を維持します。`npm run demo:hono` を実行してください（`PORT` と `AGENT_GUARD=off` は他のカタログデモと同じように動作します）。Hono は Express および Node と同じ共有受け入れスイートを実行します。
 
+## Fastify と Koa（Node ランタイム）
+
+v0.3a（未リリース）では `@imwyvern/agent-guard/fastify` と `@imwyvern/agent-guard/koa` の `agentGuard` を追加し、同じ guard または config を受け取ります。Fastify はルートより前に `await app.register(agentGuard(guard))` で登録します。ボディ解析後の `preHandler` で検査します。Koa はサイズ制限付きボディパーサーの後に `app.use(agentGuard(guard))` を配置します。どちらもリクエストストリームを消費せず、ホスト固有のクローラー向け 404、アラートのみのリプレイ検出、オプトインの lure 変換を保ちます。フレームワークはオプションの peer で、コアのランタイム依存関係は増えません。[Fastify デモ](../../examples/fastify-demo/server.ts)、[Koa デモ](../../examples/koa-demo/server.ts)、[アダプターガイド](../community.md)を参照してください。エッジランタイムは引き続きロードマップ上の作業です。
+
 ## MCP / LLM ツールエンドポイントのデコイ
 
 ```sh
@@ -126,6 +130,12 @@ curl -s http://127.0.0.1:3000/mcp -H 'Content-Type: application/json' \
 
 ルートは `mcpDecoyTools`、`inspectMcpRequest(guard, request, toolName?)`、`lintMcpDecoyDescription` をエクスポートします。有界パースの後にヘルパーを一度呼び、ツール名は `tools/call` のときだけ渡してください。`crawler_bypass` はホスト固有の 404 として扱います。この例では発見にも同じ処理を適用するため、検証済みクローラーがデコイツールを見ることはありません。すべての MCP JSON レスポンスは noindex/no-store です。組み込みの説明は中立なデータであり、テストは命令的な言い回し、URL、隠し文字を拒否します。この例は限定的な HTTP シナリオであり、完全な MCP Streamable HTTP、セッション、SSE は含みません。OWASP MCP01/MCP08 の脅威マッピング、スキーマの詳細、統合の境界については、[MCP シナリオと安全ルール（中文）](../scenarios/mcp.md) を参照してください。
 
+## GraphQL と API 専用シナリオ
+
+v0.3a は `graphqlDecoys()` と `inspectGraphqlRequest(guard, request)` をエクスポートします。返されたフィールド/型のメタデータをホストのスキーマに加え、introspection に `internalAdminUsers` を表示し、有界なボディ解析後、実行前に一度検査します。デコイが選択されると `decoy_hit`（`decoy.id: "GQL"`）を発行し、noindex/no-store 付きの標準 GraphQL `FORBIDDEN` エラーを返します。そのリクエストでは実際の resolver を実行しません。デコイ自体にも不活性なエラー resolver を設定してください。通常のクエリは通過し、不正または上限超過のクエリはホストの検証器に委譲します。検証済みクローラーはホスト固有の 404 に進みます。[GraphQL デモ](../../examples/graphql-demo/server.ts)を参照し、`npm run demo:graphql` を実行してください。
+
+HTML のない API については [API 専用ガイド](../scenarios/api-only.md)を参照してください。OpenAPI の `example`、デコイエラーの `docs_url`、隔離された `/.well-known/` ファイルへの不活性カナリア配置と、SDK やドキュメントクライアントの誤検出の境界を説明します。
+
 ## 設定
 
 公開フィールドすべてのデフォルトは [src/types.ts](../../src/types.ts) に記載されています。必須フィールドは `project`、`env`、`mode: 'detect'`、`projectSeed`、および `canary.secret`/`canary.registry` です。
@@ -134,6 +144,7 @@ curl -s http://127.0.0.1:3000/mcp -H 'Content-Type: application/json' \
 | --- | --- |
 | `canary.prefix` | `AG-CANARY-`；パターン `^[A-Z][A-Z0-9]{1,15}-CANARY-$` |
 | `canary.registry` | 必須の version-1 オブジェクトまたは JSON パス。secret は格納されない |
+| `incident.windowMs` | 900000；固定 15 分の相関窓、0 で無効化；メタデータのみ |
 | `decoys.enabled` | D1–D5；`/.env` エイリアス、admin サブツリー、ops notes、OpenAPI、偽ログイン |
 | `decoys.basePath` | `/api/internal` |
 | `decoys.paths` / `siteName` | 任意のパス上書き / `.invalid` メールドメイン |
@@ -158,6 +169,12 @@ curl -s http://127.0.0.1:3000/mcp -H 'Content-Type: application/json' \
 `guard.robotsLines()` は手動の robots 統合を支援します。`guard.htmlCommentFor(path)` はオプトインコメントまたは null を返します。`guard.metrics()` はリクエスト/イベント/配送の件数と、有界な直近 inspect タイミング分位数を返します。スコアはインスタンスごとの有界な観測値であり、強制には使いません。クライアント状態：50k エントリ、30 分のアイドル TTL。クローラーキャッシュ：10k、陽性 24h / 陰性 1h。転送ヘッダーは自動的には信頼されません。
 
 D5 は常にログインを拒否し、決定的な 300–600ms の遅延を伴います。すべてのデコイは `noindex`、`no-store`、≤8KiB で、`.invalid` ホスト名のみを使い、cookie の作成、認証、業務サービス呼び出しは行いません。申告済み AI クローラーのデコイヒットは重大度 `info` です。検索クローラーの DNS 検査はデコイルート上でのみ行われます。エラー/タイムアウトは fail open し、ネイティブ 404 になります。
+
+## インシデント相関とカナリア伝播追跡
+
+v0.3a は同じ `client_key` の既存イベントに任意の `incident` を付加します。フィールドは `id`、順序付き `sequence`（例：`robots → D1 → D2`）、`first_seen`、`last_seen`、`confidence` です。`incident.windowMs` の既定値は 900000（最初の観測から固定 15 分）、0 は相関を無効化します。状態は 50k クライアントの LRU に収め、直近 32 観測を保持します。単独ヒットの反復は low、異なるデコイまたは発見とデコイの組み合わせは medium、`canary_replay` は high に上げます。同じ窓内で確信度は下がりません。robots の訪問は内部マーカーで、イベント型を追加しません。共有ネットワークではクライアントが統合され得ます。相関は観測情報の補足のみで、重大度、HTTP 応答、クローラーバイパス、デコイ判断を変更しません。`mode` は引き続き `detect` のみです。
+
+リプレイアラートは `canary.id`、`placement`、`env`、`found_in`、`field` を保ち、`leaked_at`（配置）、`replayed_at`（パス）、`dwell_ms`（最初のデコイ配信からの時間）、`client_keys_seen`（異なるリプレイクライアントキー数、最大 8）を追加します。返すデコイボディにトークンが含まれる場合だけ配信を記録し、HEAD とクローラーバイパスは数えません。追跡はプロセス内のみで、50k 件の LRU と 24 時間 TTL を使います。追い出し、再起動、組み込みデコイ以外での配信では時刻が不明となり、`dwell_ms` を省略します。これらの観測は身元や悪意の証明にはなりません。
 
 ## アラートと署名
 
@@ -185,7 +202,10 @@ node dist/cli/main.js canary list
 node dist/cli/main.js canary scan ./config
 node dist/cli/main.js canary scan ./config --registry agent-guard.canaries.json
 node dist/cli/main.js report --since 7d ./events.jsonl
+node dist/cli/main.js lint ./config
 ```
+
+`agent-guard lint <path>`（または上記のビルド済み CLI）は、組み込みデコイ/lure 出力と配置ファイルの命令表現、隠し文字、予約外 URL ホスト、実在ベンダーのキー接頭辞を検査します。違反は終了コード 1、用法エラーは 2 です。配置の安全性を検査するもので、意図しないトークン漏洩は別途 `canary scan` で検査します。
 
 レジストリ作成時、`canary new` は `--prefix ACME-CANARY-` と `--registry <file>` も受け付けます。正規プレフィックスまたはレジストリトークンが、レジストリ/`src/decoys/*.ts` ホワイトリストの外に現れた場合、スキャンは `file:line` を出して終了コード 1 で終了します。用法エラーは終了コード 2 です。シンボリックリンクと `.git`、`node_modules`、`dist`、`coverage` はスキップされます。意図的なドキュメント/テスト例に当たらないよう、対象を絞った設定ディレクトリをスキャンしてください。レジストリの完全一致により、シークレットローテーション後も古いトークンを許可します。`report` は観測されたイベント/配送遅延を要約します。FP/検出率には、ラベル付きのシミュレーションセッションが必要です。
 
@@ -200,6 +220,11 @@ node dist/cli/main.js report --since 7d ./events.jsonl
 
 ```sh
 npm run demo:express
+npm run demo:hono
+npm run demo:fastify
+npm run demo:koa
+npm run demo:graphql
+npm run demo:mcp
 PORT=3001 npm run demo:node
 AGENT_GUARD=off npm run demo:express
 npm run bench:simulate
@@ -234,7 +259,7 @@ v0.3b 以降、`npm run bench:exhaust-sim` はスクリプト化された貪欲 
 
 ## 対象外であること
 
-WAF、DDoS 防御、認証システム、ボットブロッカー、本番デプロイ、検索エンジン動作の保証ではありません。自動ブロック、トラフィック制限、trap モード、迷路、リバースプロンプトインジェクション、外向きプロービング、実在ベンダーの認証情報、第三者コールバックの honeytoken はありません。Slack/Telegram/Feishu/email および Edge/Fastify アダプターは今後の作業です。Hono アダプターはすでに Node ≥20 向けに提供されています。機械的タイミングと Prometheus エンドポイントは任意の設計アイデアであり、v0.1 では有効化されていません。
+WAF、DDoS 防御、認証システム、ボットブロッカー、本番デプロイ、検索エンジン動作の保証ではありません。自動ブロック、トラフィック制限、trap モード、迷路、リバースプロンプトインジェクション、外向きプロービング、実在ベンダーの認証情報、第三者コールバックの honeytoken はありません。Slack/Telegram/Feishu/email および Edge アダプターは今後の作業です。Hono アダプターはすでに Node ≥20 向けに提供されています。機械的タイミングと Prometheus エンドポイントは任意の設計アイデアであり、v0.1 では有効化されていません。
 
 ## ロードマップと設計ドキュメント
 

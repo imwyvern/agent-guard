@@ -43,31 +43,33 @@
 
 ## 4. v0.3 —— 多 runtime + 多场景 + 深度检测
 
+> **v0.3a / unreleased 已完成**：Fastify/Koa Node 适配器与共享验收、GraphQL helper/演示、API-only 放置文档、per-session incident、canary propagation tracing、placement linter/CLI，以及 README/五语译本和社区文档。`mode` 仍只有 `detect`。Web-standard core、edge runtimes、完整 MCP Streamable HTTP、其他行为信号、Web Bot Auth、Exhaust/trap 均未完成。
+
 ### 4.1 Runtimes
 | 项目 | Rationale | Risk | Acceptance |
 | --- | --- | --- | --- |
 | **Web-standard core**（`Request`→decision，WebCrypto HMAC，无 `node:*` import） | 一份 core 跑所有 edge runtime | WebCrypto 是 async，hot path 变 async → 只在 canary 候选出现时才算 HMAC | core bundle 在 `--platform=neutral` 下构建成功、无 `node:` import |
-| **Fastify plugin**、**Koa middleware** | Node 主流框架 | 各自生命周期（`onRequest` vs body 解析顺序） | 每个 adapter 跑通共享 AC 套件 |
+| **Fastify plugin**、**Koa middleware**（✅ done，v0.3a / unreleased） | Node 主流框架 | Fastify `preHandler` / Koa 宿主有界 body 解析后的顺序 | 每个 adapter 跑通共享 AC 套件 |
 | **Next.js middleware**、**Vercel Edge**、**Cloudflare Workers** | 大量站点在 edge | edge 无持久内存 → 状态需外置（KV / Durable Object）或降级为无状态 | Miniflare / `next dev` 下 AC 通过；无状态模式下文档说明哪些信号失效 |
 | **Deno / Bun** | 覆盖新 runtime | 测试矩阵膨胀 | CI matrix 中有 smoke test |
 
 ### 4.2 Scenarios
 | 场景 | 设计要点 | Acceptance |
 | --- | --- | --- |
-| **API-only backend** | 无 HTML lure；canary 放在 OpenAPI `example`、错误响应的 `docs_url`、假 `/.well-known/` 文件 | 示例 + AC：JSON 客户端不误报 |
+| **API-only backend**（✅ 文档完成，v0.3a / unreleased） | 无 HTML lure；canary 放在 OpenAPI `example`、错误响应的 `docs_url`、假 `/.well-known/` 文件 | [放置指南](scenarios/api-only.md) + Express demo 配置变体；现有 JSON 客户端 AC 与传播单测保留响应行为 |
 | **MCP server / LLM tool endpoint**（v0.2 示例升级为一等公民 `mcpDecoys()`） | 支持 Streamable HTTP JSON-RPC；decoy tool 只返回 permission error；description 经 lint（无 imperative / 无 U+200B–200F, U+202A–202E, U+2060, U+FEFF） | tool-description linter 有测试；`tools/call` decoy 必告警 |
-| **GraphQL** | decoy field / type（如 `internalAdminUsers`）只在 introspection 里出现，查询即告警；不影响真实 schema | introspection 正常；查询 decoy field 告警；不改变真实 resolver |
+| **GraphQL**（✅ done，v0.3a / unreleased） | decoy field / type（如 `internalAdminUsers`）只在 introspection 里出现，查询即告警；不影响真实 schema | introspection 正常；查询 decoy field 告警；不改变真实 resolver |
 | **SPA + auth API** | canary 放在 source map / 构建产物注释中的 inert 假 key，`/api/auth` 旁的 decoy 路由 | Lighthouse 无回归；真人登录流程零告警 |
 | **Docs site** | `llms.txt` / docs 页面里的 opt-in inert canary；decoy 页 `noindex` | 搜索引擎 crawler 零进入；`llms.txt` lure 默认关 |
 
 ### 4.3 Deeper detection
 | 项目 | Rationale | Risk | Acceptance |
 | --- | --- | --- | --- |
-| **Per-session correlation**：同一 `client_key` 的 decoy-hit 序列（robots → `.env` → admin API）合成一个 incident | 单点 hit 有噪声，序列才是 agent 的典型 kill chain | client_key 在 NAT / 代理下合并多人 → incident 只升级置信度，不阻断 | incident 事件 schema；序列模拟测试 |
-| **Canary propagation tracing**：每个 canary 绑定 placement（哪个页面/文件/字段），replay 时报告"在 A 处泄露、在 B 处被回放、间隔多久、跨了几个 client_key" | 回答"agent 从哪里拿到的" | registry 体积增长 → placement 有上限 | 告警含 `leaked_at` / `replayed_at` / `dwell_ms` |
+| **Per-session correlation**（✅ done，v0.3a / unreleased）：同一 `client_key` 的 decoy-hit 序列（robots → `.env` → admin API）附加可选 incident 字段（默认固定 15 min 窗口；最近 32 次观察；50k 客户端 LRU） | 单点 hit 有噪声，序列才是 agent 的典型 kill chain | client_key 在 NAT / 代理下合并多人 → incident 只升级置信度，不阻断 | v1 可选字段，不新增事件类型；序列、响应不变、50k 客户端 ≤10 MB 内存测试 |
+| **Canary propagation tracing**（✅ done，v0.3a / unreleased）：每个 canary 绑定 placement（哪个页面/文件/字段），replay 时报告"在 A 处泄露、在 B 处被回放、间隔多久、跨了几个 client_key" | 回答"agent 从哪里拿到的" | 进程内 50k 记录 LRU、24h TTL；下发未知则省略 dwell，重放 client_keys_seen 上限 8 | 告警新增 `leaked_at` / `replayed_at` / 可选 `dwell_ms` / `client_keys_seen`，保留原有 canary 字段 |
 | **Header/TLS-agnostic behavioral signals**：请求间隔规律性、无静态资源加载、跳过 robots 直接 decoy、HEAD/OPTIONS 枚举 | 不依赖易伪造的 UA，也不依赖 TLS 指纹（middleware 拿不到） | 误伤自动化测试/监控 → 只输出 `automation` 轴分数，永不单独判 `agent`（借鉴 Drosera 三轴） | 真人 / 爬虫模拟流量误报 0 |
 | **Web Bot Auth verification** | 正向验证自报身份 agent；verified agent 同 verified crawler 一样 bypass decoy | 草案在演进（Dictionary vs bare string）；key directory 抓取本身是 SSRF 面 → 目录 URL 只允许 https、allowlist、超时、缓存、大小上限 | RFC 9421 测试向量通过；两种 `Signature-Agent` 形式都能解析；过期/篡改签名拒绝 |
-| **Prompt-injection-safe canary placement**（HTML / JSON / OpenAPI） | canary 文本可能被 agent 读进上下文 → 文本必须是数据，不是指令 | 自己变成 injection 源 → placement linter：禁止 imperative、禁止隐藏字符、禁止 URL 外呼诱导 | linter 测试 + 文档；所有内置 lure 通过 lint |
+| **Prompt-injection-safe canary placement**（✅ done，v0.3a / unreleased；HTML / JSON / OpenAPI） | canary 文本可能被 agent 读进上下文 → 文本必须是数据，不是指令 | 自己变成 injection 源 → placement linter：禁止 imperative、禁止隐藏字符、禁止 URL 外呼诱导 | `agent-guard lint <path>` + 单测/文档；所有内置 decoy/lure 与 deception bench 通过 lint |
 
 ## 5. v0.4 —— 可观测 + 供应链 + 社区
 

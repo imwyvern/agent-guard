@@ -132,6 +132,10 @@ CLI：`agent-guard canary new --env demo --placement "D3:password"`、`agent-gua
 - `client_key = sha256(ip/24 或 ipv6/48 + UA)[0:16]`，不存原始 IP 到告警（日志可配置是否保留原 IP，默认保留在本地日志、告警中打码）。
 - 状态存内存 LRU（默认 50k client_key，TTL 30 min）；多实例部署时分数是 per-instance 近似值，MVP 接受此限制（不引入 Redis）。
 
+v0.3a / unreleased 新增的关联层独立于上述分数：同一 `client_key` 在默认固定 15 min 窗口内附加可选 `incident`（id、最近 32 项有序 sequence、first_seen/last_seen、low/medium/high confidence）。`incident.windowMs` 可配置，0 关闭；50k 客户端 LRU，序列以四位编码存储。置信度只升不降，不影响严重级别、HTTP 响应、诱饵选择或爬虫绕过。robots 只增加内部序列标记，不新增事件类型。共享网络下 client_key 不代表真实用户或登录会话。
+
+Canary propagation 只在返回的内置诱饵响应体中确实包含令牌时记录首次下发，HEAD / crawler bypass 不计。进程内 50k 记录 LRU、24h TTL，最多保留 8 个不同重放 client_key；重放附加 leaked_at、replayed_at、可选 dwell_ms 与 client_keys_seen。未知下发时间（重启、淘汰或宿主自定义响应）必须省略 dwell_ms，不使用 registry.createdAt 替代。完整可选字段以 [event.v1.json](../schema/event.v1.json) 与 [类型定义](../src/types.ts) 为准。
+
 ## 7. 结构化日志（JSON schema）
 
 每个事件一行 JSON（默认 stdout，可自定义 sink）。
@@ -263,7 +267,8 @@ export interface AgentGuardConfig {
 |---|---|---|
 | v0.1 | `agent-guard/express` | `app.use(agentGuard(config))`；body 扫描需放在 `express.json()`/`urlencoded()` 之后（文档给出顺序） |
 | v0.1 | `agent-guard/node`（原生 `http`） | `(req, res, next)` 兼容层 + `wrap(handler)`，供原生 http / Next.js custom server / Koa 等 |
-| v0.2 | `agent-guard/fastify`、`agent-guard/hono` | 推迟：MVP 验证只用 Express + 原生 http demo |
+| v0.2（已完成） | `agent-guard/hono` | Node ≥20；有界克隆请求体扫描；edge 仍未实现 |
+| v0.3a / unreleased（已完成） | `agent-guard/fastify`、`agent-guard/koa` | Fastify preHandler / Koa 宿主解析后检查；共享验收、原生 crawler 404 与可选 lure 变换 |
 | v0.3+ | `agent-guard/cloudflare`、`agent-guard/vercel-edge` | 用 WebCrypto；rDNS 改为 DoH（需显式配置 DoH 端点，否则 Edge 上 crawler 校验依赖平台 `cf.verifiedBot` 等字段） |
 
 ## 11. 可观测性

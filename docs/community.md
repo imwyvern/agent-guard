@@ -1,6 +1,6 @@
 # Community guide
 
-agent-guard is an open-source research project: HTTP middleware that detects, traps, and observes AI-agent and scanner traffic with isolated decoy routes and inert canary credentials. It is alert-only by default. It does not hack back, probe, or attack anyone.
+agent-guard is an open-source research project: HTTP middleware that detects, deceives, and observes AI-agent and scanner traffic with isolated decoy routes and inert canary credentials. It is alert-only by default. It does not hack back, probe, or attack anyone.
 
 This page describes how to contribute. Also read [CONTRIBUTING.md](../CONTRIBUTING.md), the [roadmap](roadmap.md), its [charter and non-goals](roadmap.md#6-明确不做non-goals延续-charter), the [design](design.md), and the [security policy](../SECURITY.md). Follow the [Code of Conduct](../CODE_OF_CONDUCT.md) in all project interactions.
 
@@ -12,6 +12,8 @@ The core interface is `AgentGuard.inspect(req): Promise<AGDecision>` in [`src/ty
 
 - Express ([`express.ts`](../src/adapters/express.ts)) is a thin wrapper around the Node adapter.
 - Node `http` ([`node.ts`](../src/adapters/node.ts)) maps the request to `AGRequest`, calls `inspect`, writes a decoy response or calls `next()`, and optionally installs lure transforms.
+- Fastify ([`fastify.ts`](../src/adapters/fastify.ts), v0.3a / unreleased) uses `preHandler` after body parsing and `onSend` for opted-in lure transforms.
+- Koa ([`koa.ts`](../src/adapters/koa.ts), v0.3a / unreleased) inspects after the host body parser and applies opted-in transforms after downstream handlers.
 - Hono ([`hono.ts`](../src/adapters/hono.ts)) does the same on Hono's Web-standard `Request`/`Response`, still on Node ≥20. The shared core uses `node:crypto` and Node DNS; edge runtimes are roadmap work.
 
 A new adapter should follow that contract, not invent a second inspection API:
@@ -22,69 +24,43 @@ A new adapter should follow that contract, not invent a second inspection API:
 4. If `action === 'respond'` and the events do **not** include `crawler_bypass`, send `decision.response` status, headers, and body, then stop the routing chain.
 5. Otherwise continue to the host, including verified-crawler bypass, so the host's native missing-route response is preserved.
 6. Optional robots/HTML/`llms.txt` transforms must match the existing adapters: only opted-in paths, only successful uncompressed responses, at most 1 MiB buffered. Ordinary streams pass through.
-7. Export a subpath such as `@imwyvern/agent-guard/fastify` or `@imwyvern/agent-guard/koa`. The framework may be an optional peer. Add no runtime dependencies.
-8. Run the shared acceptance suite used by Express, Node, and Hono: ordinary human traffic does not alert; canary replay alerts; verified crawlers never enter decoys.
+7. Export a framework subpath, following the existing `@imwyvern/agent-guard/fastify` and `@imwyvern/agent-guard/koa` adapters. The framework may be an optional peer. Add no runtime dependencies.
+8. Run the shared acceptance suite used by Express, Node, Hono, Fastify, and Koa: ordinary human traffic does not alert; canary replay alerts; verified crawlers never enter decoys.
 
-The following is a **sketch** of a Fastify plugin, not a shipped adapter. It is meant to show the hook and mapping, and it omits URL-length caps, lure transforms, and tests.
+Fastify and Koa ship as real adapters in v0.3a (unreleased). Reuse the guard from the [README](../README.md) and register it before routes:
 
 ```ts
-import type { FastifyInstance, FastifyPluginAsync, FastifyRequest, FastifyReply } from 'fastify';
-import { createAgentGuard } from '@imwyvern/agent-guard';
-import type { AgentGuard, AgentGuardConfig, AGRequest } from '@imwyvern/agent-guard';
+import Fastify from 'fastify';
+import { agentGuard } from '@imwyvern/agent-guard/fastify';
 
-function isGuard(value: AgentGuard | AgentGuardConfig): value is AgentGuard {
-  return 'inspect' in value;
-}
-
-function toRequest(req: FastifyRequest): AGRequest {
-  const path = (req.url ?? '/').split('?')[0] ?? '/';
-  const query = Object.create(null) as AGRequest['query'];
-  for (const [key, value] of Object.entries((req.query ?? {}) as Record<string, string | string[]>)) {
-    query[key] = value;
-  }
-  return {
-    method: req.method,
-    path,
-    query,
-    headers: req.headers as AGRequest['headers'],
-    ip: req.socket.remoteAddress ?? '',
-    body: req.body,
-  };
-}
-
-export function agentGuardFastify(configOrGuard: AgentGuardConfig | AgentGuard): FastifyPluginAsync {
-  const guard = isGuard(configOrGuard) ? configOrGuard : createAgentGuard(configOrGuard);
-  const plugin: FastifyPluginAsync = async (app: FastifyInstance) => {
-    // preHandler runs after the host body parser. The guard never reads the stream.
-    app.addHook('preHandler', async (req: FastifyRequest, reply: FastifyReply) => {
-      let decision;
-      try {
-        decision = await guard.inspect(toRequest(req));
-      } catch {
-        return; // fail open
-      }
-      if (decision.action === 'respond' && !decision.events.some((event) => event.event === 'crawler_bypass')) {
-        void reply.headers(decision.response.headers)
-          .code(decision.response.status)
-          .send(decision.response.body);
-      }
-    });
-  };
-  return plugin;
-}
+const app = Fastify();
+await app.register(agentGuard(guard));
+app.get('/', async () => ({ status: 'ok' }));
 ```
 
-Koa is a similar `async (ctx, next)` function. A Next.js middleware or edge adapter should say clearly which signals require Node (`node:crypto`, Node DNS, in-memory client state) and which degrade in a stateless edge runtime; a complete Edge port waits for the Web-standard core on the [roadmap](roadmap.md).
+```ts
+import Koa from 'koa';
+import { agentGuard } from '@imwyvern/agent-guard/koa';
+
+const app = new Koa();
+// Install your bounded body parser here, before the guard.
+app.use(agentGuard(guard));
+app.use(async ctx => { ctx.body = { status: 'ok' }; });
+```
+
+Both accept a config or an existing guard, preserve alert-only canary replay and verified-crawler native 404s, and add no runtime dependencies. Run `npm run demo:fastify` or `npm run demo:koa`; full integrations are in [fastify-demo](../examples/fastify-demo/server.ts) and [koa-demo](../examples/koa-demo/server.ts). Close the guard on shutdown to flush alerts.
+
+A Next.js middleware or edge adapter should say clearly which signals require Node (`node:crypto`, Node DNS, in-memory client state) and which degrade in a stateless edge runtime; a complete Edge port waits for the Web-standard core on the [roadmap](roadmap.md).
 
 ### Persona / scenario pack (roadmap)
 
-Richer decoy personas and additional scenario packs (GraphQL, docs sites, cloud-console style, and so on) are **roadmap proposals**, not a shipping pack format. See [deception.md](deception.md) and [docs/scenarios/](scenarios/). If you want to contribute a pack, open a [design RFC](../.github/ISSUE_TEMPLATE/rfc.md) first and describe the format, isolation rules, and tests. Do not add a pack loader to the core until that RFC is accepted.
+GraphQL helpers and a [local demo](../examples/graphql-demo/server.ts) ship in v0.3a (unreleased); see also the [API-only placement guide](scenarios/api-only.md) and existing [MCP scenario](scenarios/mcp.md). Richer decoy personas and a reusable pack format for docs sites, cloud-console style, and other scenarios remain **roadmap proposals**. See [deception.md](deception.md) and [docs/scenarios/](scenarios/). If you want to contribute a pack, open a [design RFC](../.github/ISSUE_TEMPLATE/rfc.md) first and describe the format, isolation rules, and tests. Do not add a pack loader to the core until that RFC is accepted.
 
-Until then, scenario work should stay as documented examples plus tests, in the spirit of the existing MCP helper and demo: fake data only, inert canaries, `noindex` / `no-store`, no imperative or hidden-character lure text, and verified crawlers never see decoy content.
+Until then, scenario work should stay as documented examples plus tests, following the MCP and GraphQL helpers and demos: fake data only, inert canaries, `noindex` / `no-store`, no imperative or hidden-character lure text, and verified crawlers never see decoy content.
 
 ### Detection signatures
 
-Useful contributions include crawler-family suffixes, user-agent patterns, and regression fixtures that improve classification without changing default enforcement. Please include tests and anonymized or synthetic samples only. Behavioral scores must not, by themselves, label a client as an agent or block it. Verified crawlers and allowlisted clients must continue to fail open to the host.
+Useful contributions include crawler-family suffixes, user-agent patterns, and regression fixtures that improve classification without changing default enforcement. Please include tests and anonymized or synthetic samples only. Behavioral scores must not, by themselves, label a client as an agent or block it. The optional incident field correlates up to 32 observations per client in a fixed 15-minute window (50k-client cap); confidence may rise, but response decisions and severity stay unchanged. Canary propagation is process-local (50k records, 24-hour TTL, at most 8 replaying client keys); unknown issuance must omit dwell time. Verified crawlers and allowlisted clients must continue to fail open to the host.
 
 ### Benchmarks and simulations
 

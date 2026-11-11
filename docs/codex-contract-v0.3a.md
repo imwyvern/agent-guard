@@ -30,5 +30,5 @@
 - 新增测试：每个新 runtime 的共享验收套件、GraphQL 场景、incident 序列、propagation 字段、linter 坏样例必须报错而现有诱饵必须通过。
 - `bench:latency:hr` 不要求重跑，但 `npm run bench:deception-lint` 须仍通过；对 incident 状态补一个 50k client 内存上限测试（≤10 MB 门槛不变）。
 - `npm audit` 结果写进报告；`npm pack --dry-run` 内容里不应出现 devDependencies 或示例。
-- grep `liandaai|练答` 为 0；README 与五个译本的代码块一致、相对链接全部可用。
+- 特定站点集成引用为 0；README 与五个译本的代码块一致、相对链接全部可用。
 - 正常提交、`git push origin main`，不 force。

@@ -9,7 +9,7 @@ An AI-agent honeypot middleware for Node and the edge.
 - AI agents and scanners probe APIs, read `.env` files, and replay credentials they find.
 - Isolated decoy routes and inert canary credentials detect that exploration and replay.
 - Detection is alert-only by default: the middleware records events and sends asynchronous alerts; it does not block, throttle, or retaliate.
-- Zero runtime dependencies, with optional Express and Hono peers. It ships for Node ≥20 today; edge runtimes are on the roadmap.
+- Zero runtime dependencies, with optional Express, Hono, Fastify, and Koa peers. It ships for Node ≥20 today; edge runtimes are on the roadmap.
 
 **What it is / is not.** agent-guard detects, traps, and observes hostile or exploratory AI-agent traffic on your APIs. It does not hack back or attack anyone. See [What it is NOT](#what-it-is-not) for the full list of non-goals.
 
@@ -110,6 +110,10 @@ Install Hono and your Node server integration in the consuming app. This reposit
 
 Detection remains alert-only: canary replay continues to the host, decoys have noindex/no-store headers, and verified crawlers reach the host's native missing-route handler. Opt-in robots/HTML/llms transforms preserve the existing 1 MiB buffer limit. Run `npm run demo:hono` (`PORT` and `AGENT_GUARD=off` work as in the other catalog demos). Hono runs the same shared acceptance suite as Express and Node.
 
+## Fastify and Koa (Node runtime)
+
+v0.3a (unreleased) adds `agentGuard` at `@imwyvern/agent-guard/fastify` and `@imwyvern/agent-guard/koa`, accepting the same guard or config. Register the Fastify plugin with `await app.register(agentGuard(guard))` before routes; inspection runs in `preHandler` after body parsing. Use `app.use(agentGuard(guard))` in Koa after your bounded body parser. Neither adapter consumes the request stream. Both preserve native crawler 404s, alert-only replay, and opt-in lure transforms; frameworks are optional peers and the core adds no runtime dependencies. See the [Fastify demo](examples/fastify-demo/server.ts), [Koa demo](examples/koa-demo/server.ts), and [adapter guide](docs/community.md). Edge runtimes remain roadmap work.
+
 ## MCP / LLM tool endpoint decoy
 
 ```sh
@@ -124,6 +128,12 @@ The local Node HTTP example implements minimal JSON-RPC `initialize`, `tools/lis
 
 The root exports `mcpDecoyTools`, `inspectMcpRequest(guard, request, toolName?)` and `lintMcpDecoyDescription`. Call the helper once after bounded parsing, passing a tool name only for `tools/call`; handle `crawler_bypass` as the host's native 404. The example applies this to discovery too, so verified crawlers never see decoy tools. All MCP JSON responses are noindex/no-store. Built-in descriptions are neutral data, with tests rejecting imperative language, URLs and hidden characters. This example is a limited HTTP scenario, without full MCP Streamable HTTP, sessions or SSE support. See [MCP scenario and safety rules（中文）](docs/scenarios/mcp.md) for OWASP MCP01/MCP08 threat mapping, schema details and integration boundaries.
 
+## GraphQL and API-only scenarios
+
+v0.3a exports `graphqlDecoys()` and `inspectGraphqlRequest(guard, request)`. Add the returned field/type metadata to your host schema so introspection lists `internalAdminUsers`, then inspect once after bounded body parsing and before execution. A selected decoy emits `decoy_hit` with `decoy.id: "GQL"` and returns a standard GraphQL `FORBIDDEN` error with noindex/no-store; no real resolver executes for that request. Give the decoy its own inert error resolver too. Real queries pass through; malformed or excessive queries go to the host validator. Verified crawlers reach the host's native 404. See the [GraphQL demo](examples/graphql-demo/server.ts) and run `npm run demo:graphql`.
+
+For APIs without HTML, see the [API-only guide](docs/scenarios/api-only.md): inert canaries in OpenAPI `example`, decoy error `docs_url`, and isolated `/.well-known/` files, with boundaries for SDKs and documentation clients.
+
 ## Configuration
 
 Every public field has defaults documented in [src/types.ts](src/types.ts). Required fields: `project`, `env`, `mode: 'detect'`, `projectSeed`, and `canary.secret`/`canary.registry`.
@@ -132,6 +142,7 @@ Every public field has defaults documented in [src/types.ts](src/types.ts). Requ
 | --- | --- |
 | `canary.prefix` | `AG-CANARY-`; pattern `^[A-Z][A-Z0-9]{1,15}-CANARY-$` |
 | `canary.registry` | Required version-1 object or JSON path; no secret is stored in it |
+| `incident.windowMs` | 900000; fixed 15-minute correlation window, 0 disables; metadata only |
 | `decoys.enabled` | D1–D5; `/.env` aliases, admin subtree, ops notes, OpenAPI, fake login |
 | `decoys.basePath` | `/api/internal` |
 | `decoys.paths` / `siteName` | Optional path overrides / `.invalid` email domain |
@@ -156,6 +167,12 @@ Every public field has defaults documented in [src/types.ts](src/types.ts). Requ
 `guard.robotsLines()` supports manual robots integration. `guard.htmlCommentFor(path)` returns the opt-in comment or null. `guard.metrics()` returns request/event/delivery counts and bounded recent inspect timing quantiles. Scores are bounded per-instance observations, never enforcement. Client state: 50k entries, 30-minute idle TTL; crawler cache: 10k, positive 24h / negative 1h. No forwarded header is trusted automatically.
 
 D5 always denies login with a deterministic 300–600ms delay. All decoys are `noindex`, `no-store`, ≤8KiB, use only `.invalid` hostnames, and never create cookies, authenticate, or call business services. Declared AI crawler decoy hits have `info` severity. Search crawler DNS checks occur only on decoy routes. Errors/timeouts fail open to a native 404.
+
+## Incident correlation and canary propagation
+
+v0.3a attaches optional `incident` metadata to existing events for the same `client_key`: `id`, ordered `sequence` (for example `robots → D1 → D2`), `first_seen`, `last_seen`, and `confidence`. `incident.windowMs` defaults to 900000 (15 minutes from the first observation); 0 disables correlation. State uses a 50k-client LRU and retains the latest 32 observations. Repeated isolated hits have low confidence; distinct decoys or discovery plus a decoy raise it to medium; `canary_replay` raises it to high. Confidence never falls within the window. Robots visits are internal markers and add no new event type. Shared networks can merge clients; correlation only enriches observations and never changes severity, HTTP responses, crawler bypass, or decoy decisions. `mode` remains only `detect`.
+
+Replay alerts retain `canary.id`, `placement`, `env`, `found_in`, and `field`, adding `leaked_at` (placement), `replayed_at` (pathname), `dwell_ms` (time since first decoy delivery), and `client_keys_seen` (distinct replaying client keys, capped at 8). Issuance starts when a returned decoy body contains the token; HEAD and crawler bypass do not count. Tracing is process-local, with a 50k-entry LRU and 24-hour TTL. Eviction, restart, or delivery outside built-in decoys leaves issuance unknown, so `dwell_ms` is omitted. These observations do not prove identity or malicious intent.
 
 ## Alerts and signatures
 
@@ -183,7 +200,10 @@ node dist/cli/main.js canary list
 node dist/cli/main.js canary scan ./config
 node dist/cli/main.js canary scan ./config --registry agent-guard.canaries.json
 node dist/cli/main.js report --since 7d ./events.jsonl
+node dist/cli/main.js lint ./config
 ```
+
+`agent-guard lint <path>` (or the built CLI above) checks built-in decoy/lure output and placement files for imperative language, hidden characters, non-reserved URL hosts, and real vendor key prefixes. Findings exit 1; usage errors exit 2. It checks placement safety; use `canary scan` separately to detect accidental token leakage.
 
 `canary new` also accepts `--prefix ACME-CANARY-` when creating a registry and `--registry <file>`. Scan exits 1 with `file:line` when canonical prefixes or registry tokens appear outside the registry/`src/decoys/*.ts` whitelist; usage errors exit 2. Symlinks and `.git`, `node_modules`, `dist`, `coverage` are skipped. Scan a targeted configuration directory to avoid intentional documentation/test examples. Registry exact matches permit older tokens after secret rotation. `report` summarizes observed events/delivery latency; FP/detection rates require labeled simulation sessions.
 
@@ -198,6 +218,11 @@ Example adopting-project CI step (uses only the built CLI):
 
 ```sh
 npm run demo:express
+npm run demo:hono
+npm run demo:fastify
+npm run demo:koa
+npm run demo:graphql
+npm run demo:mcp
 PORT=3001 npm run demo:node
 AGENT_GUARD=off npm run demo:express
 npm run bench:simulate
@@ -232,7 +257,7 @@ From v0.3b, `npm run bench:exhaust-sim` runs an in-memory cost-ratio simulation 
 
 ## What it is NOT
 
-A WAF, DDoS defense, authentication system, bot blocker, production deployment, or guarantee of search-engine behavior. There is no auto-block, traffic throttling, trap mode, maze, reverse prompt injection, outbound probing, real vendor credential, or third-party callback honeytoken. Slack/Telegram/Feishu/email and Edge/Fastify adapters remain future work. A Hono adapter already ships for Node ≥20. Mechanical timing and a Prometheus endpoint are optional design ideas and are not enabled in v0.1.
+A WAF, DDoS defense, authentication system, bot blocker, production deployment, or guarantee of search-engine behavior. There is no auto-block, traffic throttling, trap mode, maze, reverse prompt injection, outbound probing, real vendor credential, or third-party callback honeytoken. Slack/Telegram/Feishu/email and Edge adapters remain future work. A Hono adapter already ships for Node ≥20. Mechanical timing and a Prometheus endpoint are optional design ideas and are not enabled in v0.1.
 
 ## Roadmap & design docs
 

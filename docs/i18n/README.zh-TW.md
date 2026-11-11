@@ -11,7 +11,7 @@ An AI-agent honeypot middleware for Node and the edge.
 - AI agent 和掃描器會探測 API、讀取 `.env`，並重放它們找到的憑證。
 - 隔離的誘餌路由和惰性金絲雀憑證用於偵測這類探測與重放。
 - 預設僅偵測並警示：中介軟體記錄事件並傳送非同步警示，不會阻擋、節流或反擊。
-- 零執行期相依；Express 與 Hono 為可選 peer。目前面向 Node ≥20；邊緣執行環境已列入路線圖。
+- 零執行期相依；Express、Hono、Fastify 與 Koa 為可選 peer。目前面向 Node ≥20；邊緣執行環境已列入路線圖。
 
 **它是什麼 / 不是什麼。** agent-guard 用於偵測、誘捕並觀察針對你的 API 的敵對或探測性 AI agent 流量。它不會反擊或攻擊任何人。完整的非目標清單見[它不是什麼](#它不是什麼)。
 
@@ -112,6 +112,10 @@ serve({ fetch: app.fetch, hostname: '127.0.0.1', port: 3000 });
 
 偵測仍然僅為警示：金絲雀重放會繼續到達主機，誘餌帶有 noindex/no-store 標頭，已驗證的爬蟲會到達主機原生的缺失路由處理常式。可選的 robots/HTML/llms 轉換保留既有的 1 MiB 緩衝上限。執行 `npm run demo:hono`（`PORT` 和 `AGENT_GUARD=off` 的用法與其他目錄示範相同）。Hono 執行與 Express 和 Node 相同的共用驗收套件。
 
+## Fastify 與 Koa（Node 執行環境）
+
+v0.3a（未發佈）新增 `@imwyvern/agent-guard/fastify` 與 `@imwyvern/agent-guard/koa` 的 `agentGuard`，接受相同的 guard 或 config。在路由之前透過 `await app.register(agentGuard(guard))` 註冊 Fastify 外掛；檢查在請求主體剖析後的 `preHandler` 中執行。Koa 使用 `app.use(agentGuard(guard))`，放在有界請求主體剖析器之後。兩個轉接器均不消費請求串流，並保留主機原生的爬蟲 404、僅警示的重放偵測及可選 lure 轉換；框架為可選 peer，核心不增加執行期相依套件。見 [Fastify 示範](../../examples/fastify-demo/server.ts)、[Koa 示範](../../examples/koa-demo/server.ts)和[轉接器指南](../community.md)。邊緣執行環境仍屬路線圖工作。
+
 ## MCP / LLM 工具端點誘餌
 
 ```sh
@@ -126,6 +130,12 @@ curl -s http://127.0.0.1:3000/mcp -H 'Content-Type: application/json' \
 
 根匯出提供 `mcpDecoyTools`、`inspectMcpRequest(guard, request, toolName?)` 和 `lintMcpDecoyDescription`。在有界剖析之後呼叫一次該輔助函式，僅在 `tools/call` 時傳入工具名稱；將 `crawler_bypass` 按主機原生 404 處理。此範例同樣把這一點用於探索階段，因此已驗證的爬蟲永遠看不到誘餌工具。所有 MCP JSON 回應均為 noindex/no-store。內建描述是中性資料，測試會拒絕祈使語氣、URL 和隱藏字元。本範例是有限的 HTTP 場景，不包含完整的 MCP Streamable HTTP、工作階段或 SSE 支援。OWASP MCP01/MCP08 威脅對應、schema 細節與整合界限見 [MCP 場景與安全規則（中文）](../scenarios/mcp.md)。
 
+## GraphQL 與純 API 場景
+
+v0.3a 匯出 `graphqlDecoys()` 與 `inspectGraphqlRequest(guard, request)`。將回傳的欄位/類型中繼資料加入主機 schema，讓 introspection 列出 `internalAdminUsers`；在有界請求主體剖析之後、執行之前檢查一次。選中誘餌會發出 `decoy_hit`（`decoy.id: "GQL"`），並回傳帶 noindex/no-store 的標準 GraphQL `FORBIDDEN` 錯誤；該請求不會執行真實 resolver。誘餌本身也應設定惰性的錯誤 resolver。真實查詢繼續交給主機；格式錯誤或超限的查詢交給主機驗證器。已驗證爬蟲到達主機原生 404。見 [GraphQL 示範](../../examples/graphql-demo/server.ts)，執行 `npm run demo:graphql`。
+
+沒有 HTML 的 API 請參閱[純 API 指南](../scenarios/api-only.md)：將惰性金絲雀放在 OpenAPI `example`、誘餌錯誤的 `docs_url` 與隔離的 `/.well-known/` 檔案中，並說明 SDK 與文件用戶端的誤報界限。
+
 ## 設定
 
 每個公開欄位的預設值記錄在 [src/types.ts](../../src/types.ts)。必填欄位：`project`、`env`、`mode: 'detect'`、`projectSeed`，以及 `canary.secret`/`canary.registry`。
@@ -134,6 +144,7 @@ curl -s http://127.0.0.1:3000/mcp -H 'Content-Type: application/json' \
 | --- | --- |
 | `canary.prefix` | `AG-CANARY-`；模式 `^[A-Z][A-Z0-9]{1,15}-CANARY-$` |
 | `canary.registry` | 必填的 version-1 物件或 JSON 路徑；其中不儲存任何 secret |
+| `incident.windowMs` | 900000；固定 15 分鐘關聯窗口，0 關閉；僅附加中繼資料 |
 | `decoys.enabled` | D1–D5；`/.env` 別名、admin 子樹、ops notes、OpenAPI、假登入 |
 | `decoys.basePath` | `/api/internal` |
 | `decoys.paths` / `siteName` | 可選路徑覆寫 / `.invalid` 電子郵件網域 |
@@ -158,6 +169,12 @@ curl -s http://127.0.0.1:3000/mcp -H 'Content-Type: application/json' \
 `guard.robotsLines()` 支援手動 robots 整合。`guard.htmlCommentFor(path)` 回傳可選註解或 null。`guard.metrics()` 回傳請求/事件/傳遞計數，以及有界的近期 inspect 延遲分位數。分數是依執行個體的有界觀測值，從不作為強制執行依據。用戶端狀態：50k 筆，30 分鐘閒置 TTL；爬蟲快取：10k，陽性 24h / 陰性 1h。任何轉送標頭都不會被自動信任。
 
 D5 一律拒絕登入，並帶有確定性的 300–600ms 延遲。所有誘餌均為 `noindex`、`no-store`，≤8KiB，只使用 `.invalid` 主機名稱，且從不建立 cookie、進行驗證或呼叫業務服務。已宣告的 AI 爬蟲誘餌命中嚴重程度為 `info`。搜尋爬蟲的 DNS 檢查只發生在誘餌路由上。錯誤/逾時會以 fail open 落到原生 404。
+
+## 事件關聯與金絲雀傳播追蹤
+
+v0.3a 為同一 `client_key` 的既有事件附加可選 `incident`：`id`、有序 `sequence`（例如 `robots → D1 → D2`）、`first_seen`、`last_seen` 和 `confidence`。`incident.windowMs` 預設為 900000（從首次觀察起固定 15 分鐘）；0 關閉關聯。狀態使用 50k 用戶端 LRU，保留最近 32 次觀察。重複的孤立命中信心等級為 low；不同誘餌或探索加誘餌升為 medium；`canary_replay` 升為 high。同一窗口內信心等級不會降低。robots 存取僅作內部標記，不增加事件類型。共用網路可能合併用戶端；關聯只補充觀察資訊，永不改變嚴重程度、HTTP 回應、爬蟲繞過或誘餌決策。`mode` 仍只接受 `detect`。
+
+重放警示保留 `canary.id`、`placement`、`env`、`found_in`、`field`，新增 `leaked_at`（放置位置）、`replayed_at`（路徑）、`dwell_ms`（首次誘餌下發至重放的時間）與 `client_keys_seen`（不同重放用戶端鍵的數量，上限 8）。只有回傳的誘餌回應主體包含權杖時才記錄下發；HEAD 與爬蟲繞過不計。追蹤僅存在於處理程序內，使用 50k 筆 LRU 與 24 小時 TTL。淘汰、重新啟動或內建誘餌之外的下發會使時間未知，因此省略 `dwell_ms`。這些觀察無法證明身分或惡意意圖。
 
 ## 警示與簽章
 
@@ -185,7 +202,10 @@ node dist/cli/main.js canary list
 node dist/cli/main.js canary scan ./config
 node dist/cli/main.js canary scan ./config --registry agent-guard.canaries.json
 node dist/cli/main.js report --since 7d ./events.jsonl
+node dist/cli/main.js lint ./config
 ```
+
+`agent-guard lint <path>`（或上面的已建置 CLI）檢查內建誘餌/lure 輸出及放置檔案中的祈使語句、隱藏字元、非保留 URL 主機名稱與真實廠商密鑰前綴。發現問題結束代碼為 1；用法錯誤為 2。它檢查放置安全性；權杖意外洩漏另用 `canary scan` 檢查。
 
 建立登錄時，`canary new` 也接受 `--prefix ACME-CANARY-` 以及 `--registry <file>`。當規範前綴或登錄權杖出現在登錄/`src/decoys/*.ts` 白名單之外時，掃描以結束代碼 1 結束並輸出 `file:line`；用法錯誤以結束代碼 2 結束。符號連結以及 `.git`、`node_modules`、`dist`、`coverage` 會被略過。請掃描指定的設定目錄，以避免命中文件/測試中有意放置的範例。登錄的精確比對允許在密鑰輪替後仍辨識舊權杖。`report` 彙總觀察到的事件/傳遞延遲；誤報率/偵測率需要帶標註的模擬工作階段。
 
@@ -200,6 +220,11 @@ node dist/cli/main.js report --since 7d ./events.jsonl
 
 ```sh
 npm run demo:express
+npm run demo:hono
+npm run demo:fastify
+npm run demo:koa
+npm run demo:graphql
+npm run demo:mcp
 PORT=3001 npm run demo:node
 AGENT_GUARD=off npm run demo:express
 npm run bench:simulate
@@ -234,7 +259,7 @@ curl -s -H "Authorization: Bearer $TOKEN" http://127.0.0.1:3000/api/internal/adm
 
 ## 它不是什麼
 
-它不是 WAF、DDoS 防禦、驗證系統、機器人封鎖器、正式環境部署，也不保證搜尋引擎行為。沒有自動封鎖、流量節流、trap 模式、迷宮、反向提示注入、出站探測、真實廠商憑證，或第三方回呼 honeytoken。Slack/Telegram/Feishu/email 以及 Edge/Fastify 轉接器仍屬後續工作。Hono 轉接器已面向 Node ≥20 提供。機械計時和 Prometheus 端點是可選的設計構想，在 v0.1 中未啟用。
+它不是 WAF、DDoS 防禦、驗證系統、機器人封鎖器、正式環境部署，也不保證搜尋引擎行為。沒有自動封鎖、流量節流、trap 模式、迷宮、反向提示注入、出站探測、真實廠商憑證，或第三方回呼 honeytoken。Slack/Telegram/Feishu/email 以及 Edge 轉接器仍屬後續工作。Hono 轉接器已面向 Node ≥20 提供。機械計時和 Prometheus 端點是可選的設計構想，在 v0.1 中未啟用。
 
 ## 路線圖與設計文件
 

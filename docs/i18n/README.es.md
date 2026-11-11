@@ -11,7 +11,7 @@ An AI-agent honeypot middleware for Node and the edge.
 - Los agentes de IA y los escáneres exploran las API, leen archivos `.env` y reutilizan las credenciales que encuentran.
 - Las rutas señuelo aisladas y las credenciales canario inertes detectan esa exploración y reutilización.
 - Por defecto solo detecta y alerta: el middleware registra eventos y envía alertas de forma asíncrona; no bloquea, limita ni toma represalias.
-- Cero dependencias de tiempo de ejecución; Express y Hono son peers opcionales. Hoy funciona en Node ≥20; los runtimes de edge están en la hoja de ruta.
+- Cero dependencias de tiempo de ejecución; Express, Hono, Fastify y Koa son peers opcionales. Hoy funciona en Node ≥20; los runtimes de edge están en la hoja de ruta.
 
 **Qué es y qué no es.** agent-guard detecta, atrae y observa el tráfico de agentes de IA hostiles o exploratorios que llegan a tus API. No contraataca ni ataca a nadie. La lista completa de no objetivos está en [Lo que NO es](#lo-que-no-es).
 
@@ -112,6 +112,10 @@ Instale Hono y su integración de servidor Node en la aplicación consumidora. E
 
 La detección sigue siendo solo de alerta: la reutilización de canarios continúa hacia el anfitrión, los señuelos llevan cabeceras noindex/no-store, y los rastreadores verificados llegan al manejador nativo de ruta inexistente del anfitrión. Las transformaciones opt-in de robots/HTML/llms conservan el tope de búfer existente de 1 MiB. Ejecute `npm run demo:hono` (`PORT` y `AGENT_GUARD=off` funcionan como en las demás demos del catálogo). Hono ejecuta la misma suite de aceptación compartida que Express y Node.
 
+## Fastify y Koa (runtime de Node)
+
+v0.3a (sin publicar) añade `agentGuard` en `@imwyvern/agent-guard/fastify` y `@imwyvern/agent-guard/koa`, con el mismo guard o config. Registre el plugin Fastify con `await app.register(agentGuard(guard))` antes de las rutas; inspecciona en `preHandler` después de analizar el cuerpo. En Koa, use `app.use(agentGuard(guard))` después de su analizador de cuerpo acotado. Ninguno consume el flujo de la petición. Ambos preservan los 404 nativos para rastreadores, las alertas de reutilización y las transformaciones opt-in; los frameworks son peers opcionales y el núcleo no añade dependencias de runtime. Consulte la [demo Fastify](../../examples/fastify-demo/server.ts), la [demo Koa](../../examples/koa-demo/server.ts) y la [guía de adaptadores](../community.md). Los runtimes edge siguen en la hoja de ruta.
+
 ## Señuelo de endpoint de herramientas MCP / LLM
 
 ```sh
@@ -126,6 +130,12 @@ El ejemplo local de HTTP de Node implementa un JSON-RPC mínimo de `initialize`,
 
 La raíz exporta `mcpDecoyTools`, `inspectMcpRequest(guard, request, toolName?)` y `lintMcpDecoyDescription`. Llame al ayudante una vez después del análisis acotado, pasando un nombre de herramienta solo para `tools/call`; trate `crawler_bypass` como el 404 nativo del anfitrión. El ejemplo también aplica esto al descubrimiento, de modo que los rastreadores verificados nunca vean las herramientas señuelo. Todas las respuestas JSON de MCP son noindex/no-store. Las descripciones integradas son datos neutrales, y las pruebas rechazan el lenguaje imperativo, las URL y los caracteres ocultos. Este ejemplo es un escenario HTTP limitado, sin compatibilidad completa con MCP Streamable HTTP, sesiones o SSE. Consulte [escenario MCP y reglas de seguridad（中文）](../scenarios/mcp.md) para el mapeo de amenazas OWASP MCP01/MCP08, los detalles del esquema y los límites de integración.
 
+## Escenarios GraphQL y solo API
+
+v0.3a exporta `graphqlDecoys()` e `inspectGraphqlRequest(guard, request)`. Añada los metadatos de campos/tipos al esquema anfitrión para que la introspección liste `internalAdminUsers`, e inspeccione una vez tras analizar el cuerpo acotado y antes de ejecutarlo. Seleccionar un señuelo emite `decoy_hit` con `decoy.id: "GQL"` y devuelve un error GraphQL estándar `FORBIDDEN` con noindex/no-store; esa petición no ejecuta resolvers reales. Asigne también al señuelo su propio resolver de error inerte. Las consultas reales pasan; las malformadas o excesivas van al validador anfitrión. Los rastreadores verificados llegan al 404 nativo. Consulte la [demo GraphQL](../../examples/graphql-demo/server.ts) y ejecute `npm run demo:graphql`.
+
+Para API sin HTML, consulte la [guía solo API](../scenarios/api-only.md): canarios inertes en OpenAPI `example`, `docs_url` de errores señuelo y archivos aislados `/.well-known/`, con límites de falsos positivos para SDK y clientes de documentación.
+
 ## Configuración
 
 Todos los campos públicos tienen valores por defecto documentados en [src/types.ts](../../src/types.ts). Campos obligatorios: `project`, `env`, `mode: 'detect'`, `projectSeed`, y `canary.secret`/`canary.registry`.
@@ -134,6 +144,7 @@ Todos los campos públicos tienen valores por defecto documentados en [src/types
 | --- | --- |
 | `canary.prefix` | `AG-CANARY-`; patrón `^[A-Z][A-Z0-9]{1,15}-CANARY-$` |
 | `canary.registry` | Objeto version-1 obligatorio o ruta JSON; no se almacena ningún secret en él |
+| `incident.windowMs` | 900000; ventana fija de correlación de 15 minutos, 0 desactiva; solo metadatos |
 | `decoys.enabled` | D1–D5; alias de `/.env`, subárbol admin, ops notes, OpenAPI, inicio de sesión falso |
 | `decoys.basePath` | `/api/internal` |
 | `decoys.paths` / `siteName` | Sustituciones opcionales de ruta / dominio de correo `.invalid` |
@@ -158,6 +169,12 @@ Todos los campos públicos tienen valores por defecto documentados en [src/types
 `guard.robotsLines()` admite la integración manual de robots. `guard.htmlCommentFor(path)` devuelve el comentario opt-in o null. `guard.metrics()` devuelve recuentos de peticiones/eventos/entrega y cuantiles acotados de temporización reciente de inspect. Las puntuaciones son observaciones acotadas por instancia, nunca un mecanismo de imposición. Estado del cliente: 50k entradas, TTL de inactividad de 30 minutos; caché de rastreadores: 10k, positivo 24h / negativo 1h. Ninguna cabecera reenviada se considera de confianza de forma automática.
 
 D5 siempre deniega el inicio de sesión con un retraso determinista de 300–600ms. Todos los señuelos son `noindex`, `no-store`, ≤8KiB, usan solo nombres de host `.invalid` y nunca crean cookies, autentican ni llaman a servicios de negocio. Los aciertos de señuelo de rastreadores de IA declarados tienen gravedad `info`. Las comprobaciones DNS de rastreadores de búsqueda ocurren solo en las rutas señuelo. Los errores/tiempos de espera fallan de forma abierta hacia un 404 nativo.
+
+## Correlación de incidentes y seguimiento de propagación
+
+v0.3a adjunta metadatos `incident` opcionales a los eventos existentes del mismo `client_key`: `id`, `sequence` ordenada (por ejemplo `robots → D1 → D2`), `first_seen`, `last_seen` y `confidence`. `incident.windowMs` vale 900000 por defecto (15 minutos fijos desde la primera observación); 0 desactiva la correlación. El estado usa una LRU de 50k clientes y conserva las últimas 32 observaciones. Los aciertos aislados repetidos tienen confianza low; distintos señuelos o descubrimiento más un señuelo la elevan a medium; `canary_replay` la eleva a high. La confianza no baja dentro de la ventana. Las visitas a robots son marcas internas y no añaden tipos de evento. Las redes compartidas pueden agrupar clientes; la correlación solo enriquece observaciones y nunca cambia la gravedad, las respuestas HTTP, el bypass de rastreadores ni las decisiones sobre señuelos. `mode` sigue admitiendo solo `detect`.
+
+Las alertas de reutilización conservan `canary.id`, `placement`, `env`, `found_in` y `field`, añadiendo `leaked_at` (ubicación), `replayed_at` (ruta), `dwell_ms` (tiempo desde la primera entrega del señuelo) y `client_keys_seen` (claves distintas de clientes que reutilizan el token, máximo 8). Solo se registra la entrega si el cuerpo señuelo devuelto contiene el token; HEAD y bypass de rastreadores no cuentan. El seguimiento vive en memoria del proceso, con una LRU de 50k entradas y TTL de 24 horas. La expulsión, el reinicio o la entrega fuera de señuelos integrados dejan el momento desconocido, por lo que se omite `dwell_ms`. Estas observaciones no prueban identidad ni intención maliciosa.
 
 ## Alertas y firmas
 
@@ -185,7 +202,10 @@ node dist/cli/main.js canary list
 node dist/cli/main.js canary scan ./config
 node dist/cli/main.js canary scan ./config --registry agent-guard.canaries.json
 node dist/cli/main.js report --since 7d ./events.jsonl
+node dist/cli/main.js lint ./config
 ```
+
+`agent-guard lint <path>` (o la CLI compilada de arriba) comprueba las salidas señuelo/lure integradas y los archivos de ubicación: lenguaje imperativo, caracteres ocultos, hosts URL no reservados y prefijos de claves reales de proveedores. Los hallazgos salen con código 1; los errores de uso, con 2. Comprueba la seguridad de la ubicación; use `canary scan` por separado para detectar fugas accidentales de tokens.
 
 Al crear un registro, `canary new` también acepta `--prefix ACME-CANARY-` y `--registry <file>`. El escaneo termina con código 1 y `file:line` cuando aparecen prefijos canónicos o tokens del registro fuera de la lista blanca del registro/`src/decoys/*.ts`; los errores de uso terminan con código 2. Se omiten los enlaces simbólicos y `.git`, `node_modules`, `dist`, `coverage`. Examine un directorio de configuración concreto para evitar ejemplos intencionados de documentación/pruebas. Las coincidencias exactas del registro permiten tokens antiguos tras la rotación del secreto. `report` resume los eventos observados y la latencia de entrega; las tasas de FP/detección requieren sesiones de simulación etiquetadas.
 
@@ -200,6 +220,11 @@ Ejemplo de paso de CI en un proyecto que lo adopta (usa solo la CLI ya compilada
 
 ```sh
 npm run demo:express
+npm run demo:hono
+npm run demo:fastify
+npm run demo:koa
+npm run demo:graphql
+npm run demo:mcp
 PORT=3001 npm run demo:node
 AGENT_GUARD=off npm run demo:express
 npm run bench:simulate
@@ -234,7 +259,7 @@ Desde v0.3b, `npm run bench:exhaust-sim` ejecuta en memoria una simulación de r
 
 ## Lo que NO es
 
-Un WAF, una defensa DDoS, un sistema de autenticación, un bloqueador de bots, un despliegue en producción ni una garantía del comportamiento de los buscadores. No hay bloqueo automático, limitación de tráfico, modo trap, laberinto, inyección inversa de indicaciones, sondeo de salida, credencial real de un proveedor ni honeytoken de devolución de llamada de terceros. Slack/Telegram/Feishu/email y los adaptadores Edge/Fastify siguen siendo trabajo futuro. Un adaptador de Hono ya se distribuye para Node ≥20. El temporizado mecánico y un endpoint de Prometheus son ideas de diseño opcionales y no están habilitados en v0.1.
+Un WAF, una defensa DDoS, un sistema de autenticación, un bloqueador de bots, un despliegue en producción ni una garantía del comportamiento de los buscadores. No hay bloqueo automático, limitación de tráfico, modo trap, laberinto, inyección inversa de indicaciones, sondeo de salida, credencial real de un proveedor ni honeytoken de devolución de llamada de terceros. Slack/Telegram/Feishu/email y los adaptadores Edge siguen siendo trabajo futuro. Un adaptador de Hono ya se distribuye para Node ≥20. El temporizado mecánico y un endpoint de Prometheus son ideas de diseño opcionales y no están habilitados en v0.1.
 
 ## Hoja de ruta y documentos de diseño
 
