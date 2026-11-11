@@ -38,7 +38,7 @@ export interface AgentGuardEvent {
     v: 1;
     ts: string;
     event_id: string;
-    event: 'decoy_hit' | 'canary_replay' | 'probe' | 'ai_discovery' | 'crawler_bypass' | 'alert_sent' | 'alert_failed' | 'trap_block' | 'trap_circuit_open' | 'exhaust_budget_spent' | 'canary_callback';
+    event: 'decoy_hit' | 'canary_replay' | 'probe' | 'ai_discovery' | 'crawler_bypass' | 'alert_sent' | 'alert_failed' | 'trap_block' | 'trap_circuit_open' | 'exhaust_budget_spent' | 'canary_callback' | 'honeyfile_read';
     severity: Severity;
     project: string;
     env: string;
@@ -57,6 +57,13 @@ export interface AgentGuardEvent {
     decoy?: {
         id: DecoyId | 'MCP' | 'GQL';
         status: number;
+    };
+    honeyfile?: {
+        path: string;
+        placement: string;
+        source: 'auditd' | 'inotify';
+        uid?: string;
+        comm?: string;
     };
     canary?: {
         id: string;

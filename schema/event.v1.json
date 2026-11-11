@@ -38,7 +38,8 @@
         "trap_block",
         "trap_circuit_open",
         "exhaust_budget_spent",
-        "canary_callback"
+        "canary_callback",
+        "honeyfile_read"
       ]
     },
     "severity": {
@@ -173,6 +174,18 @@
           "description": "Distinct replaying client keys retained in memory, saturated at 8"
         }
       }
+    },
+    "honeyfile": {
+      "type": "object",
+      "required": ["path", "placement", "source"],
+      "properties": {
+        "path": { "type": "string" },
+        "placement": { "type": "string" },
+        "source": { "enum": ["auditd", "inotify"] },
+        "uid": { "type": "string" },
+        "comm": { "type": "string" }
+      },
+      "additionalProperties": false
     },
     "score": {
       "type": "integer"
