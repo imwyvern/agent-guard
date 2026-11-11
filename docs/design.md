@@ -1,7 +1,7 @@
 # agent-guard 设计文档（MVP = detect + canary）
 
 - 日期：2026-11-11（HKT）
-- 状态：保留 MVP 设计背景，已按 v0.4b（unreleased，2026-11-11 HKT）更新实现边界；Node API 以 [src/types.ts](../src/types.ts) 为准，Web API 见 [src/web/index.ts](../src/web/index.ts) 与 [edge.md](edge.md)。
+- 状态：保留 MVP 设计背景，已按 v0.5a（unreleased，未发 npm/未打 tag，2026-11-11 HKT）更新实现边界；Node API 以 [src/types.ts](../src/types.ts) 为准，Web API 见 [src/web/index.ts](../src/web/index.ts) 与 [edge.md](edge.md)。
 - 上游：`/workspace/security/bla-server-anti-ai-assessment-2026-11-10.md`、`docs/threat-model.md`、`docs/kpi.md`
 - 定位：Node ≥20 HTTP 中间件与 Web-standard core / Edge 适配器（v0.4b，unreleased）；纯开源研究项目，本仓库不部署到任何服务器，验证在本地 demo app 上完成。
 
@@ -12,7 +12,7 @@
 ## 1. 设计原则
 
 1. **Alert-by-default**：detect 保留 MVP 的诱饵响应 + 告警行为。只有显式 opt-in 的 trap block 可对已确认的同一 client key 在 TTL 内返回 403（含真实路由）；delay / rateLimit 只作用于 D1–D5，maze 只作用于隔离的 archive 路径。
-2. **真人零误伤**：诱饵没有任何可见/可点击入口；canary 只出现在诱饵响应和（可选）HTML 注释里。
+2. **真人零误伤目标**：HTTP 诱饵没有可见/可点击入口；canary 位于诱饵响应、可选 HTML 注释，以及运营者显式 seed 的 honeyfiles。文件被自家工具读取也可能产生告警。
 3. **SEO 零回归**：诱饵 = noindex + X-Robots-Tag + robots Disallow + 不进 sitemap + verified-crawler bypass。
 4. **Inert canary**：canary 永不进入真实 IdP / secret store / DB；它不能登录任何东西。
 5. **隔离**：decoy handler 不调用任何业务代码 / DB / 外部服务。
@@ -60,6 +60,18 @@ request ──► [Node agent-guard core，以下为 detect 默认流程]
 v0.4a 的 trap 闸门：verified crawler / allowlist 永不进入；canary replay 或 `incident.confidence === 'high'` 可确认会话；delay/rateLimit/maze 也接受「已有前次请求检测信号 + 检测分 ≥ `trap.gate.minScore`（默认 200）」。首次单次 `/.env` 不够；机械 `automation_score` 不计入闸门，检测分单独不能 block。block 默认 TTL 15 min、上限 24 h，8192 项 LRU（可配至 50k），每次 403 记录 `trap_block`，普通访问不续期。key 已含网络前缀 + UA，可能合并无关用户。
 
 Node 运行时可用 `AGENT_GUARD_TRAP=off` 或 `guard.setTrapEnabled(false)` 关闭所有 trap；inspect p99 / 事件循环延迟超阈值则打开断路器、发 `trap_circuit_open` 并回到检测。`setTrapEnabled(true)` 重置断路器，但不能覆盖环境关闭或改变 mode/功能开关。迷宫有深度、页数、字节、时长与全局并发/字节预算；v0.3b 字节比 1:1，成本门槛未通过，详见 [Exhaust](exhaust.md)。
+
+### v0.5a：Node 主机与处置层（已实现，unreleased）
+
+`seed` 默认 dry-run，四种 profile；显式 `--write` 创建 0600 inert honeyfiles，不覆盖、不跟随不安全路径/symlink，`--verify` 只读核查。新 canary ID 由 seed、secret、env、placement 确定性导出并复用匹配 registry，不能把本设计中普通 canary 的随机 ID 说明套用于 seed。所有值不使用真实厂商凭据格式/前缀，callback 只指向运营者自托管端点，不由 seed 包装为签名 callback URL。
+
+可选 Linux `watch` 只解析运营者 auditd / `inotifywait -e access` 日志，不自行检测读取、不配置系统审计、不出站探测；parser 无需 root，日志来源可能需要。输出 medium `honeyfile_read` 不进入 trap/block，没有 HTTP incident ID；CLI 只展示日志相邻关系。
+
+Node incident 新增 `first_touch_at`、首个成功投递的 `alerted_at`、从 first touch 到当前事件的非负 `dwell_ms`，不同于 canary 首次诱饵下发到重放的 dwell。进程内状态仍有界，seed 下发未知不补造 canary dwell。可选 `log.file` 默认 10 MiB、0600、sanitized，超过上限前截断；`incident list|show` 从 JSONL 只读重建，`ack` 追加记录。默认关闭的 escalation/reminders 从首次成功告警计时，默认 300000 ms/最多 2 次，只有同一 `log.file` 的 CLI ack 才被进程看到。
+
+Node response hooks opt-in、默认关闭；固定绝对路径 executable/argv，`spawn` / `shell: false`，不插入请求内容；新 env 仅五个 `AG_*` 元数据白名单、不继承 secret。有 SIGTERM→SIGKILL 超时、每小时/并发上限，`hook_result` 失败绝不影响 inspect。stdout/stderr 丢弃。Web/Edge 不实现 hooks、Node 文件日志或升级提醒。guard 不轮换密钥、不改防火墙；仅日志/打印的示例见 [hooks](examples/hooks/README.md)。
+
+实现与配置细节见 [seed.md](seed.md)、[incident-response.md](incident-response.md)。假成功、独立诱饵主机与真实 agent 成本评估仍规划中；假成功需安全评估/单独批准，主机仅计划提供模板不部署，评测预算未设定，模拟字节比仍 1:1；E4 仍禁止。
 
 ## 3. MVP 诱饵路由（固定 5 条）
 
@@ -167,7 +179,7 @@ Canary propagation 只在返回的内置诱饵响应体中确实包含令牌时�
 
 ## 7. 结构化日志（JSON schema）
 
-每个事件一行 JSON（默认 stdout，可自定义 sink）。下例保留 MVP schema 形状；v0.4a 的新增 trap/callback 事件、`automation_score` 与可选 incident/传播字段以 [event.v1.json](../schema/event.v1.json) 为准。
+每个事件一行 JSON（默认 stdout，可自定义 sink；v0.5a Node 可选有界 0600 sanitized `log.file`）。下例保留 MVP schema 形状；新增 trap/callback、honeyfile、incident/hook 事件、`automation_score` 与可选 incident/传播字段以 [event.v1.json](../schema/event.v1.json) 为准。
 
 ```json
 {
@@ -286,7 +298,10 @@ export interface AgentGuardConfig {
   allowlist?: { ips?: string[]; cidrs?: string[]; uaPatterns?: RegExp[]; headerToken?: { name: string; value: string } };
   alerts?: { adapters: AlertAdapter[];   // webhook / console / slack / telegram / feishu / smtp
               minSeverity?: Severity; dedupeWindowSec?: number; ratePerMinute?: number; redactIp?: boolean };
-  log?: { sink?: (e: AgentGuardEvent) => void; level?: Severity; keepIp?: boolean };
+  log?: { sink?: (e: AgentGuardEvent) => void; level?: Severity; keepIp?: boolean;
+          file?: string; maxBytes?: number }; // Node-only，默认 10 MiB，超过前截断
+  escalation?: { enabled?: boolean; remindAfterMs?: number; maxReminders?: number }; // Node-only，默认关
+  hooks?: ResponseHook[];                // Node-only，默认不配置，固定 argv / 无 shell
   clientIp?: (req: AGRequest) => string; // 默认 socket IP；仅在验证可信代理后显式覆盖
 }
 ```
@@ -310,7 +325,7 @@ export interface AgentGuardConfig {
 ## 11. 可观测性
 
 - `guard.metrics()` 返回内存计数器：`requests_inspected`、`decoy_hits{decoy}`、`canary_replays`、`crawler_bypass`、`alerts_sent/failed`、`inspect_ns_p50/p99`。
-- 已实现 `guard.prometheusText()` 与 `prometheusHandler(guard)`（Prometheus 0.0.4 text），不默认挂载、无路径 label。包含请求/事件/投递计数、近期延迟分位数、client/timing 状态与 trap 状态；宿主自行选择路径和访问控制，不内置 headerToken 验证。
+- 已实现 `guard.prometheusText()` 与 `prometheusHandler(guard)`（Prometheus 0.0.4 text）；v0.5a Node 增加 `agent_guard_time_to_alert_seconds` / `agent_guard_incident_dwell_seconds` summaries，无 path/UA/IP labels。不默认挂载、无路径 label。包含请求/事件/投递计数、近期延迟分位数、client/timing 状态与 trap 状态；宿主自行选择路径和访问控制，不内置 headerToken 验证。
 - `npx agent-guard report --since 7d <log.jsonl>`：生成 KPI 表（见 kpi.md）。
 - 不内置 OpenTelemetry 依赖；提供 `onEvent` hook 供接入。
 

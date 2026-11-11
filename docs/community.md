@@ -1,6 +1,6 @@
 # Community guide
 
-agent-guard is an open-source research project: HTTP middleware that detects, deceives, and observes AI-agent and scanner traffic with isolated decoy routes and inert canary credentials. It is a last-line tripwire and early-warning / delay layer at the server, alert-only by default. It does not hack back, probe, or attack anyone, and it does not replace patching, a WAF, or least privilege. See [positioning.md](positioning.md) for the pitch, scope boundaries, and honest claims.
+agent-guard is an open-source research project: HTTP middleware that detects, deceives, and observes AI-agent and scanner traffic with isolated decoy routes, inert canary credentials and optional host honeyfiles (read alerts require operator-supplied Linux logs). It is a last-line tripwire and early-warning / delay layer at the server, alert-only by default. It does not hack back, probe, or attack anyone, and it does not replace patching, a WAF, or least privilege. See [positioning.md](positioning.md) for the pitch, scope boundaries, and honest claims.
 
 This page describes how to contribute. Also read [CONTRIBUTING.md](../CONTRIBUTING.md), the [roadmap](roadmap.md), its [charter and non-goals](roadmap.md#6-明确不做non-goals延续-charter), the [design](design.md), and the [security policy](../SECURITY.md). Follow the [Code of Conduct](../CODE_OF_CONDUCT.md) in all project interactions.
 
@@ -72,6 +72,12 @@ v0.4a adds first-party `slackAdapter`, `telegramAdapter`, `feishuAdapter` and `s
 
 Default `mode: 'detect'` remains alert-only. `mode: 'trap'` exposes independent, default-off delay, rateLimit, block and **experimental** maze flags. Verified crawlers and allowlists are immune, a single `/.env` hit is insufficient, and runtime kill switches and a circuit breaker stop trap actions. Block can affect real routes for a confirmed client key. Read [trap-mode.md](trap-mode.md) and [exhaust.md](exhaust.md) before enabling controls; the v0.3b simulation's byte ratio was 1:1, below the 3:1 floor, so maze needs the operator's own real-agent measurement. Mechanical `automation_score` is automatically observed after enough samples, has no enable flag, and never raises severity or triggers block/maze by itself.
 
+### Host honeyfiles and incident response (v0.5a, unreleased)
+
+`seed`, Linux-log `watch`, the incident timeline/CLI, bounded Node `log.file`, summaries, default-off escalation/reminders and Node-only response hooks are implemented in this source tree, with no npm publication or tag. They are not unimplemented first issues. Read [seed.md](seed.md), [incident-response.md](incident-response.md) and the [log-only hook examples](examples/hooks/README.md) before contributing.
+
+Preserve dry-run defaults, 0600/no-overwrite/path safety, deterministic inert values without real vendor credential formats/prefixes, and operator-hosted endpoints only. Watch only parses operator-configured auditd/inotifywait access logs: no in-process read sensor, no trap/block, no cross-process identity correlation. Preserve the distinction between incident dwell and canary issuance dwell, bounded retention, no path/UA/IP metric labels, and same-file `log.file` acknowledgment visibility. Hooks stay default-off and Node-only, with literal argv/no shell, five-key fresh environment, time/rate/concurrency caps and isolated `hook_result` failures. The guard itself does not rotate keys or change firewalls.
+
 ### Persona / scenario pack (roadmap)
 
 GraphQL helpers and a [local demo](../examples/graphql-demo/server.ts) ship in v0.3a (unreleased); see also the [API-only placement guide](scenarios/api-only.md) and existing [MCP scenario](scenarios/mcp.md). Richer decoy personas and a reusable pack format for docs sites, cloud-console style, and other scenarios remain **roadmap proposals**. See [deception.md](deception.md) and [docs/scenarios/](scenarios/). If you want to contribute a pack, open a [design RFC](../.github/ISSUE_TEMPLATE/rfc.md) first and describe the format, isolation rules, and tests. Do not add a pack loader to the core until that RFC is accepted.
@@ -94,10 +100,10 @@ README translations live in [`docs/i18n/`](i18n/). When `README.md` changes, upd
 
 The direction of travel is listed in the README and in [roadmap.md §0](roadmap.md#0-方向接下来往哪里走). Useful starting points, consistent with [positioning.md](positioning.md):
 
-- **Host honeyfiles / `agent-guard seed`** — design the file formats, placement paths, and access-alert hook for inert fake `.env`, cloud credentials, SSH keys, and kubeconfig on disk. Do not invent real-looking vendor prefixes. Start with an RFC if the on-disk layout or privilege model is unclear.
+- **Honeyfile operator docs** — improve Linux auditd/inotifywait configuration and troubleshooting examples for the shipped seed/watch commands; keep templates operator-run and read alerts log-only. Changes to layout or privilege boundaries need an RFC.
 - **Fake-success environment** — design-only until a safety assessment lands. Open an RFC before any runtime change. The simulation must stay synthetic, inert, cookie-free, and opt-in. See [deception.md](deception.md).
-- **Incident timeline and dwell-time** — operator-facing timeline on top of the existing process-local incident fields and `dwell_ms`, plus documented hooks so operators can run their own key-rotation or block scripts. Do not add built-in blocking beyond opt-in trap mode.
-- **Real-agent token-cost eval harness** — a documented, local research harness that measures maze byte and token cost against agents we control. Record assumptions honestly; do not treat a 1:1 byte ratio as success.
+- **Incident-response docs** — improve examples of retained timelines, same-file acknowledgments and print/log-only hooks for the shipped commands. Preserve bounded state and default-off escalation/hooks; do not advertise built-in key rotation or firewall changes.
+- **Real-agent token-cost eval harness** — planned, with no model budget set; a documented, local research harness that measures maze byte and token cost against agents we control. Record assumptions honestly; do not treat a 1:1 byte ratio as success.
 - **Edge adapter improvements** — v0.4b is implemented (unreleased). Follow the [Web adapter contract](#edge--web-adapters-v04b-unreleased) and [operator guide](edge.md); preserve neutral bundles, differential parity, explicit IP trust and state degradation. Future product work starts at [v0.5+](plan-v0.5-v0.7.md).
 
 Label new work `enhancement` and, when it is a planned direction rather than a bug, `roadmap`. Use `good first issue` only when the acceptance criteria fit a first contribution. Fake-success and other safety-line changes also need the `design` label and an RFC.

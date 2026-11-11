@@ -8,33 +8,34 @@ An AI-agent honeypot middleware for Node and the edge.
 
 ## 為什麼需要它
 
-攻擊者現在用 AI agent 探測伺服器、讀取設定，並重放它們找到的金鑰。agent-guard 在應用程式的 HTTP/API 層埋入隔離的假設定、假金鑰和假端點——無法解鎖任何真實權限的惰性金絲雀。當攻擊者的 AI 觸碰到它們時，你會得到一則高置信度的早期警示，以及一段可以回應的時間窗口：輪替金鑰、收緊存取，或將主機下線。
+攻擊者現在用 AI agent 探測伺服器、讀取設定，並重放找到的金鑰。agent-guard 在 HTTP/API 層與可選的主機 honeyfiles 中埋入隔離的假設定、假金鑰和假端點——無法解鎖任何真實權限的惰性金絲雀。重放提供高置信度訊號；檔案讀取警示需要營運者提供 Linux 存取日誌。警示與時間線協助你回應：輪替金鑰、收緊存取，或將主機下線。
 
 這是伺服器層面的最後一道行程絆線與早期預警 / 延遲層。它不能取代修補程式、WAF 或最小權限。預設模式僅偵測並警示。可選且預設關閉的 trap 模式可以拖慢或限流已確認的用戶端；它並不聲稱能阻擋攻擊。
 
 **今天交付了什麼，什麼還沒有。**
 
-- **今天**涵蓋的是 HTTP/API 層：五條隔離的誘餌路由、MCP 與 GraphQL 誘餌，以及惰性金絲雀憑證（`AG-CANARY-…`）。執行期相依為零；在 Node ≥20 上提供 Express、Node `http`、Hono、Fastify 與 Koa 轉接器，以及 v0.4b 的 Web / Edge 轉接器（尚未發佈）。
-- **主機層 honeyfile**（磁碟上的假 `.env`、雲端憑證、SSH 金鑰或 kubeconfig，並在被存取時警示）是**規劃中**的能力，尚未交付。未來的 `agent-guard seed` 命令見[路線圖](../roadmap.md)。
-- **「假成功」欺騙**——一套可能讓攻擊者的 AI 誤以為已入侵成功的模擬環境——是**規劃中**的能力（必須 opt-in，並先做安全評估），尚未交付。見 [deception.md](../deception.md)。
+- **今天** HTTP/API 層已交付五條隔離的誘餌路由、MCP 與 GraphQL 誘餌，以及惰性金絲雀憑證（`AG-CANARY-…`）。執行期相依為零；Node ≥20 上提供 Express、Node `http`、Hono、Fastify 與 Koa 轉接器，以及自 v0.4b 起的 Web / Edge 轉接器。
+- **主機 honeyfiles 已在此尚未發佈的 v0.5a 程式碼樹中交付**：`agent-guard seed` 預設僅輸出惰性檔案計畫；`--write` 以 0600 建立檔案，不覆寫既有檔案、不跟隨不安全路徑/符號連結。可選 `watch` 是僅限 Linux、唯讀的剖析器，讀取營運者提供的 auditd 或 `inotifywait -e access` 日誌。guard 本身看不到讀取；日誌來源設定可能需 root，剖析器不需要。無出站探測。見 [seed 與 watch](../seed.md)。
+- **回應時間窗口已在此尚未發佈的 v0.5a 程式碼樹中交付**：incident 時間線欄位、可選且有界的 Node `log.file`、指標、`incident list|show|ack`，以及預設關閉的升級/提醒。Node response hooks 須明確啟用、預設關閉，以固定 argv 與僅含中繼資料的環境執行營運者指令碼；Web / Edge 沒有 hooks。guard 本身不輪替金鑰、不改防火牆。見 [incident response](../incident-response.md) 與[僅記錄日誌的 hook 範例](../examples/hooks/README.md)。
+- **「假成功」欺騙**——讓攻擊者的 AI 可能誤以為已入侵成功的模擬環境——仍**規劃中、未交付**；必須先做安全評估並獲單獨核准，才可 opt-in 實作。見 [deception.md](../deception.md)。
 - **消耗攻擊者的 token** 目前**尚未得到驗證**。實驗性迷宮在模擬中的位元組比為 1:1，低於 3:1 下限；時間比數字來自 25 ms/request 模型，不是對真實 LLM agent 的測量。在完成這項測量之前，不要指望啟用迷宮就能消耗對方 token。見 [exhaust.md](../exhaust.md) 和 [trap-mode.md](../trap-mode.md)。
 - 金絲雀始終 inert。本專案從不使用真實憑證，從不做反向提示注入，也從不去做出站探測。它不會反擊。
 
 **它是什麼 / 不是什麼。** agent-guard 用於偵測、誘捕並觀察針對你的 API 的敵對或探測性 AI agent 流量。它不會反擊或攻擊任何人。非目標、可選功能與實驗性限制見[它不是什麼](#它不是什麼)。
 
-這是一個開源研究專案，尚未發佈到 npm。請從原始碼安裝，或使用 `npm pack` 建立本機 tarball。目前的套件名稱為 `@imwyvern/agent-guard`。Apache-2.0，著作權 2026 Wesley Wang。
+這是一個開源研究專案。v0.5a 已在此尚未發佈的原始碼樹中交付，未發 npm、未打版本 tag。請從原始碼安裝，或使用 `npm pack` 建立本機 tarball。目前套件名稱為 `@imwyvern/agent-guard`。Apache-2.0，著作權 2026 Wesley Wang。
 
 請參閱[安全性政策](../../SECURITY.md)、[貢獻指南](../../CONTRIBUTING.md)、[定位說明](../positioning.md)和[路線圖](../roadmap.md)。
 
 ## 路線圖：接下來往哪裡走
 
-除另有說明外，下列事項均為規劃中，尚未交付：
+以下已交付項目均位於尚未發佈的程式碼樹；其餘仍為規劃：
 
-- **主機層 honeyfile** — `agent-guard seed` 在磁碟上放置惰性的假 `.env`、雲端憑證、SSH 金鑰和 kubeconfig，並在被存取時警示。
-- **假成功模擬環境** — 必須 opt-in，並先做安全評估：一套可能讓攻擊者的 AI 把假資料當成真資料的模擬服務面。見 [deception.md](../deception.md)。
-- **回應時間窗口** — 面向營運者的 incident 時間線、dwell-time 指標，以及掛鉤到營運者自己的金鑰輪替 / 封鎖指令碼。行程內 incident 關聯和 `dwell_ms` 已經交付；面向營運者的時間線與掛鉤尚未交付。
-- **隔離誘餌主機** — 與正式環境應用程式行程分離的獨立誘餌環境。
-- **真實 agent 的 token 成本評估** — 在任何人啟用實驗性迷宮之前，先測量它是否真的消耗真實 AI agent 的 token。目前 1:1 的位元組比只是假設。
+- **主機 honeyfiles（v0.5a）** — **已交付、尚未發佈**：惰性 `seed` 檔案與可選 Linux 存取日誌 `watch`；主機涵蓋範圍取決於營運者的日誌來源。
+- **假成功模擬環境** — **規劃中、未交付**：須安全評估與單獨核准後才可 opt-in 實作。見 [deception.md](../deception.md)。
+- **回應時間窗口（v0.5a）** — **已交付、尚未發佈**：時間線、dwell 指標、incident CLI、有界檔案日誌、可選提醒與連接營運者指令碼的 Node hooks。
+- **隔離誘餌主機** — **規劃中、未交付**：獨立誘餌環境；範圍僅為程式/範本，部署由營運者負責。
+- **真實 agent 的 token 成本評估** — **規劃中、未交付**：模型預算未設定。消耗攻擊者 token 尚未證明；迷宮模擬位元組比仍為 1:1。
 - **Edge 轉接器（v0.4b）** — **已交付（尚未發佈）**：Web-standard core、Cloudflare Workers、Next.js middleware / Vercel Edge、Deno、Bun 和 Hono-web。
 
 詳細計畫見 [docs/roadmap.md](../roadmap.md)。範圍界線與誠實聲明見 [docs/positioning.md](../positioning.md)。
@@ -82,7 +83,7 @@ const server = app.listen(3000, '127.0.0.1');
 // On shutdown: stop accepting requests, then await guard.close() to flush alerts.
 ```
 
-若使用登錄檔案名稱，請先以 CLI 準備該檔案。空的登錄會在記憶體中產生六個規範的誘餌金絲雀。若權杖必須在重新啟動後保持穩定，請用 CLI 持久化登錄中的放置位置。種子只控制無害的假資料；金絲雀 ID 仍保持密碼學隨機。
+若使用登錄檔案名稱，請先用 CLI 準備。空登錄在記憶體中產生六個規範誘餌金絲雀；需要跨重新啟動穩定的權杖時，用 CLI 持久化 placement。`projectSeed` 控制無害假資料；一般誘餌的金絲雀 ID 為密碼學隨機。獨立的 honeyfile `seed` 命令依營運者 seed、HMAC secret、環境與 placement 確定性導出新 ID，並重用符合的登錄項目。
 
 ## 原生 Node HTTP
 
@@ -295,6 +296,9 @@ v0.3a 匯出 `graphqlDecoys()` 與 `inspectGraphqlRequest(guard, request)`。將
 | `alerts.ratePerMinute` | 每通道 30；被抑制的計數會帶到下一則警示摘要中 |
 | `alerts.redactIp` | `true`；警示中使用粗略的 IPv4/IPv6 網段 |
 | `log.sink` / `level` / `keepIp` | stdout JSONL / `info` / `true` |
+| `log.file` / `maxBytes` | 僅 Node，opt-in sanitized JSONL，0600；預設 10 MiB，附加將超限時先截斷 |
+| `escalation` | 僅 Node，預設關閉；首次成功警示後預設每 300000 ms 提醒，每 incident 最多 2 次 |
+| `hooks` | 僅 Node，預設未設定/空；固定 argv、無 shell、新建中繼資料環境、逾時與頻率/並行上限 |
 | `clientIp` | socket IP；僅在驗證受信任的代理之後再覆寫 |
 | `onEvent` | 可選觀察者；觀察者/sink 失敗會被隔離 |
 
@@ -307,6 +311,55 @@ detect 模式下，D5 一律拒絕登入，並帶有確定性的 300–600ms 延
 v0.3a 為同一 `client_key` 的既有事件附加可選 `incident`：`id`、有序 `sequence`（例如 `robots → D1 → D2`）、`first_seen`、`last_seen` 和 `confidence`。`incident.windowMs` 預設為 900000（從首次觀察起固定 15 分鐘）；0 關閉關聯。狀態使用 50k 用戶端 LRU，保留最近 32 次觀察。重複的孤立命中信心等級為 low；不同誘餌或探索加誘餌升為 medium；`canary_replay` 升為 high。同一窗口內信心等級不會降低。robots 存取僅作內部標記，不增加事件類型。共用網路可能合併用戶端；關聯不提升嚴重程度；預設 detect 下保留 HTTP 回應和誘餌決策，v0.4a opt-in trap 可將 high confidence 用於閘門。verified crawler 與 allowlist 始終免疫。見 [trap 模式](../trap-mode.md)。
 
 重放警示保留 `canary.id`、`placement`、`env`、`found_in`、`field`，新增 `leaked_at`（放置位置）、`replayed_at`（路徑）、`dwell_ms`（首次誘餌下發至重放的時間）與 `client_keys_seen`（不同重放用戶端鍵的數量，上限 8）。只有回傳的誘餌回應主體包含權杖時才記錄下發；HEAD 與爬蟲繞過不計。追蹤僅存在於處理程序內，使用 50k 筆 LRU 與 24 小時 TTL。淘汰、重新啟動或內建誘餌之外的下發會使時間未知，因此省略 `dwell_ms`。這些觀察無法證明身分或惡意意圖。
+
+## 主機 honeyfiles 與 incident response（v0.5a，尚未發佈）
+
+使用下方已建置 CLI（或本機使用端安裝的 `agent-guard`）。準備非空 UTF-8 seed 檔案，透過 secret 機制設定 `AG_CANARY_SECRET`；命令不列印這些值。dry-run 需要既有的 `--dir`；`--write` 可建立目錄。Profiles 為 `node`、`python`、`k8s`、`generic`。內容為 inert，相同輸入/registry 得到確定性內容，不使用真實廠商憑證格式或前綴；callback URL 只能由營運者自行託管。
+
+```sh
+node dist/cli/main.js seed --profile node --dir ./honeyfiles --seed-file ./operator-seed.txt --env demo
+node dist/cli/main.js seed --profile node --dir ./honeyfiles --seed-file ./operator-seed.txt --env demo --write
+node dist/cli/main.js seed --profile node --dir ./honeyfiles --seed-file ./operator-seed.txt --env demo --verify
+```
+
+`--write` 預設持久化 `agent-guard.canaries.json` 與 `agent-guard.seed.json`。metadata 放在 honeyfile 目錄之外。驗證唯讀，報告缺失/修改或權限錯誤；發現不是存取警示。見 [profiles、路徑安全與日誌來源範本](../seed.md)。
+
+營運者自行設定 auditd 或執行 `inotifywait -e access`。`watch` 預設從日誌末尾跟隨，除非設定 `--from-start`；它不使用 `fs.watch` 或 atime 偵測讀取。選擇一種來源：
+
+```sh
+node dist/cli/main.js watch --inotify-log ./access.log --dir ./honeyfiles --manifest ./agent-guard.seed.json --project local-catalog --env demo
+# Alternative: use an operator-configured auditd log.
+node dist/cli/main.js watch --auditd /var/log/audit/audit.log --dir ./honeyfiles --manifest ./agent-guard.seed.json --project local-catalog --env demo
+```
+
+`watch` 向 stdout 輸出 medium `honeyfile_read` JSONL；同時設定 `AG_ALERT_WEBHOOK_URL` 與 `AG_ALERT_WEBHOOK_SECRET` 時可選 webhook 警示。這些事件永不觸發 trap/block，也沒有 HTTP incident ID；收集至 CLI 輸入日誌後顯示為日誌相鄰紀錄。獨立 watch CLI 沒有 hook 設定參數。
+
+Node 建立 guard 時可加入以下選項。先建立日誌父目錄；HTTP replay 來源定位需使用 seed 的 registry 及相同 secret/seed/環境；將 executable/script 路徑換成主機絕對路徑。hook 範例僅附加本機日誌行，其日誌目錄必須已存在。見 [hooks 安全用法](../incident-response.md)與[範例設定](../examples/hooks/README.md)。
+
+```ts
+const responseOptions = {
+  log: { file: './events.jsonl', maxBytes: 10 * 1024 * 1024, keepIp: false },
+  escalation: { enabled: true, remindAfterMs: 300000, maxReminders: 2 },
+  hooks: [{
+    on: 'canary_replay' as const,
+    run: ['/usr/bin/node', '/absolute/path/to/agent-guard/docs/examples/hooks/append-log.mjs'] as [string, ...string[]],
+    timeoutMs: 1000, maxPerHour: 10, maxConcurrent: 1,
+  }],
+};
+// Pass ...responseOptions into createAgentGuard({...}). Omit to keep these options off.
+```
+
+Hooks 用 `spawn` / `shell: false`，不把請求內容插入 argv，只在可用時接收 `AG_INCIDENT_ID`、`AG_EVENT_TYPE`、`AG_CLIENT_KEY_HASH`、`AG_CANARY_ID`、`AG_PLACEMENT`。不繼承父處理程序 secret。逾時先 SIGTERM 再 SIGKILL；每小時與並行上限限制執行。失敗發出 `hook_result`，永不影響 `inspect`；stdout/stderr 丟棄。Hooks 僅 Node、預設關閉。
+
+時間線位於 `event.incident`：`first_touch_at`、`alerted_at`（首次成功投遞）、`dwell_ms`（首次觸碰至目前事件，最小為零）。它不同於 `event.canary.dwell_ms`，後者測量已知誘餌下發至重放；未知下發（包括 seed 檔案）時省略。Node Prometheus summaries `agent_guard_time_to_alert_seconds` 與 `agent_guard_incident_dwell_seconds` 沒有 path、UA 或 IP labels。
+
+```sh
+node dist/cli/main.js incident list --log ./events.jsonl
+node dist/cli/main.js incident show INCIDENT_ID --log ./events.jsonl --json
+node dist/cli/main.js incident ack INCIDENT_ID --log ./events.jsonl
+```
+
+將 `INCIDENT_ID` 換成 `list` 的 ID。`list`、`show` 唯讀；`ack` 附加 `incident_ack`。升級/提醒預設關閉。啟用後，Node guard 只有透過同一 `log.file` 才能看到 CLI 確認；使用其他檔案或沒有 `log.file` 時，提醒仍有上限，但看不到這些 ack。留存與關聯有界且僅在處理程序內；限制見 [incident response](../incident-response.md)。
 
 ## 警示與簽章
 
@@ -395,7 +448,7 @@ curl -s -H "Authorization: Bearer $TOKEN" http://127.0.0.1:3000/api/internal/adm
 
 它不是 WAF、DDoS 防護、身分驗證系統或通用機器人阻擋工具。它不能取代修補程式、最小權限或金鑰衛生。本研究專案不提供正式環境部署，也不保證搜尋引擎行為。
 
-主機層 honeyfile 與「假成功」欺騙是規劃中的能力，尚未交付。消耗攻擊者的 token 尚未得到驗證。見[定位說明](../positioning.md)和上文的[路線圖列表](#路線圖接下來往哪裡走)。
+主機涵蓋範圍僅限可選的 seed honeyfiles 與營運者設定的 Linux 日誌；guard 本身看不到檔案讀取。假成功欺騙與隔離誘餌主機仍規劃中、未交付；假成功須安全評估及單獨核准，我們不部署主機。消耗攻擊者 token 尚未證明；真實 agent 評估未設預算。見[定位說明](../positioning.md)與上文[路線圖列表](#路線圖接下來往哪裡走)。
 
 反向提示注入 / counter-injection（E4）永不進入產品。不做出站探測，也不由 guard 主動向第三方回連；營運者設定的警示 adapters 是唯一的出站通知例外，既有爬蟲身分 DNS 驗證不變。金絲雀始終是 inert HMAC 權杖，不是真實廠商憑證。不使用第三方 honeytoken 服務（Canarytokens 等）；callback canary 僅由營運者自行託管。
 
@@ -416,7 +469,9 @@ v0.4a 已實作以下**明確 opt-in、預設關閉**的整合與控制；預設
 
 - [定位說明](../positioning.md) — 專案敘事、範圍界線，以及誠實聲明表（聲明 / 狀態 / 證據）。
 - [社群參與](../community.md) — 如何貢獻轉接器、偵測特徵、譯本和 RFC。
-- [路線圖](../roadmap.md) — 前進方向、v0.4a/v0.4b 完成項（尚未發佈）與 v0.5+ 計畫；persona/deception 擴充仍屬設計。
+- [路線圖](../roadmap.md) — v0.4a/v0.4b/v0.5a 完成項（尚未發佈）及後續計畫；persona/deception 擴充仍為設計工作。
+- [Seed 與 watch](../seed.md) — 惰性 honeyfiles、權限、驗證與營運者提供的 Linux 存取日誌。
+- [Incident response](../incident-response.md) — 時間線、有界日誌、指標、確認、可選提醒與[僅記錄日誌的 hooks](../examples/hooks/README.md)。
 - [Edge 營運指南](../edge.md) — 執行環境接入、StateStore 範例、降級與疑難排解。
 - [Exhaust](../exhaust.md) — 已實作的 opt-in 延遲與實驗性迷宮；上下文消耗（E3）尚未實作；消耗 token 尚未得到驗證。
 - [Deception](../deception.md) — 提高誘餌資料的可信度，讓攻擊者的 agent 可能把它當成真實資料；「假成功」是規劃中的能力，尚未交付。

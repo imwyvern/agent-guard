@@ -6,33 +6,34 @@ An AI-agent honeypot middleware for Node and the edge.
 
 ## Why
 
-Attackers now use AI agents to probe servers, read configuration, and replay whatever keys they find. agent-guard plants isolated fake configs, keys, and endpoints — inert canaries that unlock nothing — on the HTTP/API surface of your application. When an attacker's AI touches them, you get an early, high-confidence alert and a window of time to respond: rotate keys, tighten access, or take the host offline.
+Attackers now use AI agents to probe servers, read configuration, and replay whatever keys they find. agent-guard plants isolated fake configs, keys, and endpoints — inert canaries that unlock nothing — on your HTTP/API surface and, optionally, in host honeyfiles. Replay provides a high-confidence signal; file-read alerts require operator-supplied Linux access logs. Alerts and timelines help you respond: rotate keys, tighten access, or take the host offline.
 
 This is a last-line tripwire and early-warning / delay layer at the server. It is not a replacement for patching, a WAF, or least privilege. Default mode is detect-and-alert only. An optional, default-off trap mode can slow or rate-limit a confirmed client; it does not claim to block attacks.
 
 **What ships today, and what does not.**
 
-- **Today** coverage is the HTTP/API layer: five isolated decoy routes, MCP and GraphQL decoys, and inert canary credentials (`AG-CANARY-…`). Zero runtime dependencies; adapters for Express, Node `http`, Hono, Fastify, and Koa on Node ≥20, plus Web / Edge adapters in v0.4b (unreleased).
-- **Host-level honeyfiles** (fake `.env`, cloud creds, SSH keys, or kubeconfig on disk with access alerts) are **planned**, not shipped. A future `agent-guard seed` command is on the [roadmap](docs/roadmap.md).
+- **Today** the HTTP/API layer ships five isolated decoy routes, MCP and GraphQL decoys, and inert canary credentials (`AG-CANARY-…`). Zero runtime dependencies; adapters for Express, Node `http`, Hono, Fastify, and Koa on Node ≥20, plus Web / Edge adapters from v0.4b.
+- **Host honeyfiles ship in this unreleased v0.5a tree**: `agent-guard seed` plans inert files by default; `--write` creates them at mode 0600 without overwriting existing files or following unsafe paths/symlinks. Optional `watch` is a Linux-only, read-only parser of operator-supplied auditd or `inotifywait -e access` logs. The guard cannot observe reads itself; log-source setup may need root, the parser does not. No outbound probing. See [seed and watch](docs/seed.md).
+- **Response time window ships in this unreleased v0.5a tree**: incident timeline fields, optional bounded Node `log.file`, metrics, `incident list|show|ack`, and default-off escalation/reminders. Opt-in, default-off Node response hooks run operator scripts with fixed argv and a metadata-only environment; Web / Edge has no hooks. The guard itself does not rotate keys or change firewalls. See [incident response](docs/incident-response.md) and [log-only hook examples](docs/examples/hooks/README.md).
 - **"Fake success" deception** — a simulated environment that makes the attacker's AI believe it has breached the server — is **planned** (opt-in, safety-assessed first), not shipped. See [deception.md](docs/deception.md).
 - **Burning the attacker's tokens** is **not yet demonstrated**. The experimental maze's byte ratio was 1:1 in simulation, below the 3:1 floor; the time-ratio numbers are a 25 ms/request model, not a measurement against real LLM agents. Do not enable the maze expecting token drain until that is measured. See [exhaust.md](docs/exhaust.md) and [trap-mode.md](docs/trap-mode.md).
 - Canaries stay inert. The project never uses real credentials, never performs reverse prompt injection, and never probes outbound. It does not hack back.
 
 **What it is / is not.** agent-guard detects, traps, and observes hostile or exploratory AI-agent traffic on your APIs. It does not hack back or attack anyone. See [What it is NOT](#what-it-is-not) for non-goals, opt-in features and experimental limits.
 
-This is an open-source research project, not yet published to npm. Install from source or create a local tarball with `npm pack`. The working package name is `@imwyvern/agent-guard`. Apache-2.0, copyright 2026 Wesley Wang.
+This is an open-source research project. v0.5a is shipped in this unreleased source tree, with no npm publication or version tag. Install from source or create a local tarball with `npm pack`. The working package name is `@imwyvern/agent-guard`. Apache-2.0, copyright 2026 Wesley Wang.
 
 See the [security policy](SECURITY.md), [contributing guide](CONTRIBUTING.md), [positioning](docs/positioning.md), and [roadmap](docs/roadmap.md).
 
 ## Roadmap: where this is heading
 
-These items are planned, not shipped, except where noted:
+The shipped items below are in the unreleased tree; the remaining items are planned:
 
-- **Host honeyfiles** — `agent-guard seed` plants inert fake `.env`, cloud credentials, SSH keys, and kubeconfig on disk, with access alerts.
-- **Fake-success environment** — opt-in, safety-assessed first: a simulated service surface that may lead an attacker's AI to treat fake data as real. See [deception.md](docs/deception.md).
-- **Response time window** — an incident timeline with a dwell-time metric, plus hooks so operators can run their own key-rotation or block scripts. Process-local incident correlation and `dwell_ms` already ship; the operator-facing timeline and hooks do not.
-- **Isolated decoy host** — a dedicated decoy environment, separate from the production application process.
-- **Real-agent token-cost evaluation** — measure whether the experimental maze actually costs a real AI agent tokens before anyone should enable it. The current 1:1 byte ratio is only a hypothesis.
+- **Host honeyfiles (v0.5a)** — **shipped, unreleased**: inert `seed` files plus optional Linux access-log parsing with `watch`; host coverage depends on the operator's log source.
+- **Fake-success environment** — **planned, not shipped**: needs a safety assessment and separate approval before opt-in implementation. See [deception.md](docs/deception.md).
+- **Response time window (v0.5a)** — **shipped, unreleased**: timeline, dwell metrics, incident CLI, bounded file log, optional reminders and Node hooks to operator scripts.
+- **Isolated decoy host** — **planned, not shipped**: a separate decoy environment; the scope is programs/templates only, with deployment left to operators.
+- **Real-agent token-cost evaluation** — **planned, not shipped**: no model budget is set. Burning attacker tokens is not demonstrated; the maze simulation byte ratio remains 1:1.
 - **Edge adapters (v0.4b)** — **shipped (unreleased)**: Web-standard core, Cloudflare Workers, Next.js middleware / Vercel Edge, Deno, Bun, and Hono-web.
 
 The detailed plan is in [docs/roadmap.md](docs/roadmap.md). Scope and honest claims are in [docs/positioning.md](docs/positioning.md).
@@ -80,7 +81,7 @@ const server = app.listen(3000, '127.0.0.1');
 // On shutdown: stop accepting requests, then await guard.close() to flush alerts.
 ```
 
-When using a registry filename, prepare it with the CLI. An empty registry generates six canonical decoy canaries in memory. Persist registry placements with the CLI if tokens must remain stable across restarts. The seed controls harmless fake data; canary IDs remain cryptographically random.
+When using a registry filename, prepare it with the CLI. An empty registry generates six canonical decoy canaries in memory. Persist registry placements with the CLI if tokens must remain stable across restarts. `projectSeed` controls harmless fake data; ordinary decoy canary IDs are cryptographically random. The separate honeyfile `seed` command derives new IDs deterministically from the operator seed, HMAC secret, environment and placement, and reuses matching registry entries.
 
 ## Native Node HTTP
 
@@ -293,6 +294,9 @@ Every public field has defaults documented in [src/types.ts](src/types.ts). Requ
 | `alerts.ratePerMinute` | 30 per channel; suppressed counts carried in the next alert summary |
 | `alerts.redactIp` | `true`; coarse IPv4/IPv6 networks in alerts |
 | `log.sink` / `level` / `keepIp` | stdout JSONL / `info` / `true` |
+| `log.file` / `maxBytes` | Node-only, opt-in sanitized JSONL, mode 0600; default 10 MiB, truncates before an append exceeding the bound |
+| `escalation` | Node-only, default off; reminders default to 300000 ms after first successful alert, at most 2 per incident |
+| `hooks` | Node-only, unset/empty by default; fixed argv, no shell, fresh metadata environment, timeout and rate/concurrency caps |
 | `clientIp` | Socket IP; override only after validating a trusted proxy |
 | `onEvent` | Optional observer; observer/sink failures are isolated |
 
@@ -305,6 +309,55 @@ In detect mode, D5 always denies login with a deterministic 300–600ms delay. A
 v0.3a attaches optional `incident` metadata to existing events for the same `client_key`: `id`, ordered `sequence` (for example `robots → D1 → D2`), `first_seen`, `last_seen`, and `confidence`. `incident.windowMs` defaults to 900000 (15 minutes from the first observation); 0 disables correlation. State uses a 50k-client LRU and retains the latest 32 observations. Repeated isolated hits have low confidence; distinct decoys or discovery plus a decoy raise it to medium; `canary_replay` raises it to high. Confidence never falls within the window. Robots visits are internal markers and add no new event type. Shared networks can merge clients; correlation does not raise severity. In default detect mode it preserves HTTP responses and decoy decisions; opt-in v0.4a trap can use high confidence as a gate. Verified crawlers and allowlists remain immune. See [trap mode](docs/trap-mode.md).
 
 Replay alerts retain `canary.id`, `placement`, `env`, `found_in`, and `field`, adding `leaked_at` (placement), `replayed_at` (pathname), `dwell_ms` (time since first decoy delivery), and `client_keys_seen` (distinct replaying client keys, capped at 8). Issuance starts when a returned decoy body contains the token; HEAD and crawler bypass do not count. Tracing is process-local, with a 50k-entry LRU and 24-hour TTL. Eviction, restart, or delivery outside built-in decoys leaves issuance unknown, so `dwell_ms` is omitted. These observations do not prove identity or malicious intent.
+
+## Host honeyfiles and incident response (v0.5a, unreleased)
+
+Use the built CLI below (or `agent-guard` in a local consumer installation). Prepare a nonempty UTF-8 seed file and set `AG_CANARY_SECRET` through your secret mechanism; neither command prints their values. Dry-run needs an existing `--dir`; `--write` can create it. Profiles are `node`, `python`, `k8s`, and `generic`. Contents are inert and deterministic for matching inputs/registry, without real vendor credential formats or prefixes; any callback URL must be operator-hosted.
+
+```sh
+node dist/cli/main.js seed --profile node --dir ./honeyfiles --seed-file ./operator-seed.txt --env demo
+node dist/cli/main.js seed --profile node --dir ./honeyfiles --seed-file ./operator-seed.txt --env demo --write
+node dist/cli/main.js seed --profile node --dir ./honeyfiles --seed-file ./operator-seed.txt --env demo --verify
+```
+
+`--write` persists `agent-guard.canaries.json` and `agent-guard.seed.json` by default. Keep metadata outside the honeyfile directory. Verification is read-only and reports missing/modified files or incorrect permissions; findings are not access alerts. See [profiles, path safety and log-source templates](docs/seed.md).
+
+Operators configure auditd or run `inotifywait -e access` themselves. `watch` tails the supplied log from its end unless `--from-start` is set; it does not use `fs.watch` or atime to detect reads. Choose one source:
+
+```sh
+node dist/cli/main.js watch --inotify-log ./access.log --dir ./honeyfiles --manifest ./agent-guard.seed.json --project local-catalog --env demo
+# Alternative: use an operator-configured auditd log.
+node dist/cli/main.js watch --auditd /var/log/audit/audit.log --dir ./honeyfiles --manifest ./agent-guard.seed.json --project local-catalog --env demo
+```
+
+`watch` emits medium-severity `honeyfile_read` JSONL to stdout, with optional webhook alerts when both `AG_ALERT_WEBHOOK_URL` and `AG_ALERT_WEBHOOK_SECRET` are configured. These events never trigger trap/block and have no HTTP incident ID; the incident CLI shows them as log-adjacent records when collected into its input log. The standalone watch CLI has no hook-config flag.
+
+For Node, add these options when creating your guard. Create the log's parent directory first, use the seeded registry with the same secret/seed/environment for HTTP replay provenance, and replace executable/script paths with absolute paths on your host. This hook example only appends a local log line; its log directory must already exist. See [safe hook usage](docs/incident-response.md) and the [example setup](docs/examples/hooks/README.md).
+
+```ts
+const responseOptions = {
+  log: { file: './events.jsonl', maxBytes: 10 * 1024 * 1024, keepIp: false },
+  escalation: { enabled: true, remindAfterMs: 300000, maxReminders: 2 },
+  hooks: [{
+    on: 'canary_replay' as const,
+    run: ['/usr/bin/node', '/absolute/path/to/agent-guard/docs/examples/hooks/append-log.mjs'] as [string, ...string[]],
+    timeoutMs: 1000, maxPerHour: 10, maxConcurrent: 1,
+  }],
+};
+// Pass ...responseOptions into createAgentGuard({...}). Omit to keep these options off.
+```
+
+Hooks use `spawn` with `shell: false`, never interpolate request content into argv, and receive only `AG_INCIDENT_ID`, `AG_EVENT_TYPE`, `AG_CLIENT_KEY_HASH`, `AG_CANARY_ID`, `AG_PLACEMENT` when available. No parent secrets are inherited. Timeouts send SIGTERM then SIGKILL; per-hour and concurrency caps bound execution. Failures emit `hook_result` and never affect `inspect`; stdout/stderr are discarded. Hooks are Node-only and default off.
+
+Timeline metadata lives under `event.incident`: `first_touch_at`, `alerted_at` (first successful delivery), and `dwell_ms` (first touch to this event, clamped at zero). This differs from `event.canary.dwell_ms`, which measures known decoy issuance to replay and is absent for unknown issuance, including seeded files. Node Prometheus summaries `agent_guard_time_to_alert_seconds` and `agent_guard_incident_dwell_seconds` have no path, UA or IP labels.
+
+```sh
+node dist/cli/main.js incident list --log ./events.jsonl
+node dist/cli/main.js incident show INCIDENT_ID --log ./events.jsonl --json
+node dist/cli/main.js incident ack INCIDENT_ID --log ./events.jsonl
+```
+
+Replace `INCIDENT_ID` with an ID from `list`. `list` and `show` are read-only; `ack` appends `incident_ack`. Escalation/reminders are default off. When enabled, the Node guard can see CLI acknowledgments only through the same `log.file`; with another file or no `log.file`, reminders stay capped but cannot see those acks. Retention and correlation are bounded and process-local; see [incident response](docs/incident-response.md) for limits.
 
 ## Alerts and signatures
 
@@ -393,7 +446,7 @@ From v0.3b, `npm run bench:exhaust-sim` runs an in-memory cost-ratio simulation 
 
 It is not a WAF, DDoS defense, authentication system or general bot blocker. It is not a replacement for patching, least privilege, or secret hygiene. This research project provides neither a production deployment nor a guarantee of search-engine behavior.
 
-Host-level honeyfiles and "fake success" deception are planned, not shipped. Burning the attacker's tokens is not demonstrated. See [positioning](docs/positioning.md) and the short [roadmap list](#roadmap-where-this-is-heading) above.
+Host coverage is limited to optional seeded honeyfiles and Linux logs configured by the operator; the guard itself cannot see file reads. Fake-success deception and an isolated decoy host remain planned, not shipped; fake success needs safety review and separate approval, and we do not deploy hosts. Burning the attacker's tokens is not demonstrated; real-agent evaluation has no budget set. See [positioning](docs/positioning.md) and the short [roadmap list](#roadmap-where-this-is-heading) above.
 
 Reverse prompt injection / counter-injection (E4) is never in the product. There is no outbound probing or guard-initiated callback toward third parties; operator-configured alert adapters are the only outbound notification exception. Existing crawler-identity DNS checks remain unchanged. Canaries stay inert HMAC tokens, never real vendor credentials. No third-party honeytoken service (Canarytokens, etc.) is used; the callback canary is operator-hosted only.
 
@@ -414,7 +467,9 @@ The **experimental maze** needs the operator's own real-agent measurement before
 
 - [Positioning](docs/positioning.md) — the pitch, scope boundaries, and an honest claims table (claim / status / evidence).
 - [Community](docs/community.md) — how to contribute adapters, signatures, translations, and RFCs.
-- [Roadmap](docs/roadmap.md) — direction of travel, v0.4a/v0.4b completion (unreleased), and the v0.5+ plan; persona/deception extensions remain design work.
+- [Roadmap](docs/roadmap.md) — v0.4a/v0.4b/v0.5a completion (unreleased) and remaining plans; persona/deception extensions remain design work.
+- [Seed and watch](docs/seed.md) — inert honeyfiles, permissions, verification and operator-supplied Linux access logs.
+- [Incident response](docs/incident-response.md) — timeline, bounded logs, metrics, acknowledgments, optional reminders and [log-only hooks](docs/examples/hooks/README.md).
 - [Edge operator guide](docs/edge.md) — runtime setup, StateStore examples, degradation, and troubleshooting.
 - [Exhaust](docs/exhaust.md) — implemented opt-in delay and experimental maze; context burn (E3) remains unimplemented; token drain is not demonstrated.
 - [Deception](docs/deception.md) — making decoy data believable so an attacker’s agent may treat it as real; "fake success" is planned, not shipped.

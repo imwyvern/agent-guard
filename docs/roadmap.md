@@ -1,6 +1,6 @@
-# agent-guard Roadmap（v0.4b 已完成，v0.5+ 规划）
+# agent-guard Roadmap（v0.5a 已实现，后续规划）
 
-> 状态：v0.4a / v0.4b 已实现（unreleased），文档状态更新于 2026-11-11（HKT）；v0.5+ 见 [plan-v0.5-v0.7.md](plan-v0.5-v0.7.md)。作者：agent-guard 维护者。
+> 状态：v0.4a / v0.4b / v0.5a 已实现（unreleased，未发 npm、未打 tag），文档状态更新于 2026-11-11（HKT）；v0.5+ 见 [plan-v0.5-v0.7.md](plan-v0.5-v0.7.md)。作者：agent-guard 维护者。
 > 范围约束不变：**detect + alert only** 为默认；canary 永远 inert；decoy 永远 `noindex`；verified crawler 永远不进 decoy；任何 blocking / budget trap 只能 opt-in 且默认关闭；不做生产环境 reverse prompt injection、不做全站 tarpit、不攻击任何第三方系统；不 fork、不复制其他项目代码（尤其 GPL 的 Beelzebub，只借鉴思路）。
 > 定位与诚实声明见 [positioning.md](positioning.md)：这是服务器层面的**最后一道行程绊线与早期预警 / 延迟层**，不能替代补丁、WAF 或最小权限。
 
@@ -8,15 +8,15 @@
 
 叙事主轴（方向，不是已交付能力的清单）：攻击者现在用 AI agent 入侵；我们在服务端埋入假配置、假密钥和假端点（inert canaries）；对方 AI 一旦触碰，我们得到高置信度的早期告警和一段可操作的响应窗口；可选的 opt-in trap 可以拖慢或限流已确认的客户端。
 
-今日范围是 **HTTP/API 层**。下列方向是规划中的迭代，**尚未交付**（除已注明者外）：
+今日范围是 **HTTP/API 层 + 可选主机 honeyfiles**；读取告警依赖运营者提供的 Linux auditd/inotifywait 访问日志，guard 不能自行看见读取。下表区分本 unreleased 代码树中的已实现能力与规划：
 
 | # | 方向 | 状态 | 说明 |
 | --- | --- | --- | --- |
-| 0.1 | **主机层 honeyfile**（`agent-guard seed`） | 规划中，未交付 | 在磁盘上放置惰性的假 `.env`、云凭证、SSH 密钥、kubeconfig，并在被访问时告警。今天只在 HTTP 响应里放置 canary，不写主机文件。 |
+| 0.1 | **主机层 honeyfile**（`agent-guard seed`） | ✅ v0.5a 已实现，unreleased | 四种 profile，默认 dry-run；`--write` 创建 0600 inert 文件、不覆盖、不跟随不安全路径/符号链接，`--verify` 只读核查。可选 Linux-only `watch` 解析运营者 auditd / `inotifywait -e access` 日志；guard 不自行检测读取，来源配置可能需 root，parser 无需 root；`honeyfile_read` 不触发 trap/block。见 [seed.md](seed.md)。 |
 | 0.2 | **假成功仿真环境** | 规划中，未交付 | opt-in，先做安全评估。让攻击者的 AI 可能误以为已入侵成功，并继续在假数据上行动。见 [deception.md](deception.md)。现有 D2/D5 仍始终拒绝。 |
-| 0.3 | **响应时间窗口 / incident timeline** | 部分交付 | v0.3a 已有进程内 incident 关联和 canary 回放的 `dwell_ms`。面向运营者的时间线，以及挂钩到运营者自己的密钥轮换 / 阻断脚本，尚未交付。 |
-| 0.4 | **隔离诱饵主机** | 规划中，未交付 | 与生产应用进程分离的独立诱饵环境。相关讨论见 [distribution.md](distribution.md)。 |
-| 0.5 | **真实 agent 的 token 成本评估** | 规划中，未交付 | 用我们控制的真实 AI agent 测量实验性迷宫是否真的消耗对方 token。当前模拟字节比为 1:1，低于 3:1 下限，**不能声称已消耗攻击者 token**。见 [exhaust.md](exhaust.md)、[trap-mode.md](trap-mode.md)。 |
+| 0.3 | **响应时间窗口 / incident timeline** | ✅ v0.5a 已实现，unreleased | timeline 字段、Node 有界 0600 `log.file`、无 path/UA/IP labels 的 summaries、`incident list` / `show` / `ack`；升级/提醒与 Node hooks 均 opt-in、默认关闭，Web/Edge 无 hooks。CLI ack 只有写到同一 `log.file` 才被进程看到。guard 不轮换密钥、不改防火墙，示例仅记录日志。见 [incident-response.md](incident-response.md)。 |
+| 0.4 | **隔离诱饵主机** | 规划中，未交付 | 与生产应用进程分离的独立诱饵环境；仅计划提供程序/模板，不替运营者部署。相关讨论见 [distribution.md](distribution.md)。 |
+| 0.5 | **真实 agent 的 token 成本评估** | 规划中，未交付 | 模型预算未设定；计划用我们控制的真实 AI agent 测量实验性迷宫是否真的消耗对方 token。当前模拟字节比为 1:1，低于 3:1 下限，**不能声称已消耗攻击者 token**。见 [exhaust.md](exhaust.md)、[trap-mode.md](trap-mode.md)。 |
 | 0.6 | **Edge 适配器（v0.4b）** | ✅ 已完成，unreleased | Web-standard core、Cloudflare Workers、Next.js middleware / Vercel Edge、Deno、Bun、Hono-web。降级与接入见 [edge.md](edge.md)。 |
 
 README 六个语言版本的顶部都有同一份短列表。贡献入口见 [community.md](community.md) 的 roadmap / good first issue 说明。
@@ -89,9 +89,9 @@ README 六个语言版本的顶部都有同一份短列表。贡献入口见 [co
 | **Web Bot Auth verification** | 正向验证自报身份 agent；verified agent 同 verified crawler 一样 bypass decoy | 草案在演进（Dictionary vs bare string）；key directory 抓取本身是 SSRF 面 → 目录 URL 只允许 https、allowlist、超时、缓存、大小上限 | RFC 9421 测试向量通过；两种 `Signature-Agent` 形式都能解析；过期/篡改签名拒绝 |
 | **Prompt-injection-safe canary placement**（✅ done，v0.3a / unreleased；HTML / JSON / OpenAPI） | canary 文本可能被 agent 读进上下文 → 文本必须是数据，不是指令 | 自己变成 injection 源 → placement linter：禁止 imperative、禁止隐藏字符、禁止 URL 外呼诱导；v0.4a 已提供可选精确 `allowedHosts` 以 lint 运营者的 callback 放置，默认仍严格 | `agent-guard lint <path>` + 单测/文档；所有内置 decoy/lure 与 deception bench 通过 lint |
 
-## 5. v0.4a / v0.4b 已实现与 v0.5+ 规划
+## 5. v0.4a / v0.4b / v0.5a 已实现与后续规划
 
-> 第 0 节中的主机 honeyfile、假成功环境、响应时间窗口挂钩、隔离诱饵主机和真实 agent 评估，是 v0.4a 之后的产品方向，与本节的技术债（OTel、CEF/STIX、供应链）并行；Web-standard core / Edge 已在 v0.4b 完成（unreleased）。后续顺序与验收见 [plan-v0.5-v0.7.md](plan-v0.5-v0.7.md)。假成功必须 opt-in 且先做安全评估；迷宫在真实 agent 测量完成前不应作为默认建议启用。
+> 第 0 节中的主机 honeyfile 与响应时间窗口已在 v0.5a 实现（unreleased）；假成功环境、隔离诱饵主机和真实 agent 评估仍是规划，与本节的技术债（OTel、CEF/STIX、供应链）并行；Web-standard core / Edge 已在 v0.4b 完成（unreleased）。后续顺序与验收见 [plan-v0.5-v0.7.md](plan-v0.5-v0.7.md)。假成功必须 opt-in 且先做安全评估；迷宫在真实 agent 测量完成前不应作为默认建议启用。
 
 > **v0.4a / unreleased 已完成**：Slack / Telegram / 飞书 / SMTP 告警 adapters（opt-in、零运行时依赖）；Prometheus 文本导出（不默认挂载、无路径 label）；机械节奏观测（不升严重级别、不单独触发 block/maze）；独立 opt-in 的 delay / rateLimit / block；实验性有界 maze；自托管 callback canary（handler 显式挂载，guard 不 fetch baseUrl）；可选精确 lint 主机放行。默认 `mode: 'detect'`，trap 全部功能开关默认关闭。
 
@@ -101,7 +101,7 @@ README 六个语言版本的顶部都有同一份短列表。贡献入口见 [co
 | --- | --- | --- | --- |
 | **OpenTelemetry**（span event + attributes，可选 peer） | 接入现有 tracing | 引入依赖 → 仅 optional peer，core 零依赖 | 示例里在 OTel collector 看到 `agent_guard.decoy_hit` |
 | **Prometheus metrics**（✅ done，v0.4a / unreleased；`prometheusText` / `prometheusHandler`，不默认挂载） | 运维习惯 | 指标泄露 decoy 路径 → 默认不暴露路径 label | 文本 `# HELP` / `# TYPE` 格式测试；无 promtool 依赖、无路径 label |
-| **Structured log sinks**：JSONL、syslog、CEF / STIX 2.1 导出（借鉴 Oubliette 的思路，自写） | SOC 集成 | 字段膨胀 → 遵守现有 event schema 版本化 | schema 测试；CLI `report` 支持导出 |
+| **Structured log sinks**：Node 有界 sanitized JSONL `log.file` 已在 v0.5a 实现；syslog、CEF / STIX 2.1 导出仍规划中（借鉴 Oubliette 的思路，自写） | SOC 集成 | 字段膨胀 → 遵守现有 event schema 版本化 | schema 测试；CLI `report` 支持导出 |
 | **Supply chain**：npm provenance、CycloneDX SBOM、signed tags、OpenSSF Scorecard workflow | 安全工具自身必须可信 | 需要 Dan 批准 npm publish 才有意义 | Scorecard ≥ 7；SBOM 随 release 附带 |
 | **Opt-in delay / rateLimit / block 与实验性 maze**（✅ done，v0.4a / unreleased） | 对已确认的 decoy 命中者消耗其预算（借鉴 AI Labyrinth，但**有限深度、默认关、noindex、verified crawler 不进**） | 默认关；verified crawler / allowlist 免疫；replay / high incident 或先前信号 + 检测分闸门（block 只认前两者）；TTL/LRU、预算、kill switch、断路器 | 默认配置不生效；模拟 crawler 免疫；v0.3b 字节比 1:1，maze 未经自身真实 agent 测量不应启用 |
 | **Community**：docs site（静态站，GitHub Pages）、贡献指南扩展、good-first-issue 标签、威胁模型公开讨论 | 长期维护 | 维护负担 | docs site 构建进 CI |

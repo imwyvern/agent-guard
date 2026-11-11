@@ -8,34 +8,35 @@ An AI-agent honeypot middleware for Node and the edge.
 
 ## 왜 필요한가
 
-공격자는 이제 AI agent를 사용해 서버를 탐색하고, 구성을 읽으며, 발견한 키를 재사용합니다. agent-guard는 애플리케이션의 HTTP/API 계층에 격리된 가짜 구성, 키, 엔드포인트(아무 권한도 열지 않는 비활성 카나리아)를 심습니다. 공격자의 AI가 이를 건드리면, 높은 신뢰도의 조기 알림과 키 교체, 접근 축소, 호스트 격리 같은 대응에 쓸 수 있는 시간 창을 얻게 됩니다.
+공격자는 AI agent로 서버를 탐색하고 구성을 읽으며 발견한 키를 재사용합니다. agent-guard는 HTTP/API 계층과 선택적 호스트 honeyfile에 격리된 가짜 구성, 키, 엔드포인트(권한을 열지 않는 비활성 카나리아)를 심습니다. 재사용은 신뢰도 높은 신호를 제공하며, 파일 읽기 알림에는 운영자가 제공한 Linux 접근 로그가 필요합니다. 알림과 타임라인은 키 교체, 접근 축소, 호스트 중단 같은 대응을 돕습니다.
 
 이것은 서버 수준의 마지막 트립와이어이자 조기 경보 / 지연 계층입니다. 패치, WAF, 최소 권한을 대체하지 않습니다. 기본 모드는 탐지와 알림뿐입니다. 선택적이고 기본 꺼짐인 trap 모드는 확인된 클라이언트를 늦추거나 속도 제한할 수 있지만, 공격을 차단한다고 주장하지 않습니다.
 
 **오늘 제공되는 것과 아직 제공되지 않는 것.**
 
-- **오늘**의 범위는 HTTP/API 계층입니다. 격리된 다섯 개의 디코이 라우트, MCP 및 GraphQL 디코이, 비활성 카나리아 자격 증명(`AG-CANARY-…`). 런타임 의존성은 없으며, Node ≥20에서 Express, Node `http`, Hono, Fastify, Koa 어댑터를 제공합니다. 또한 v0.4b의 Web / Edge 어댑터가 구현되어 있습니다(아직 릴리스되지 않음).
-- **호스트 수준 honeyfile**(디스크상의 가짜 `.env`, 클라우드 자격 증명, SSH 키, kubeconfig와 접근 시 알림)은 **계획 중**이며 아직 제공되지 않습니다. 미래의 `agent-guard seed` 명령은 [로드맵](../roadmap.md)에 있습니다.
-- **「가짜 성공」 기만** — 공격자의 AI가 침입에 성공했다고 믿게 만들 수 있는 시뮬레이션 환경 — 은 **계획 중**입니다(옵트인 필수, 먼저 안전성 평가). 아직 제공되지 않습니다. [deception.md](../deception.md)를 참고하세요.
+- **오늘** HTTP/API 계층에는 격리된 디코이 라우트 다섯 개, MCP 및 GraphQL 디코이와 비활성 카나리아 자격 증명(`AG-CANARY-…`)이 구현되어 있습니다. 런타임 의존성은 없으며 Node ≥20의 Express, Node `http`, Hono, Fastify, Koa와 v0.4b부터의 Web / Edge 어댑터를 제공합니다.
+- **호스트 honeyfile은 이 미릴리스 v0.5a 트리에 구현되어 있습니다**. `agent-guard seed`는 기본적으로 비활성 파일 계획을 출력하고, `--write`는 0600 파일을 생성합니다. 기존 파일을 덮어쓰거나 안전하지 않은 경로/심볼릭 링크를 따라가지 않습니다. 선택적 `watch`는 운영자의 auditd 또는 `inotifywait -e access` 로그를 읽는 Linux 전용 읽기 전용 파서입니다. guard 자체는 읽기를 관찰하지 못합니다. 로그 소스 설정에는 root가 필요할 수 있지만 파서에는 필요하지 않습니다. 외부 프로빙은 없습니다. [seed와 watch](../seed.md)를 참고하세요.
+- **대응 시간 창은 이 미릴리스 v0.5a 트리에 구현되어 있습니다**. 인시던트 타임라인 필드, 선택적 크기 제한 Node `log.file`, 지표, `incident list|show|ack`, 기본 꺼짐 에스컬레이션/리마인더를 제공합니다. Node 응답 훅은 옵트인이며 기본으로 꺼지고, 고정 argv와 메타데이터만 있는 환경으로 운영자 스크립트를 실행합니다. Web / Edge에는 훅이 없습니다. guard 자체는 키를 교체하거나 방화벽을 변경하지 않습니다. [인시던트 대응](../incident-response.md)과 [로그 전용 훅 예제](../examples/hooks/README.md)를 참고하세요.
+- **「가짜 성공」 기만** — 공격자의 AI가 침입에 성공했다고 믿을 수 있는 모의 환경 — 은 **계획 중이며 미구현**입니다. 옵트인 구현 전에 안전성 평가와 별도 승인이 필요합니다. [deception.md](../deception.md)를 참고하세요.
 - **공격자의 토큰을 소모한다**는 주장은 아직 **입증되지 않았습니다**. 실험적 미로의 바이트 비율은 시뮬레이션에서 1:1로, 하한인 3:1에 미치지 못합니다. 시간 비율 수치는 25 ms/request 모델이며 실제 LLM agent를 측정한 결과가 아닙니다. 그 측정이 끝나기 전에는 토큰 소모를 기대하고 미로를 켜지 마세요. [exhaust.md](../exhaust.md)와 [trap-mode.md](../trap-mode.md)를 참고하세요.
 - 카나리아는 비활성 상태입니다. 이 프로젝트는 실제 자격 증명을 사용하지 않고, 리버스 프롬프트 인젝션을 수행하지 않으며, 외부 프로빙도 하지 않습니다. 역공하지 않습니다.
 
 **이것이 하는 일 / 하지 않는 일.** agent-guard는 API를 향한 적대적이거나 탐색적인 AI agent 트래픽을 탐지하고, 유인하며, 관찰합니다. 역공하거나 누구를 공격하지 않습니다. 비목표, 옵트인 기능과 실험적 한계는 [이것이 아닌 것](#이것이-아닌-것)을 참고하세요.
 
-이것은 오픈소스 연구 프로젝트이며 아직 npm에 게시되지 않았습니다. 소스에서 설치하거나 `npm pack`으로 로컬 tarball을 만드세요. 작업 중인 패키지 이름은 `@imwyvern/agent-guard`입니다. Apache-2.0, 저작권 2026 Wesley Wang.
+이것은 오픈소스 연구 프로젝트입니다. v0.5a는 이 미릴리스 소스 트리에 구현되었으며 npm 게시나 버전 태그는 없습니다. 소스에서 설치하거나 `npm pack`으로 로컬 tarball을 만드세요. 작업 중인 패키지 이름은 `@imwyvern/agent-guard`입니다. Apache-2.0, 저작권 2026 Wesley Wang.
 
 [보안 정책](../../SECURITY.md), [기여 가이드](../../CONTRIBUTING.md), [포지셔닝](../positioning.md), [로드맵](../roadmap.md)을 참고하세요.
 
 ## 로드맵: 앞으로의 방향
 
-별도 표기가 없는 항목은 계획 중이며 아직 제공되지 않습니다.
+아래 구현 항목은 미릴리스 트리에 있으며 나머지는 계획 중입니다.
 
-- **호스트 수준 honeyfile** — `agent-guard seed`가 디스크에 비활성 가짜 `.env`, 클라우드 자격 증명, SSH 키, kubeconfig를 심고 접근 시 알립니다.
-- **가짜 성공 환경** — 옵트인 필수, 먼저 안전성 평가. 공격자의 AI가 가짜 데이터를 실제처럼 여길 수 있는 시뮬레이션 서비스 면입니다. [deception.md](../deception.md)를 참고하세요.
-- **대응 시간 창** — 운영자용 인시던트 타임라인, 체류 시간(dwell-time) 지표, 그리고 운영자 자신의 키 교체 / 차단 스크립트에 연결하는 훅. 프로세스 내 인시던트 상관과 `dwell_ms`는 이미 제공됩니다. 운영자용 타임라인과 훅은 아직 없습니다.
-- **격리된 디코이 호스트** — 프로덕션 애플리케이션 프로세스와 분리된 전용 디코이 환경.
-- **실제 agent 토큰 비용 평가** — 실험적 미로를 켜기 전에 실제 AI agent의 토큰을 정말로 소모하는지 측정합니다. 현재 1:1 바이트 비율은 가설일 뿐입니다.
-- **Edge 어댑터(v0.4b)** — **구현 완료(아직 릴리스되지 않음)**: Web 표준 코어, Cloudflare Workers, Next.js middleware / Vercel Edge, Deno, Bun, Hono-web.
+- **호스트 honeyfile(v0.5a)** — **구현 완료, 미릴리스**: 비활성 `seed` 파일과 선택적 Linux 접근 로그 `watch`. 호스트 범위는 운영자의 로그 소스에 달려 있습니다.
+- **가짜 성공 환경** — **계획 중, 미구현**: 옵트인 구현 전에 안전성 평가와 별도 승인이 필요합니다. [deception.md](../deception.md)를 참고하세요.
+- **대응 시간 창(v0.5a)** — **구현 완료, 미릴리스**: 타임라인, dwell 지표, incident CLI, 크기가 제한된 파일 로그, 선택적 리마인더와 운영자 스크립트용 Node 훅.
+- **격리된 디코이 호스트** — **계획 중, 미구현**: 별도 디코이 환경. 범위는 프로그램/템플릿뿐이며 배포는 운영자가 합니다.
+- **실제 agent 토큰 비용 평가** — **계획 중, 미구현**: 모델 예산이 정해지지 않았습니다. 공격자의 토큰 소모는 입증되지 않았고 미로 시뮬레이션 바이트 비율은 여전히 1:1입니다.
+- **Edge 어댑터(v0.4b)** — **구현 완료(미릴리스)**: Web 표준 코어, Cloudflare Workers, Next.js middleware / Vercel Edge, Deno, Bun, Hono-web.
 
 자세한 계획은 [docs/roadmap.md](../roadmap.md)에 있습니다. 범위와 정직한 주장은 [docs/positioning.md](../positioning.md)에 있습니다.
 
@@ -82,7 +83,7 @@ const server = app.listen(3000, '127.0.0.1');
 // On shutdown: stop accepting requests, then await guard.close() to flush alerts.
 ```
 
-레지스트리 파일 이름을 사용할 때는 CLI로 먼저 준비하세요. 빈 레지스트리는 메모리에서 정규 디코이 카나리아 여섯 개를 생성합니다. 재시작 후에도 토큰이 안정적으로 유지되어야 한다면, CLI로 레지스트리 배치를 영속화하세요. 시드가 제어하는 것은 무해한 가짜 데이터이며, 카나리아 ID는 암호학적으로 무작위인 상태로 남습니다.
+레지스트리 파일 이름을 사용할 때는 CLI로 먼저 준비하세요. 빈 레지스트리는 메모리에 정규 디코이 카나리아 여섯 개를 생성합니다. 재시작 뒤에도 토큰을 유지하려면 CLI로 배치를 영속화하세요. `projectSeed`는 무해한 가짜 데이터를 제어하며 일반 디코이 카나리아 ID는 암호학적으로 무작위입니다. 별도의 honeyfile `seed` 명령은 운영자 시드, HMAC 시크릿, 환경, 배치로부터 새 ID를 결정적으로 도출하고 일치하는 레지스트리 항목을 재사용합니다.
 
 ## 네이티브 Node HTTP
 
@@ -295,6 +296,9 @@ HTML이 없는 API는 [API 전용 가이드](../scenarios/api-only.md)를 참고
 | `alerts.ratePerMinute` | 채널당 30; 억제된 횟수는 다음 알림 요약으로 이월 |
 | `alerts.redactIp` | `true`; 알림에서는 거친 IPv4/IPv6 네트워크 |
 | `log.sink` / `level` / `keepIp` | stdout JSONL / `info` / `true` |
+| `log.file` / `maxBytes` | Node 전용, 옵트인 정제 JSONL, 0600. 기본 10 MiB이며 추가 시 한도를 넘으면 먼저 파일을 비움 |
+| `escalation` | Node 전용, 기본 꺼짐. 첫 성공 알림 뒤 기본 300000 ms 간격, 인시던트당 리마인더 최대 2회 |
+| `hooks` | Node 전용, 기본 미설정/빈 배열. 고정 argv, 셸 없음, 새 메타데이터 환경, 시간 제한과 빈도/동시 실행 상한 |
 | `clientIp` | 소켓 IP; 신뢰할 수 있는 프록시를 검증한 뒤에만 재정의 |
 | `onEvent` | 선택적 관찰자; 관찰자/sink 실패는 격리됨 |
 
@@ -307,6 +311,55 @@ detect 모드에서 D5는 항상 로그인을 거부하며 결정적인 300–60
 v0.3a는 동일한 `client_key`의 기존 이벤트에 선택적 `incident`를 붙입니다. 필드는 `id`, 순서 있는 `sequence`(예: `robots → D1 → D2`), `first_seen`, `last_seen`, `confidence`입니다. `incident.windowMs` 기본값은 900000(첫 관측부터 고정 15분)이며 0이면 상관관계를 끕니다. 상태는 50k 클라이언트 LRU와 최근 32개 관측으로 제한됩니다. 단일 적중의 반복은 low, 서로 다른 디코이나 발견과 디코이의 조합은 medium, `canary_replay`는 high로 올립니다. 같은 시간 창에서 신뢰도는 내려가지 않습니다. robots 방문은 내부 표식이며 이벤트 타입을 추가하지 않습니다. 공유 네트워크에서는 클라이언트가 합쳐질 수 있습니다. 상관관계는 심각도를 올리지 않습니다. 기본 detect에서는 HTTP 응답과 디코이 결정을 유지하지만, v0.4a 옵트인 trap은 high confidence를 진입 조건으로 사용할 수 있습니다. 검증된 크롤러와 allowlist는 항상 보호됩니다. [trap 모드](../trap-mode.md)를 참고하세요.
 
 재사용 알림은 `canary.id`, `placement`, `env`, `found_in`, `field`를 유지하고 `leaked_at`(배치 위치), `replayed_at`(경로), `dwell_ms`(첫 디코이 전달부터의 시간), `client_keys_seen`(서로 다른 재사용 클라이언트 키 수, 최대 8)을 추가합니다. 반환하는 디코이 본문에 토큰이 있을 때만 전달을 기록하며 HEAD와 크롤러 우회는 제외합니다. 추적은 프로세스 메모리에만 있고 50k 항목 LRU와 24시간 TTL을 사용합니다. 퇴출, 재시작, 내장 디코이 이외의 전달로 시점을 알 수 없으면 `dwell_ms`를 생략합니다. 이 관측은 신원이나 악의의 증거를 확정하지 않습니다.
+
+## 호스트 honeyfile과 인시던트 대응(v0.5a, 미릴리스)
+
+아래 빌드된 CLI(또는 로컬 소비 프로젝트에 설치된 `agent-guard`)를 사용하세요. 비어 있지 않은 UTF-8 시드 파일을 준비하고 시크릿 관리 수단으로 `AG_CANARY_SECRET`을 설정하세요. 명령은 이 값을 출력하지 않습니다. dry-run에는 기존 `--dir`이 필요하고 `--write`는 디렉터리를 만들 수 있습니다. 프로필은 `node`, `python`, `k8s`, `generic`입니다. 내용은 비활성이며 같은 입력/레지스트리에 대해 결정적이고 실제 벤더 자격 증명 형식이나 접두사를 쓰지 않습니다. callback URL은 운영자가 직접 호스팅해야 합니다.
+
+```sh
+node dist/cli/main.js seed --profile node --dir ./honeyfiles --seed-file ./operator-seed.txt --env demo
+node dist/cli/main.js seed --profile node --dir ./honeyfiles --seed-file ./operator-seed.txt --env demo --write
+node dist/cli/main.js seed --profile node --dir ./honeyfiles --seed-file ./operator-seed.txt --env demo --verify
+```
+
+`--write`는 기본적으로 `agent-guard.canaries.json`과 `agent-guard.seed.json`을 저장합니다. 메타데이터는 honeyfile 디렉터리 밖에 두세요. 검증은 읽기 전용이며 누락/변경 파일이나 잘못된 권한을 보고합니다. 검증 결과는 접근 알림이 아닙니다. [프로필, 경로 안전성, 로그 소스 템플릿](../seed.md)을 참고하세요.
+
+운영자가 auditd를 설정하거나 `inotifywait -e access`를 직접 실행합니다. `watch`는 `--from-start`가 없으면 로그 끝부터 따라가며 `fs.watch`나 atime으로 읽기를 탐지하지 않습니다. 소스 하나를 선택하세요.
+
+```sh
+node dist/cli/main.js watch --inotify-log ./access.log --dir ./honeyfiles --manifest ./agent-guard.seed.json --project local-catalog --env demo
+# Alternative: use an operator-configured auditd log.
+node dist/cli/main.js watch --auditd /var/log/audit/audit.log --dir ./honeyfiles --manifest ./agent-guard.seed.json --project local-catalog --env demo
+```
+
+`watch`는 medium 심각도의 `honeyfile_read` JSONL을 stdout으로 내보냅니다. `AG_ALERT_WEBHOOK_URL`과 `AG_ALERT_WEBHOOK_SECRET`을 모두 설정하면 선택적 webhook 알림도 보냅니다. 이 이벤트는 trap/block을 실행하지 않으며 HTTP incident ID가 없습니다. CLI 입력 로그에 모으면 로그상 인접 레코드로 표시됩니다. 독립 watch CLI에는 훅 설정 플래그가 없습니다.
+
+Node에서는 guard 생성 시 다음 옵션을 추가하세요. 로그의 부모 디렉터리를 먼저 만들고, HTTP 재사용 출처를 확인하려면 seed 레지스트리 및 같은 시크릿/시드/환경을 사용하세요. 실행 파일/스크립트 경로를 호스트의 절대 경로로 바꾸세요. 이 예제는 로컬 로그 한 줄만 추가하며 해당 로그 디렉터리가 이미 있어야 합니다. [안전한 훅 사용](../incident-response.md)과 [예제 설정](../examples/hooks/README.md)을 참고하세요.
+
+```ts
+const responseOptions = {
+  log: { file: './events.jsonl', maxBytes: 10 * 1024 * 1024, keepIp: false },
+  escalation: { enabled: true, remindAfterMs: 300000, maxReminders: 2 },
+  hooks: [{
+    on: 'canary_replay' as const,
+    run: ['/usr/bin/node', '/absolute/path/to/agent-guard/docs/examples/hooks/append-log.mjs'] as [string, ...string[]],
+    timeoutMs: 1000, maxPerHour: 10, maxConcurrent: 1,
+  }],
+};
+// Pass ...responseOptions into createAgentGuard({...}). Omit to keep these options off.
+```
+
+훅은 `spawn`과 `shell: false`를 사용하고 요청 내용을 argv에 넣지 않습니다. 사용할 수 있는 경우 `AG_INCIDENT_ID`, `AG_EVENT_TYPE`, `AG_CLIENT_KEY_HASH`, `AG_CANARY_ID`, `AG_PLACEMENT`만 받으며 부모 시크릿을 상속하지 않습니다. 시간 초과 시 SIGTERM 다음 SIGKILL을 보내며 시간당 횟수와 동시 실행 상한이 있습니다. 실패는 `hook_result`를 내보내고 `inspect`에 영향을 주지 않습니다. stdout/stderr는 버립니다. 훅은 Node 전용이며 기본으로 꺼집니다.
+
+타임라인 메타데이터는 `event.incident`에 있습니다. `first_touch_at`, `alerted_at`(첫 전달 성공), `dwell_ms`(첫 접촉부터 현재 이벤트까지, 최솟값 0)를 포함합니다. 이는 `event.canary.dwell_ms`와 다릅니다. 후자는 알려진 디코이 전달부터 재사용까지를 측정하고 seed 파일처럼 전달 시점을 모르면 생략됩니다. Node Prometheus summaries `agent_guard_time_to_alert_seconds`와 `agent_guard_incident_dwell_seconds`에는 경로, UA, IP 레이블이 없습니다.
+
+```sh
+node dist/cli/main.js incident list --log ./events.jsonl
+node dist/cli/main.js incident show INCIDENT_ID --log ./events.jsonl --json
+node dist/cli/main.js incident ack INCIDENT_ID --log ./events.jsonl
+```
+
+`INCIDENT_ID`를 `list`의 ID로 바꾸세요. `list`와 `show`는 읽기 전용이며 `ack`는 `incident_ack`를 추가합니다. 에스컬레이션/리마인더는 기본으로 꺼집니다. 활성화한 Node guard가 CLI 확인을 보려면 같은 `log.file`이 필요합니다. 다른 파일을 쓰거나 `log.file`이 없으면 리마인더 횟수는 제한되지만 해당 ack를 볼 수 없습니다. 보존과 상관관계는 크기가 제한된 프로세스 내부 상태입니다. 한계는 [인시던트 대응](../incident-response.md)을 참고하세요.
 
 ## 알림과 서명
 
@@ -395,7 +448,7 @@ v0.3b부터 `npm run bench:exhaust-sim`은 스크립트화된 탐욕 agent를 �
 
 WAF, DDoS 방어, 인증 시스템이나 범용 봇 차단기가 아닙니다. 패치, 최소 권한, 비밀 위생을 대체하지 않습니다. 이 연구 프로젝트는 프로덕션 배포를 제공하지 않으며 검색 엔진의 동작을 보장하지 않습니다.
 
-호스트 수준 honeyfile과 「가짜 성공」 기만은 계획 중이며 아직 제공되지 않습니다. 공격자의 토큰 소모는 입증되지 않았습니다. [포지셔닝](../positioning.md)과 위의 [로드맵 목록](#로드맵-앞으로의-방향)을 참고하세요.
+호스트 범위는 선택적 seed honeyfile과 운영자가 설정한 Linux 로그로 제한되며 guard 자체는 파일 읽기를 볼 수 없습니다. 가짜 성공과 격리 디코이 호스트는 계획 중이며 미구현입니다. 가짜 성공에는 안전성 평가와 별도 승인이 필요하고 이 프로젝트는 호스트를 배포하지 않습니다. 공격자의 토큰 소모는 입증되지 않았으며 실제 agent 평가 예산도 미정입니다. [포지셔닝](../positioning.md)과 위 [로드맵 목록](#로드맵-앞으로의-방향)을 참고하세요.
 
 리버스 프롬프트 인젝션 / counter-injection(E4)은 제품에 절대 포함하지 않습니다. 외부 프로빙이나 guard가 제3자에게 먼저 보내는 콜백은 수행하지 않습니다. 운영자가 설정한 알림 어댑터만 외부 알림 전송의 예외이며, 기존 크롤러 신원 확인용 DNS 검증은 유지합니다. 카나리아는 비활성 HMAC 토큰이며 실제 벤더 자격 증명을 사용하지 않습니다. 제3자 honeytoken 서비스(Canarytokens 등)를 사용하지 않으며 콜백 카나리아는 운영자가 직접 호스팅해야 합니다.
 
@@ -416,7 +469,9 @@ v0.4a는 다음 연동과 제어를 **명시적 옵트인, 기본 꺼짐**으로
 
 - [포지셔닝](../positioning.md) — 취지, 범위 경계, 정직한 주장 표(주장 / 상태 / 근거).
 - [커뮤니티](../community.md) — 어댑터, 탐지 시그니처, 번역, RFC 기여 방법.
-- [로드맵](../roadmap.md) — 진행 방향, v0.4a/v0.4b 완료 항목(미릴리스), v0.5+ 계획. persona/deception 확장은 설계 단계입니다.
+- [로드맵](../roadmap.md) — v0.4a/v0.4b/v0.5a 완료 항목(미릴리스)과 남은 계획. persona/deception 확장은 설계 단계입니다.
+- [Seed와 watch](../seed.md) — 비활성 honeyfile, 권한, 검증, 운영자가 제공하는 Linux 접근 로그.
+- [인시던트 대응](../incident-response.md) — 타임라인, 크기가 제한된 로그, 지표, 확인, 선택적 리마인더와 [로그 전용 훅](../examples/hooks/README.md).
 - [Edge 운영 가이드](../edge.md) — 런타임 연결, StateStore 예제, 기능 축소와 문제 해결.
 - [Exhaust](../exhaust.md) — 구현된 옵트인 지연과 실험적 미로. 컨텍스트 소모(E3)는 아직 구현되지 않았습니다. 토큰 소모는 입증되지 않았습니다.
 - [Deception](../deception.md) — 디코이 데이터의 신뢰도를 높여 공격자의 agent가 이를 실제 데이터로 여길 수 있게 합니다. 「가짜 성공」은 계획 중이며 아직 제공되지 않습니다.

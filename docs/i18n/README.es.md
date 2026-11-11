@@ -8,33 +8,34 @@ An AI-agent honeypot middleware for Node and the edge.
 
 ## Por qué
 
-Los atacantes ahora usan agentes de IA para explorar servidores, leer la configuración y reutilizar las claves que encuentran. agent-guard planta, en la superficie HTTP/API de la aplicación, configuraciones, claves y endpoints falsos y aislados — canarios inertes que no desbloquean nada. Cuando la IA del atacante los toca, obtiene una alerta temprana de alta confianza y una ventana de tiempo para responder: rotar claves, restringir el acceso o poner el host fuera de servicio.
+Los atacantes usan agentes de IA para explorar servidores, leer configuraciones y reutilizar las claves que encuentran. agent-guard planta configuraciones, claves y endpoints falsos y aislados —canarios inertes que no desbloquean nada— en la superficie HTTP/API y, opcionalmente, en honeyfiles del host. La reutilización ofrece una señal de alta confianza; las alertas de lectura requieren registros de acceso de Linux aportados por el operador. Las alertas y las líneas de tiempo ayudan a responder: rotar claves, restringir el acceso o detener el host.
 
 Es una última línea de disparo (tripwire) y una capa de alerta temprana / retraso en el servidor. No sustituye al parcheo, a un WAF ni al principio de mínimo privilegio. El modo predeterminado solo detecta y alerta. Un modo trap opcional, desactivado por defecto, puede ralentizar o limitar a un cliente confirmado; no afirma bloquear ataques.
 
 **Lo que se entrega hoy y lo que no.**
 
-- **Hoy** la cobertura es la capa HTTP/API: cinco rutas señuelo aisladas, señuelos MCP y GraphQL, y credenciales canario inertes (`AG-CANARY-…`). Cero dependencias de runtime; adaptadores para Express, Node `http`, Hono, Fastify y Koa en Node ≥20. Además, v0.4b implementa adaptadores Web / Edge (sin publicar).
-- Los **honeyfiles a nivel de host** (`.env` falso, credenciales de nube, claves SSH o kubeconfig en disco, con alertas de acceso) están **planificados**, no entregados. Un futuro comando `agent-guard seed` aparece en la [hoja de ruta](../roadmap.md).
-- La **decepción de «éxito falso»** — un entorno simulado que puede hacer creer a la IA del atacante que ha comprometido el servidor — está **planificada** (opt-in, con evaluación de seguridad previa), no entregada. Véase [deception.md](../deception.md).
+- **Hoy** la capa HTTP/API incluye cinco rutas señuelo aisladas, señuelos MCP y GraphQL y credenciales canario inertes (`AG-CANARY-…`). Cero dependencias de runtime; adaptadores para Express, Node `http`, Hono, Fastify y Koa en Node ≥20, más adaptadores Web / Edge desde v0.4b.
+- **Los honeyfiles de host están implementados en este árbol v0.5a sin publicar**: `agent-guard seed` muestra por defecto el plan de archivos inertes; `--write` los crea con modo 0600, sin sobrescribir archivos existentes ni seguir rutas o enlaces simbólicos inseguros. El `watch` opcional es un analizador de solo lectura y exclusivo de Linux para registros auditd o `inotifywait -e access` aportados por el operador. El guard no observa lecturas por sí mismo; configurar la fuente puede requerir root, pero el analizador no lo necesita. Sin sondeos salientes. Véase [seed y watch](../seed.md).
+- **La ventana de respuesta está implementada en este árbol v0.5a sin publicar**: campos de línea de tiempo, `log.file` opcional y acotado de Node, métricas, `incident list|show|ack` y escalada/recordatorios desactivados por defecto. Los hooks de respuesta de Node son opt-in y ejecutan scripts del operador con argv fijo y un entorno solo de metadatos; Web / Edge no tiene hooks. El guard no rota claves ni cambia cortafuegos. Véase [respuesta a incidentes](../incident-response.md) y los [ejemplos de hooks que solo registran](../examples/hooks/README.md).
+- La **decepción de «éxito falso»** —un entorno simulado que puede hacer creer a la IA del atacante que ha comprometido el servidor— sigue **planificada, no implementada**. Requiere evaluación de seguridad y aprobación separada antes de su implementación opt-in. Véase [deception.md](../deception.md).
 - **Consumir los tokens del atacante** **aún no está demostrado**. El laberinto experimental tuvo un ratio de bytes de 1:1 en simulación, por debajo del mínimo de 3:1; las cifras de ratio de tiempo corresponden a un modelo de 25 ms/petición, no a una medición con agentes LLM reales. No active el laberinto esperando un drenaje de tokens hasta que eso se mida. Véase [exhaust.md](../exhaust.md) y [trap-mode.md](../trap-mode.md).
 - Los canarios permanecen inertes. El proyecto nunca usa credenciales reales, nunca realiza inyección inversa de prompts y nunca sondea hacia fuera. No contraataca.
 
 **Qué es y qué no es.** agent-guard detecta, atrae y observa el tráfico de agentes de IA hostiles o exploratorios que llegan a tus API. No contraataca ni ataca a nadie. Los no objetivos, las funciones opt-in y sus límites experimentales se explican en [Lo que NO es](#lo-que-no-es).
 
-Este es un proyecto de investigación de código abierto, todavía no publicado en npm. Instálelo desde el código fuente o cree un tarball local con `npm pack`. El nombre de paquete de trabajo es `@imwyvern/agent-guard`. Apache-2.0, copyright 2026 Wesley Wang.
+Este es un proyecto de investigación de código abierto. v0.5a está implementado en este árbol fuente aún sin publicar, sin publicación en npm ni etiqueta de versión. Instálelo desde las fuentes o cree un tarball local con `npm pack`. El nombre de paquete de trabajo es `@imwyvern/agent-guard`. Apache-2.0, copyright 2026 Wesley Wang.
 
 Consulte la [política de seguridad](../../SECURITY.md), la [guía de contribución](../../CONTRIBUTING.md), el [posicionamiento](../positioning.md) y la [hoja de ruta](../roadmap.md).
 
 ## Hoja de ruta: hacia dónde vamos
 
-Salvo indicación en contrario, estos elementos están planificados, no entregados:
+Los elementos implementados están en el árbol sin publicar; los restantes siguen planificados:
 
-- **Honeyfiles de host** — `agent-guard seed` planta en disco un `.env` falso inerte, credenciales de nube, claves SSH y kubeconfig, con alertas de acceso.
-- **Entorno de éxito falso** — opt-in, con evaluación de seguridad previa: una superficie de servicio simulada que puede llevar a la IA del atacante a tratar los datos falsos como reales. Véase [deception.md](../deception.md).
-- **Ventana de tiempo de respuesta** — una línea de tiempo de incidentes con una métrica de tiempo de permanencia (dwell-time), más ganchos para que el operador ejecute sus propios scripts de rotación de claves o bloqueo. La correlación de incidentes en proceso y `dwell_ms` ya se entregan; la línea de tiempo orientada al operador y los ganchos, no.
-- **Host señuelo aislado** — un entorno señuelo dedicado, separado del proceso de la aplicación de producción.
-- **Evaluación del coste en tokens con agentes reales** — medir si el laberinto experimental consume realmente tokens de un agente de IA real antes de que alguien lo active. El actual ratio de bytes 1:1 es solo una hipótesis.
+- **Honeyfiles de host (v0.5a)** — **implementados, sin publicar**: archivos inertes con `seed` y análisis opcional de registros de acceso Linux con `watch`; la cobertura del host depende de la fuente del operador.
+- **Entorno de éxito falso** — **planificado, no implementado**: requiere evaluación de seguridad y aprobación separada antes de su implementación opt-in. Véase [deception.md](../deception.md).
+- **Ventana de respuesta (v0.5a)** — **implementada, sin publicar**: línea de tiempo, métricas dwell, CLI de incidentes, registro acotado, recordatorios opcionales y hooks de Node para scripts del operador.
+- **Host señuelo aislado** — **planificado, no implementado**: un entorno separado; el alcance son programas/plantillas y el despliegue corresponde al operador.
+- **Evaluación del coste en tokens con agentes reales** — **planificada, no implementada**: no hay presupuesto de modelos definido. Consumir tokens del atacante no está demostrado; el ratio de bytes de la simulación sigue en 1:1.
 - **Adaptadores Edge (v0.4b)** — **implementados (sin publicar)**: núcleo de estándares web, Cloudflare Workers, Next.js middleware / Vercel Edge, Deno, Bun y Hono-web.
 
 El plan detallado está en [docs/roadmap.md](../roadmap.md). El alcance y las afirmaciones honestas están en [docs/positioning.md](../positioning.md).
@@ -82,7 +83,7 @@ const server = app.listen(3000, '127.0.0.1');
 // On shutdown: stop accepting requests, then await guard.close() to flush alerts.
 ```
 
-Si usa un nombre de archivo de registro, prepárelo con la CLI. Un registro vacío genera en memoria seis canarios señuelo canónicos. Persista las ubicaciones del registro con la CLI si los tokens deben permanecer estables entre reinicios. La semilla controla datos falsos inofensivos; los ID de canario siguen siendo criptográficamente aleatorios.
+Si usa un nombre de archivo de registro, prepárelo con la CLI. Un registro vacío genera seis canarios señuelo canónicos en memoria. Persista las ubicaciones con la CLI si los tokens deben permanecer estables entre reinicios. `projectSeed` controla datos falsos inofensivos; los ID de los señuelos ordinarios son criptográficamente aleatorios. El comando separado `seed` para honeyfiles deriva nuevos ID de forma determinista a partir de la semilla del operador, el secreto HMAC, el entorno y la ubicación, y reutiliza las entradas coincidentes del registro.
 
 ## HTTP nativo de Node
 
@@ -295,6 +296,9 @@ Todos los campos públicos tienen valores por defecto documentados en [src/types
 | `alerts.ratePerMinute` | 30 por canal; los recuentos suprimidos se trasladan al siguiente resumen de alerta |
 | `alerts.redactIp` | `true`; redes IPv4/IPv6 gruesas en las alertas |
 | `log.sink` / `level` / `keepIp` | stdout JSONL / `info` / `true` |
+| `log.file` / `maxBytes` | Solo Node, JSONL saneado opt-in, modo 0600; 10 MiB por defecto, se trunca antes de añadir una línea que supere el límite |
+| `escalation` | Solo Node, desactivada por defecto; recordatorios cada 300000 ms desde la primera alerta entregada, máximo 2 por incidente |
+| `hooks` | Solo Node, sin configurar/vacío por defecto; argv fijo, sin shell, entorno nuevo de metadatos y límites de tiempo, frecuencia y concurrencia |
 | `clientIp` | IP del socket; sobrescriba solo después de validar un proxy de confianza |
 | `onEvent` | Observador opcional; los fallos del observador/sink se aíslan |
 
@@ -307,6 +311,55 @@ En modo detect, D5 siempre deniega el inicio de sesión con un retraso determini
 v0.3a adjunta metadatos `incident` opcionales a los eventos existentes del mismo `client_key`: `id`, `sequence` ordenada (por ejemplo `robots → D1 → D2`), `first_seen`, `last_seen` y `confidence`. `incident.windowMs` vale 900000 por defecto (15 minutos fijos desde la primera observación); 0 desactiva la correlación. El estado usa una LRU de 50k clientes y conserva las últimas 32 observaciones. Los aciertos aislados repetidos tienen confianza low; distintos señuelos o descubrimiento más un señuelo la elevan a medium; `canary_replay` la eleva a high. La confianza no baja dentro de la ventana. Las visitas a robots son marcas internas y no añaden tipos de evento. Las redes compartidas pueden agrupar clientes; la correlación no eleva la gravedad. En el modo detect predeterminado conserva las respuestas HTTP y las decisiones sobre señuelos; trap opt-in de v0.4a puede usar high confidence como criterio de entrada. Los rastreadores verificados y las listas de permitidos conservan su inmunidad. Consulte el [modo trap](../trap-mode.md).
 
 Las alertas de reutilización conservan `canary.id`, `placement`, `env`, `found_in` y `field`, añadiendo `leaked_at` (ubicación), `replayed_at` (ruta), `dwell_ms` (tiempo desde la primera entrega del señuelo) y `client_keys_seen` (claves distintas de clientes que reutilizan el token, máximo 8). Solo se registra la entrega si el cuerpo señuelo devuelto contiene el token; HEAD y bypass de rastreadores no cuentan. El seguimiento vive en memoria del proceso, con una LRU de 50k entradas y TTL de 24 horas. La expulsión, el reinicio o la entrega fuera de señuelos integrados dejan el momento desconocido, por lo que se omite `dwell_ms`. Estas observaciones no prueban identidad ni intención maliciosa.
+
+## Honeyfiles de host y respuesta a incidentes (v0.5a, sin publicar)
+
+Use la CLI compilada de abajo (o `agent-guard` en una instalación consumidora local). Prepare un archivo de semilla UTF-8 no vacío y establezca `AG_CANARY_SECRET` con su mecanismo de secretos; los comandos no imprimen esos valores. El dry-run necesita un `--dir` existente; `--write` puede crearlo. Los perfiles son `node`, `python`, `k8s` y `generic`. El contenido es inerte y determinista con las mismas entradas/registro, sin formatos ni prefijos de credenciales reales de proveedores; cualquier URL de callback debe alojarla el operador.
+
+```sh
+node dist/cli/main.js seed --profile node --dir ./honeyfiles --seed-file ./operator-seed.txt --env demo
+node dist/cli/main.js seed --profile node --dir ./honeyfiles --seed-file ./operator-seed.txt --env demo --write
+node dist/cli/main.js seed --profile node --dir ./honeyfiles --seed-file ./operator-seed.txt --env demo --verify
+```
+
+`--write` persiste por defecto `agent-guard.canaries.json` y `agent-guard.seed.json`. Mantenga los metadatos fuera del directorio de honeyfiles. La verificación es de solo lectura e informa de archivos ausentes/modificados o permisos incorrectos; los hallazgos no son alertas de acceso. Véase [perfiles, seguridad de rutas y plantillas de fuentes de registros](../seed.md).
+
+El operador configura auditd o ejecuta `inotifywait -e access`. `watch` sigue el registro desde el final salvo que se indique `--from-start`; no usa `fs.watch` ni atime para detectar lecturas. Elija una fuente:
+
+```sh
+node dist/cli/main.js watch --inotify-log ./access.log --dir ./honeyfiles --manifest ./agent-guard.seed.json --project local-catalog --env demo
+# Alternative: use an operator-configured auditd log.
+node dist/cli/main.js watch --auditd /var/log/audit/audit.log --dir ./honeyfiles --manifest ./agent-guard.seed.json --project local-catalog --env demo
+```
+
+`watch` emite JSONL `honeyfile_read` de gravedad medium por stdout, con alertas webhook opcionales si se configuran tanto `AG_ALERT_WEBHOOK_URL` como `AG_ALERT_WEBHOOK_SECRET`. Estos eventos nunca activan trap/block y no tienen ID de incidente HTTP; la CLI los muestra como registros adyacentes si se recopilan en su archivo de entrada. La CLI independiente de watch no tiene opción de configuración de hooks.
+
+En Node, añada estas opciones al crear el guard. Cree primero el directorio padre del registro, use el registro generado por seed con el mismo secreto/semilla/entorno para conocer el origen de la reutilización HTTP y sustituya las rutas del ejecutable/script por rutas absolutas de su host. Este ejemplo solo añade una línea a un registro local; el directorio de ese registro debe existir. Véase [uso seguro de hooks](../incident-response.md) y la [configuración del ejemplo](../examples/hooks/README.md).
+
+```ts
+const responseOptions = {
+  log: { file: './events.jsonl', maxBytes: 10 * 1024 * 1024, keepIp: false },
+  escalation: { enabled: true, remindAfterMs: 300000, maxReminders: 2 },
+  hooks: [{
+    on: 'canary_replay' as const,
+    run: ['/usr/bin/node', '/absolute/path/to/agent-guard/docs/examples/hooks/append-log.mjs'] as [string, ...string[]],
+    timeoutMs: 1000, maxPerHour: 10, maxConcurrent: 1,
+  }],
+};
+// Pass ...responseOptions into createAgentGuard({...}). Omit to keep these options off.
+```
+
+Los hooks usan `spawn` con `shell: false`, nunca interpolan contenido de peticiones en argv y reciben solo `AG_INCIDENT_ID`, `AG_EVENT_TYPE`, `AG_CLIENT_KEY_HASH`, `AG_CANARY_ID` y `AG_PLACEMENT` cuando están disponibles. No heredan secretos del padre. Al agotar el tiempo se envía SIGTERM y después SIGKILL; hay topes horarios y de concurrencia. Los fallos emiten `hook_result` y nunca afectan a `inspect`; stdout/stderr se descartan. Los hooks son exclusivos de Node y están desactivados por defecto.
+
+La línea de tiempo vive en `event.incident`: `first_touch_at`, `alerted_at` (primera entrega correcta) y `dwell_ms` (desde el primer contacto hasta este evento, mínimo cero). Difiere de `event.canary.dwell_ms`, que mide desde una entrega conocida del señuelo hasta su reutilización y se omite cuando se desconoce la entrega, incluidos los archivos de seed. Los resúmenes Prometheus de Node `agent_guard_time_to_alert_seconds` y `agent_guard_incident_dwell_seconds` no tienen etiquetas de ruta, UA ni IP.
+
+```sh
+node dist/cli/main.js incident list --log ./events.jsonl
+node dist/cli/main.js incident show INCIDENT_ID --log ./events.jsonl --json
+node dist/cli/main.js incident ack INCIDENT_ID --log ./events.jsonl
+```
+
+Sustituya `INCIDENT_ID` por un ID de `list`. `list` y `show` son de solo lectura; `ack` añade `incident_ack`. La escalada y los recordatorios están desactivados por defecto. Al activarlos, el guard de Node solo ve las confirmaciones de la CLI mediante el mismo `log.file`; con otro archivo o sin `log.file`, los recordatorios siguen acotados pero no pueden ver esas confirmaciones. La retención y la correlación son acotadas y locales al proceso; véase [respuesta a incidentes](../incident-response.md) para los límites.
 
 ## Alertas y firmas
 
@@ -395,7 +448,7 @@ Desde v0.3b, `npm run bench:exhaust-sim` ejecuta en memoria una simulación de r
 
 No es un WAF, una defensa DDoS, un sistema de autenticación ni un bloqueador general de bots. No sustituye al parcheo, al mínimo privilegio ni a la higiene de secretos. Este proyecto de investigación no proporciona un despliegue en producción ni garantiza el comportamiento de los buscadores.
 
-Los honeyfiles a nivel de host y la decepción de «éxito falso» están planificados, no entregados. El consumo de tokens del atacante no está demostrado. Véase el [posicionamiento](../positioning.md) y la [lista de la hoja de ruta](#hoja-de-ruta-hacia-dónde-vamos) más arriba.
+La cobertura del host se limita a honeyfiles opcionales y registros Linux configurados por el operador; el guard no puede ver lecturas de archivos por sí mismo. El éxito falso y el host señuelo aislado siguen planificados, no implementados; el éxito falso requiere revisión de seguridad y aprobación separada, y no desplegamos hosts. El consumo de tokens del atacante no está demostrado; la evaluación con agentes reales no tiene presupuesto definido. Véase el [posicionamiento](../positioning.md) y la [lista de la hoja de ruta](#hoja-de-ruta-hacia-dónde-vamos) anterior.
 
 La inyección inversa de prompts / contrainyección (E4) nunca formará parte del producto. No realiza sondeos de salida ni inicia callbacks hacia terceros; los adaptadores de alertas configurados por el operador son la única excepción para notificaciones salientes. Se mantienen las verificaciones DNS de identidad de los rastreadores. Los canarios son tokens HMAC inertes, nunca credenciales reales de proveedores. No se usa ningún servicio de honeytokens de terceros (Canarytokens, etc.); el canario de callback solo se aloja en infraestructura del operador.
 
@@ -416,7 +469,9 @@ El **laberinto experimental** requiere mediciones del operador con agentes reale
 
 - [Posicionamiento](../positioning.md) — el propósito, los límites de alcance y una tabla de afirmaciones honestas (afirmación / estado / evidencia).
 - [Comunidad](../community.md) — cómo contribuir adaptadores, firmas de detección, traducciones y RFC.
-- [Hoja de ruta](../roadmap.md) — dirección de avance, v0.4a/v0.4b completados (sin publicar) y plan v0.5+; las extensiones persona/deception siguen en diseño.
+- [Hoja de ruta](../roadmap.md) — v0.4a/v0.4b/v0.5a completados (sin publicar) y planes restantes; las extensiones persona/deception siguen en diseño.
+- [Seed y watch](../seed.md) — honeyfiles inertes, permisos, verificación y registros de acceso Linux aportados por el operador.
+- [Respuesta a incidentes](../incident-response.md) — línea de tiempo, registros acotados, métricas, confirmaciones, recordatorios opcionales y [hooks que solo registran](../examples/hooks/README.md).
 - [Guía de operación Edge](../edge.md) — integración de runtimes, ejemplos de StateStore, degradación y resolución de problemas.
 - [Exhaust](../exhaust.md) — retraso opt-in y laberinto experimental ya implementados; el consumo de contexto (E3) sigue sin implementarse; el drenaje de tokens no está demostrado.
 - [Deception](../deception.md) — hacer que los datos señuelo resulten creíbles para que el agente del atacante pueda tratarlos como reales; el «éxito falso» está planificado, no entregado.

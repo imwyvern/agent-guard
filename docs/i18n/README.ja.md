@@ -8,33 +8,34 @@ An AI-agent honeypot middleware for Node and the edge.
 
 ## なぜ必要か
 
-攻撃者はいま、AI エージェントを使ってサーバーを探査し、設定を読み、見つけた鍵をリプレイします。agent-guard は、アプリケーションの HTTP/API 層に隔離された偽の設定・鍵・エンドポイント（何の権限も開かない不活性カナリア）を仕掛けます。攻撃者の AI がそれらに触れたとき、高い確度の早期アラートと、鍵のローテーション、アクセス制限、ホスト停止といった対応に使える時間の窓が得られます。
+攻撃者はいま、AI エージェントでサーバーを探査し、設定を読み、見つけた鍵をリプレイします。agent-guard は HTTP/API 層と、任意のホスト honeyfile に、隔離された偽の設定・鍵・エンドポイント（権限を開かない不活性カナリア）を配置します。リプレイは高い確度の信号になります。ファイル読み取りのアラートには運用者が提供する Linux アクセスログが必要です。アラートとタイムラインは、鍵のローテーション、アクセス制限、ホスト停止などの対応を支援します。
 
 これはサーバーにおける最後のトリップワイヤであり、早期警戒 / 遅延の層です。パッチ適用、WAF、最小権限の代替ではありません。既定モードは検出とアラートのみです。オプションで、デフォルト無効の trap モードは確認済みクライアントを遅延またはレート制限できますが、攻撃を遮断すると主張しません。
 
 **現在提供しているものと、まだ提供していないもの。**
 
-- **現在**の対象は HTTP/API 層です。隔離された 5 つのデコイルート、MCP および GraphQL デコイ、不活性カナリア認証情報（`AG-CANARY-…`）。ランタイム依存関係はゼロで、Node ≥20 向けに Express、Node `http`、Hono、Fastify、Koa のアダプターがあります。加えて v0.4b の Web / Edge アダプター（未リリース）を提供します。
-- **ホストレベルの honeyfile**（ディスク上の偽の `.env`、クラウド認証情報、SSH 鍵、kubeconfig と、アクセス時のアラート）は**計画中**であり、未実装です。将来の `agent-guard seed` コマンドは[ロードマップ](../roadmap.md)にあります。
-- **「偽の成功」による欺瞞** — 攻撃者の AI に侵入が成功したと信じさせる可能性のある模擬環境 — は**計画中**です（オプトイン必須、先に安全性を評価）。未実装です。[deception.md](../deception.md) を参照してください。
+- **現在** HTTP/API 層には、隔離された 5 つのデコイルート、MCP と GraphQL のデコイ、不活性カナリア認証情報（`AG-CANARY-…`）が実装されています。ランタイム依存関係はゼロです。Node ≥20 の Express、Node `http`、Hono、Fastify、Koa と、v0.4b からの Web / Edge アダプターを提供します。
+- **ホスト honeyfile はこの未リリース v0.5a ツリーに実装済みです**。`agent-guard seed` は既定で不活性ファイルの計画を表示し、`--write` で 0600 のファイルを作成します。既存ファイルを上書きせず、危険なパスやシンボリックリンクをたどりません。任意の `watch` は Linux 専用の読み取り専用パーサーで、運用者が提供する auditd または `inotifywait -e access` ログを読みます。guard 自体は読み取りを観測できません。ログ元の設定に root が必要な場合がありますが、パーサーには不要です。外向きの探索は行いません。[seed と watch](../seed.md) を参照してください。
+- **対応時間の窓はこの未リリース v0.5a ツリーに実装済みです**。インシデントのタイムラインフィールド、任意の容量制限付き Node `log.file`、メトリクス、`incident list|show|ack`、既定無効のエスカレーション/リマインダーを提供します。Node のレスポンスフックはオプトインで既定無効です。固定 argv とメタデータだけの環境で運用者のスクリプトを実行します。Web / Edge にフックはありません。guard 自体は鍵のローテーションやファイアウォール変更を行いません。[インシデント対応](../incident-response.md) と[ログ専用フック例](../examples/hooks/README.md) を参照してください。
+- **「偽の成功」による欺瞞** — 攻撃者の AI に侵入が成功したと信じさせる可能性がある模擬環境 — は**計画中、未実装**です。オプトイン実装の前に安全性評価と別途承認が必要です。[deception.md](../deception.md) を参照してください。
 - **攻撃者のトークンを消費する**ことは、まだ**実証されていません**。実験的な迷路のバイト比はシミュレーションで 1:1 であり、下限の 3:1 を下回ります。時間比の数字は 25 ms/request モデルであり、実際の LLM エージェントでの測定ではありません。その測定が終わるまで、トークン消費を期待して迷路を有効にしないでください。[exhaust.md](../exhaust.md) と [trap-mode.md](../trap-mode.md) を参照してください。
 - カナリアは不活性のままです。本プロジェクトは実在の認証情報を使わず、リバースプロンプトインジェクションを行わず、外向きの探索もしません。反撃しません。
 
 **対象と非対象。** agent-guard は、API に向かう敵対的または探索的な AI エージェントのトラフィックを検出・誘捕・観測します。反撃したり、誰かを攻撃したりはしません。非対象、オプトイン機能、実験上の制約は[対象外であること](#対象外であること)を参照してください。
 
-これはオープンソースの研究プロジェクトであり、まだ npm には公開されていません。ソースからインストールするか、`npm pack` でローカル tarball を作成してください。作業中のパッケージ名は `@imwyvern/agent-guard` です。Apache-2.0、著作権 2026 Wesley Wang。
+これはオープンソース研究プロジェクトです。v0.5a はこの未リリースのソースツリーに実装済みで、npm 公開もバージョンタグもありません。ソースからインストールするか、`npm pack` でローカル tarball を作成してください。作業中のパッケージ名は `@imwyvern/agent-guard` です。Apache-2.0、著作権 2026 Wesley Wang。
 
 [セキュリティポリシー](../../SECURITY.md)、[コントリビューションガイド](../../CONTRIBUTING.md)、[位置づけ](../positioning.md)、[ロードマップ](../roadmap.md) を参照してください。
 
 ## ロードマップ: これから向かう先
 
-特記なき項目は計画中であり、未実装です。
+以下の実装済み項目は未リリースのツリーに含まれます。残りは計画中です。
 
-- **ホストレベルの honeyfile** — `agent-guard seed` がディスク上に不活性な偽の `.env`、クラウド認証情報、SSH 鍵、kubeconfig を置き、アクセス時にアラートします。
-- **偽の成功環境** — オプトイン必須、先に安全性を評価。攻撃者の AI が偽データを本物として扱う可能性のある模擬サービス面です。[deception.md](../deception.md) を参照してください。
-- **対応時間の窓** — 運用者向けのインシデントタイムライン、滞在時間（dwell-time）指標、および運用者自身の鍵ローテーション / 遮断スクリプトへのフック。プロセス内のインシデント相関と `dwell_ms` は既に提供済みです。運用者向けタイムラインとフックは未実装です。
-- **隔離されたデコイホスト** — 本番アプリケーションプロセスから分離された専用のデコイ環境。
-- **実エージェントによるトークンコスト評価** — 実験的な迷路を有効にする前に、実際の AI エージェントのトークンを本当に消費するかを測定します。現在のバイト比 1:1 は仮説にすぎません。
+- **ホスト honeyfile（v0.5a）** — **実装済み、未リリース**：不活性な `seed` ファイルと、任意の Linux アクセスログ用 `watch`。ホストの対象範囲は運用者のログ元に依存します。
+- **偽の成功環境** — **計画中、未実装**：オプトイン実装の前に安全性評価と別途承認が必要です。[deception.md](../deception.md) を参照してください。
+- **対応時間の窓（v0.5a）** — **実装済み、未リリース**：タイムライン、dwell 指標、incident CLI、容量制限付きファイルログ、任意のリマインダーと運用者スクリプトへの Node フック。
+- **隔離されたデコイホスト** — **計画中、未実装**：独立したデコイ環境。対象はプログラム/テンプレートのみで、デプロイは運用者が行います。
+- **実エージェントのトークンコスト評価** — **計画中、未実装**：モデル予算は未設定です。攻撃者のトークン消費は未実証で、迷路のシミュレーションのバイト比は 1:1 のままです。
 - **Edge アダプター（v0.4b）** — **実装済み（未リリース）**：Web 標準コア、Cloudflare Workers、Next.js middleware / Vercel Edge、Deno、Bun、Hono-web。
 
 詳細な計画は [docs/roadmap.md](../roadmap.md) にあります。範囲と誠実な主張は [docs/positioning.md](../positioning.md) にあります。
@@ -82,7 +83,7 @@ const server = app.listen(3000, '127.0.0.1');
 // On shutdown: stop accepting requests, then await guard.close() to flush alerts.
 ```
 
-レジストリのファイル名を使う場合は、先に CLI で準備してください。空のレジストリは、メモリ上で 6 個の正規デコイカナリアを生成します。再起動後もトークンを安定させる必要がある場合は、CLI でレジストリの配置を永続化してください。シードが制御するのは無害な偽データであり、カナリア ID は暗号学的にランダムなままです。
+レジストリのファイル名を使う場合は CLI で準備してください。空のレジストリはメモリ上で 6 個の正規デコイカナリアを生成します。再起動後もトークンを維持するには CLI で配置を永続化します。`projectSeed` は無害な偽データを制御し、通常のデコイのカナリア ID は暗号学的にランダムです。別の honeyfile `seed` コマンドは、運用者のシード、HMAC シークレット、環境、配置から新しい ID を決定論的に導出し、一致するレジストリエントリーを再利用します。
 
 ## ネイティブ Node HTTP
 
@@ -295,6 +296,9 @@ HTML のない API については [API 専用ガイド](../scenarios/api-only.m
 | `alerts.ratePerMinute` | チャネルあたり 30；抑制件数は次のアラート要約に繰り越し |
 | `alerts.redactIp` | `true`；アラート内では粗い IPv4/IPv6 ネットワーク |
 | `log.sink` / `level` / `keepIp` | stdout JSONL / `info` / `true` |
+| `log.file` / `maxBytes` | Node のみ、オプトインのサニタイズ済み JSONL、0600。既定 10 MiB、追記で上限を超える前に切り詰め |
+| `escalation` | Node のみ、既定無効。最初のアラート成功から既定 300000 ms ごと、インシデントあたり最大 2 回のリマインダー |
+| `hooks` | Node のみ、既定は未設定/空。固定 argv、シェルなし、新しいメタデータ環境、タイムアウトと頻度/並列数の上限 |
 | `clientIp` | ソケット IP；信頼できるプロキシを検証したあとでのみ上書き |
 | `onEvent` | 任意のオブザーバー；オブザーバー/sink の失敗は隔離される |
 
@@ -307,6 +311,55 @@ detect モードでは、D5 は常にログインを拒否し、決定的な 300
 v0.3a は同じ `client_key` の既存イベントに任意の `incident` を付加します。フィールドは `id`、順序付き `sequence`（例：`robots → D1 → D2`）、`first_seen`、`last_seen`、`confidence` です。`incident.windowMs` の既定値は 900000（最初の観測から固定 15 分）、0 は相関を無効化します。状態は 50k クライアントの LRU に収め、直近 32 観測を保持します。単独ヒットの反復は low、異なるデコイまたは発見とデコイの組み合わせは medium、`canary_replay` は high に上げます。同じ窓内で確信度は下がりません。robots の訪問は内部マーカーで、イベント型を追加しません。共有ネットワークではクライアントが統合され得ます。相関は重大度を引き上げません。既定の detect では HTTP 応答とデコイ判断を維持しますが、v0.4a のオプトイン trap は high confidence をゲートに使えます。検証済みクローラーと allowlist は常に対象外です。[trap モード](../trap-mode.md) を参照してください。
 
 リプレイアラートは `canary.id`、`placement`、`env`、`found_in`、`field` を保ち、`leaked_at`（配置）、`replayed_at`（パス）、`dwell_ms`（最初のデコイ配信からの時間）、`client_keys_seen`（異なるリプレイクライアントキー数、最大 8）を追加します。返すデコイボディにトークンが含まれる場合だけ配信を記録し、HEAD とクローラーバイパスは数えません。追跡はプロセス内のみで、50k 件の LRU と 24 時間 TTL を使います。追い出し、再起動、組み込みデコイ以外での配信では時刻が不明となり、`dwell_ms` を省略します。これらの観測は身元や悪意の証明にはなりません。
+
+## ホスト honeyfile とインシデント対応（v0.5a、未リリース）
+
+以下のビルド済み CLI（またはローカル利用側にインストールした `agent-guard`）を使います。空でない UTF-8 シードファイルを準備し、秘密情報管理の仕組みで `AG_CANARY_SECRET` を設定します。コマンドはそれらの値を表示しません。dry-run には既存の `--dir` が必要で、`--write` はディレクトリを作成できます。プロファイルは `node`、`python`、`k8s`、`generic` です。内容は不活性で、同じ入力/レジストリから決定論的に生成され、実在ベンダーの認証情報形式や接頭辞を使いません。callback URL は運用者自身のホストに限ります。
+
+```sh
+node dist/cli/main.js seed --profile node --dir ./honeyfiles --seed-file ./operator-seed.txt --env demo
+node dist/cli/main.js seed --profile node --dir ./honeyfiles --seed-file ./operator-seed.txt --env demo --write
+node dist/cli/main.js seed --profile node --dir ./honeyfiles --seed-file ./operator-seed.txt --env demo --verify
+```
+
+`--write` は既定で `agent-guard.canaries.json` と `agent-guard.seed.json` を永続化します。メタデータは honeyfile ディレクトリの外に置きます。検証は読み取り専用で、欠落/変更や権限の誤りを報告します。検出事項はアクセスアラートではありません。[プロファイル、パス安全性、ログ元テンプレート](../seed.md) を参照してください。
+
+運用者自身が auditd を設定するか、`inotifywait -e access` を実行します。`watch` は `--from-start` 指定時を除きログの末尾から追跡し、`fs.watch` や atime で読み取りを検出しません。ログ元を一つ選びます。
+
+```sh
+node dist/cli/main.js watch --inotify-log ./access.log --dir ./honeyfiles --manifest ./agent-guard.seed.json --project local-catalog --env demo
+# Alternative: use an operator-configured auditd log.
+node dist/cli/main.js watch --auditd /var/log/audit/audit.log --dir ./honeyfiles --manifest ./agent-guard.seed.json --project local-catalog --env demo
+```
+
+`watch` は重大度 medium の `honeyfile_read` JSONL を stdout に出力します。`AG_ALERT_WEBHOOK_URL` と `AG_ALERT_WEBHOOK_SECRET` の両方を設定すると webhook アラートも利用できます。このイベントは trap/block を発動せず、HTTP incident ID も持ちません。CLI 入力ログに収集するとログ上の隣接レコードとして表示されます。独立した watch CLI にフック設定フラグはありません。
+
+Node では guard 作成時に以下のオプションを追加します。ログの親ディレクトリを先に作成してください。HTTP リプレイの出所を示すには、seed のレジストリと同じシークレット/シード/環境を使います。実行ファイル/スクリプトのパスはホスト上の絶対パスに置き換えます。この例はローカルログに一行追記するだけで、そのログディレクトリは既存である必要があります。[安全なフック利用](../incident-response.md) と[例の設定](../examples/hooks/README.md) を参照してください。
+
+```ts
+const responseOptions = {
+  log: { file: './events.jsonl', maxBytes: 10 * 1024 * 1024, keepIp: false },
+  escalation: { enabled: true, remindAfterMs: 300000, maxReminders: 2 },
+  hooks: [{
+    on: 'canary_replay' as const,
+    run: ['/usr/bin/node', '/absolute/path/to/agent-guard/docs/examples/hooks/append-log.mjs'] as [string, ...string[]],
+    timeoutMs: 1000, maxPerHour: 10, maxConcurrent: 1,
+  }],
+};
+// Pass ...responseOptions into createAgentGuard({...}). Omit to keep these options off.
+```
+
+フックは `spawn` と `shell: false` を使い、リクエスト内容を argv に挿入しません。利用可能な場合に渡すのは `AG_INCIDENT_ID`、`AG_EVENT_TYPE`、`AG_CLIENT_KEY_HASH`、`AG_CANARY_ID`、`AG_PLACEMENT` だけです。親プロセスのシークレットは継承しません。タイムアウトでは SIGTERM、続いて SIGKILL を送り、時間あたりの回数と並列数に上限があります。失敗は `hook_result` を発行し、`inspect` に影響しません。stdout/stderr は破棄します。フックは Node 専用で既定無効です。
+
+タイムラインは `event.incident` にあり、`first_touch_at`、`alerted_at`（最初の配送成功）、`dwell_ms`（最初の接触からこのイベントまで、最小ゼロ）を含みます。これは `event.canary.dwell_ms` と異なります。後者は既知のデコイ配信からリプレイまでを測り、seed ファイルなど配信不明の場合は省略されます。Node Prometheus summaries の `agent_guard_time_to_alert_seconds` と `agent_guard_incident_dwell_seconds` にパス、UA、IP のラベルはありません。
+
+```sh
+node dist/cli/main.js incident list --log ./events.jsonl
+node dist/cli/main.js incident show INCIDENT_ID --log ./events.jsonl --json
+node dist/cli/main.js incident ack INCIDENT_ID --log ./events.jsonl
+```
+
+`INCIDENT_ID` を `list` の ID に置き換えます。`list` と `show` は読み取り専用で、`ack` は `incident_ack` を追記します。エスカレーション/リマインダーは既定無効です。有効時、Node guard が CLI の確認を認識するには同じ `log.file` が必要です。別ファイルや `log.file` なしではリマインダーに上限はありますが、その ack を認識できません。保持と相関には上限があり、プロセス内に限られます。制約は[インシデント対応](../incident-response.md)を参照してください。
 
 ## アラートと署名
 
@@ -395,7 +448,7 @@ v0.3b 以降、`npm run bench:exhaust-sim` はスクリプト化された貪欲 
 
 WAF、DDoS 防御、認証システム、汎用ボットブロッカーではありません。パッチ適用、最小権限、秘密情報の衛生管理の代替でもありません。この研究プロジェクトは本番デプロイを提供せず、検索エンジンの動作も保証しません。
 
-ホストレベルの honeyfile と「偽の成功」による欺瞞は計画中であり、未実装です。攻撃者のトークン消費は実証されていません。[位置づけ](../positioning.md)と上記の[ロードマップ一覧](#ロードマップ-これから向かう先)を参照してください。
+ホストの対象は任意の seed honeyfile と運用者設定の Linux ログに限られ、guard 自体はファイル読み取りを観測できません。偽の成功と隔離デコイホストは計画中、未実装です。偽の成功には安全性評価と別途承認が必要で、本プロジェクトはホストをデプロイしません。攻撃者のトークン消費は未実証で、実エージェント評価の予算も未設定です。[位置づけ](../positioning.md)と上記[ロードマップ一覧](#ロードマップ-これから向かう先)を参照してください。
 
 リバースプロンプトインジェクション / counter-injection（E4）は製品に一切含めません。外向きの探索や、guard が第三者に向けて開始するコールバックは行いません。外向きの通知は運用者が設定したアラートアダプターだけで、既存のクローラー識別用 DNS 検証は変わりません。カナリアは不活性な HMAC トークンであり、実在するベンダーの認証情報は使いません。第三者の honeytoken サービス（Canarytokens など）は利用せず、コールバックカナリアは運用者自身のホストでのみ受信します。
 
@@ -416,7 +469,9 @@ v0.4a には以下の**明示的なオプトインが必要で、デフォルト
 
 - [位置づけ](../positioning.md) — 趣旨、範囲の境界、誠実な主張の表（主張 / 状態 / 根拠）。
 - [コミュニティ](../community.md) — アダプター、検出シグネチャ、翻訳、RFC の貢献方法。
-- [ロードマップ](../roadmap.md) — 進む方向、v0.4a/v0.4b の完了項目（未リリース）、v0.5+ の計画。persona/deception の拡張は設計段階です。
+- [ロードマップ](../roadmap.md) — v0.4a/v0.4b/v0.5a の完了項目（未リリース）と今後の計画。persona/deception 拡張は設計段階です。
+- [Seed と watch](../seed.md) — 不活性 honeyfile、権限、検証、運用者提供の Linux アクセスログ。
+- [インシデント対応](../incident-response.md) — タイムライン、容量制限付きログ、指標、確認、任意のリマインダーと[ログ専用フック](../examples/hooks/README.md)。
 - [Edge 運用ガイド](../edge.md) — ランタイムの接続、StateStore の例、縮退とトラブルシューティング。
 - [Exhaust](../exhaust.md) — 実装済みのオプトイン遅延と実験的な迷路。コンテキスト消費（E3）は未実装です。トークン消費は実証されていません。
 - [Deception](../deception.md) — デコイデータをより信じられるものにし、攻撃者の agent がそれを本物として扱う可能性を高める。「偽の成功」は計画中であり、未実装です。

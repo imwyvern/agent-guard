@@ -1,8 +1,8 @@
-# agent-guard 威胁模型（MVP 背景与 v0.4b 边界）
+# agent-guard 威胁模型（MVP 背景与 v0.5a 边界）
 
-- 日期：初稿 2026-11-10；v0.4b 更新 2026-11-11（HKT, UTC+8）
+- 日期：初稿 2026-11-10；v0.5a unreleased 更新 2026-11-11（HKT, UTC+8）
 - 来源：`/workspace/security/bla-server-anti-ai-assessment-2026-11-10.md`（权威起点）
-- 范围：HTTP/API 运行时（Node 中间件与已实现、unreleased 的 v0.4b Web / Edge 核心）。**不是** WAF、不是 DDoS 防护、不是客户端反逆向（那是 BLA 的本职）。
+- 范围：HTTP/API 运行时（Node 与 Web / Edge）及 v0.5a 可选主机 honeyfiles；读取告警仅解析运营者提供的 Linux auditd/inotifywait 日志，guard 不能自行看见读取。v0.5a 为 unreleased 代码树，未发 npm、未打 tag。**不是** WAF、不是 DDoS 防护、不是客户端反逆向（那是 BLA 的本职）。
 - 性质：纯开源研究项目，本仓库不部署到任何服务器；验证全部在本地 demo app 上进行。
 
 ## 1. 资产（Assets）
@@ -42,7 +42,7 @@
 
 - agent-guard 运行在应用进程内，**只读** 请求；detect 默认只写诱饵响应和日志/告警。v0.4a 显式 trap 可增加诱饵延迟/429、maze 响应及同一 client key 的 403（包括真实路由），不调用业务服务。
 - 诱饵响应与真实业务数据完全隔离：decoy handler 不调用任何业务 service / DB。
-- canary 只存在于：agent-guard 配置 + 诱饵响应。**永不** 进入真实 IdP、secret manager、DB 用户表。
+- canary 只存在于：agent-guard 配置/registry、诱饵响应与运营者显式生成的 inert honeyfiles。**永不** 进入真实 IdP、secret manager、DB 用户表。
 
 ## 5. Out-of-scope 与 v0.4a 显式 opt-in 边界
 
@@ -80,3 +80,13 @@ Node 的 `AGENT_GUARD_TRAP=off` 与 `guard.setTrapEnabled(false)` 可运行时�
 - **执行与投递**：trap 默认关闭；edge `trap.delay` 占用 wall time，不建议启用，显式开启上限 3000 ms。Web 不读取 Node 环境关闭开关，应使用 `setTrapEnabled(false)`。告警仅 fetch webhook / Slack / Telegram / 飞书，无 SMTP；无宿主 `waitUntil` 时异步投递可能随请求生命周期终止。持久 store 不使告警去重或指标成为全局视图。
 
 接入、仅文档的存储示例和故障排查见 [edge.md](edge.md)。这些限制不改变 WAF / 补丁 / 最小权限的职责，也不证明实验性 maze 的 token 成本收益。
+
+## 8. v0.5a honeyfiles、日志与 hooks 信任边界
+
+- **Seed 文件风险**：假配置可能被真人、备份或安全扫描器误读。仅在运营者选择的隔离目录生成，不替换真实配置。内容 deterministic、inert，不使用真实厂商凭据格式/前缀；SSH placeholder 明显无效。默认 dry-run；显式 `--write` 的文件 0600、新目录 0700，现有文件不覆盖、目标 symlink 跳过，祖先 symlink/路径穿越/不安全 metadata 拒绝，不跟随不安全路径。已有目录权限不改；目录须由运营者控制，检查不是防并发替换祖先的 sandbox。`--verify` 只读检查完整性/权限，修改发现不是读取告警。callback URL 只能运营者自托管，默认保留域名；seed 不请求 URL、不部署 listener，也不自动生成签名 callback URL。
+- **Watch 信任来源**：仅 Linux、只读 auditd/inotifywait 日志 parser；不使用 `fs.watch` / atime 声称检测读取。auditd read 规则与 `inotifywait -e access` 由运营者配置/运行，来源可能需 root，guard 无需 root。攻击者能写日志就可能伪造/抹除告警；丢行、inotify 合并、配置错误、速率/行长上限可能漏报。解析有界、畸形行忽略、轮转/截断重置。`honeyfile_read` medium，不进入 trap/block，不把 uid/comm 当身份凭据，不把相邻日志误当跨进程 incident 关联。无出站探测。
+- **日志与 timeline**：Node `log.file` 可选，sanitized metadata，0600，有界（默认 10 MiB，超过前截断）、拒绝 symlink/非普通/多硬链接文件。不得记录完整 canary、secret、body、Cookie/Authorization。路径/uid/进程名仍可能敏感，权限与留存由运营者管理。CLI ack 需写到同一 `log.file` 才能被进程观察；其他文件或无 file 时提醒仍有上限但看不到 ack。内存、文件与重启边界不提供持久 SOC 保证。Prometheus summaries 无 path/UA/IP labels。
+- **Hooks 攻击面**：Node 子进程以 guard 的 OS 权限执行，不是 sandbox，Web/Edge 无 hooks。默认不配置/关闭，只允许运营者写死的绝对路径 executable 与固定 argv，`spawn` / `shell: false`，不把请求内容拼入参数。新 env 仅白名单 `AG_INCIDENT_ID`、`AG_EVENT_TYPE`、`AG_CLIENT_KEY_HASH`、`AG_CANARY_ID`、`AG_PLACEMENT`，不继承 secret/PATH/HOME，不传 UA、原始请求路径、headers/body。metadata 也只能作数据，脚本不得再交给 shell/eval。运营者须控制 executable/script 与目录，脚本可拥有比 guard 更危险的能力。
+- **Hooks 自保**：SIGTERM 后 1000 ms SIGKILL 的超时、每小时上限、每 hook 并发与模块全局上限；无无界队列，stdout/stderr 丢弃。失败/超时/拒绝仅发 `hook_result`，不影响 inspect。直接子进程终止并不隔离所有后代。guard 不轮换密钥、不改防火墙；[示例](examples/hooks/README.md) 仅日志/打印，不调用网络、不做破坏性操作。
+
+操作步骤见 [seed.md](seed.md) 与 [incident-response.md](incident-response.md)。假成功仍需安全评估与单独批准；独立诱饵主机仍规划为程序/模板且不替运营者部署。真实 agent 评测预算未设定，不能声称已消耗攻击者 token；E4 仍禁止，以上功能不替代 WAF、补丁或最小权限。
