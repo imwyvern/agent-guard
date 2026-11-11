@@ -12,10 +12,10 @@
 1. **永远是合成数据**：绝不含真实的用户、密钥、主机名、IP、业务数据。数据由 `projectSeed` 通过确定性算法生成。
 2. **凭据永远 inert**：格式像真的，但不属于任何真实系统，签发方根本不存在。
    - 不使用任何云厂商或第三方服务的**真实有效格式前缀与校验位**（避免触发厂商自动吊销、被第三方扫描器误报、或碰巧匹配到真实账号）。
-   - 主机名只用 `.invalid`、`.example`、保留网段（RFC 5737 / 3849）。
-3. **不能成为注入源**：内容是数据，不含给 agent 的祈使句、隐藏字符或外部 URL。沿用 MCP 诱饵的描述检查（`lintMcpDecoyDescription`）。
-4. **不向第三方发起任何连接**：假配置里的回调地址只指向保留域名。
-5. 命中仍是 **alert-only**；是否进入 Exhaust 由 exhaust.md 的闸门决定。
+   - 假服务主机名只用 `.invalid`、`.example`、保留网段（RFC 5737 / 3849）；v0.4a 可显式配置运营者自托管的 callback URL，见 [trap-mode.md](trap-mode.md)。
+3. **不能成为注入源**：内容是数据，不含给 agent 的祈使句、隐藏字符或外呼指令。除显式配置的自托管 callback URL 外不放外部 URL，迷宫 HTML 始终无外部 URL。沿用 MCP 诱饵的描述检查（`lintMcpDecoyDescription`）与 placement lint；可选 `allowedHosts` 只放行精确指定的 callback 主机。
+4. **不主动连接第三方**：guard 永不 fetch callback baseUrl；不使用第三方 honeytoken 服务、不探测请求方。运营者配置的告警 adapters 是唯一出站通知例外，爬虫 DNS 身份验证沿用既有边界。
+5. 默认仍是 **alert-only**；v0.4a 的 opt-in trap 依照 [exhaust.md](exhaust.md) / [trap-mode.md](trap-mode.md) 的闸门与预算执行。本文 persona、分层泄露与假成功设计仍未进入运行时。
 
 ## 3. 真实度手段
 

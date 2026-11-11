@@ -13,7 +13,7 @@ An AI-agent honeypot middleware for Node and the edge.
 - 既定は検出とアラートのみです。ミドルウェアはイベントを記録し、非同期でアラートを送りますが、遮断・制限・反撃はしません。
 - ランタイム依存関係はゼロです。Express、Hono、Fastify、Koa はオプションの peer です。現在は Node ≥20 向けで、エッジランタイムはロードマップ上にあります。
 
-**対象と非対象。** agent-guard は、API に向かう敵対的または探索的な AI エージェントのトラフィックを検出・誘捕・観測します。反撃したり、誰かを攻撃したりはしません。詳細は[対象外であること](#対象外であること)を参照してください。
+**対象と非対象。** agent-guard は、API に向かう敵対的または探索的な AI エージェントのトラフィックを検出・誘捕・観測します。反撃したり、誰かを攻撃したりはしません。非対象、オプトイン機能、実験上の制約は[対象外であること](#対象外であること)を参照してください。
 
 Node ≥20 向けの HTTP ミドルウェアです。隔離された 5 つのデコイルートと不活性なカナリア認証情報により、認証情報のリプレイと探索的スキャンを検出します。イベントを記録し、非同期でアラートを送信します。ランタイム依存関係はゼロで、Express はオプションの peer です。Apache-2.0、著作権 2026 Wesley Wang。
 
@@ -92,7 +92,7 @@ const listener = wrap(guard, (_req, res) => res.end('Hello'));
 
 ## Hono（Node ランタイム）
 
-v0.2 の Hono アダプターは `@imwyvern/agent-guard/hono` として利用でき、オプションの `hono` peer を伴います。Node ≥20 が必要です。共有コアはまだ `node:crypto` と Node DNS を使っています。エッジランタイムと WebCrypto コアはロードマップの v0.3 作業です。
+v0.2 の Hono アダプターは `@imwyvern/agent-guard/hono` として利用でき、オプションの `hono` peer を伴います。Node ≥20 が必要です。共有コアはまだ `node:crypto` と Node DNS を使っています。エッジランタイムと WebCrypto コアは v0.4b の予定です。
 
 ```ts
 import { Hono } from 'hono';
@@ -110,11 +110,11 @@ serve({ fetch: app.fetch, hostname: '127.0.0.1', port: 3000 });
 
 利用側アプリケーションに Hono と Node サーバー統合をインストールしてください。このリポジトリは両者を開発依存関係としてのみインストールし、アダプターはランタイム依存関係を追加しません。`agentGuard` は guard または config を受け取り、クローンしたリクエストから対象ボディを、設定されたボディ上限（デフォルト 16 KiB）までスキャンし、元のボディは下流ハンドラーが利用できるまま残します。JSON とフォームボディに対応し、不正または切り詰められた入力は有界テキストとしてスキャンされます。ワイヤーサイズ制限とボディ読み取り期限は、引き続きホストの責任です。`@hono/node-server` がソケット IP を提供します。転送ヘッダーを使う場合は、明示的に信頼した `clientIp` コールバックが必要です。
 
-検出は引き続きアラートのみです。カナリアリプレイはホストへ進み、デコイには noindex/no-store ヘッダーが付き、検証済みクローラーはホスト固有の欠落ルートハンドラーに到達します。オプトインの robots/HTML/llms 変換は、既存の 1 MiB バッファ上限を維持します。`npm run demo:hono` を実行してください（`PORT` と `AGENT_GUARD=off` は他のカタログデモと同じように動作します）。Hono は Express および Node と同じ共有受け入れスイートを実行します。
+既定の `mode: 'detect'` では、検出は引き続きアラートのみです。カナリアリプレイはホストへ進み、デコイには noindex/no-store ヘッダーが付き、検証済みクローラーはホスト固有の欠落ルートハンドラーに到達します。オプトインの robots/HTML/llms 変換は、既存の 1 MiB バッファ上限を維持します。`npm run demo:hono` を実行してください（`PORT` と `AGENT_GUARD=off` は他のカタログデモと同じように動作します）。Hono は Express および Node と同じ共有受け入れスイートを実行します。
 
 ## Fastify と Koa（Node ランタイム）
 
-v0.3a（未リリース）では `@imwyvern/agent-guard/fastify` と `@imwyvern/agent-guard/koa` の `agentGuard` を追加し、同じ guard または config を受け取ります。Fastify はルートより前に `await app.register(agentGuard(guard))` で登録します。ボディ解析後の `preHandler` で検査します。Koa はサイズ制限付きボディパーサーの後に `app.use(agentGuard(guard))` を配置します。どちらもリクエストストリームを消費せず、ホスト固有のクローラー向け 404、アラートのみのリプレイ検出、オプトインの lure 変換を保ちます。フレームワークはオプションの peer で、コアのランタイム依存関係は増えません。[Fastify デモ](../../examples/fastify-demo/server.ts)、[Koa デモ](../../examples/koa-demo/server.ts)、[アダプターガイド](../community.md)を参照してください。エッジランタイムは引き続きロードマップ上の作業です。
+v0.3a（未リリース）では `@imwyvern/agent-guard/fastify` と `@imwyvern/agent-guard/koa` の `agentGuard` を追加し、同じ guard または config を受け取ります。Fastify はルートより前に `await app.register(agentGuard(guard))` で登録します。ボディ解析後の `preHandler` で検査します。Koa はサイズ制限付きボディパーサーの後に `app.use(agentGuard(guard))` を配置します。どちらもリクエストストリームを消費せず、ホスト固有のクローラー向け 404、detect モードでのアラートのみのリプレイ検出、オプトインの lure 変換を保ちます。フレームワークはオプションの peer で、コアのランタイム依存関係は増えません。[Fastify デモ](../../examples/fastify-demo/server.ts)、[Koa デモ](../../examples/koa-demo/server.ts)、[アダプターガイド](../community.md)を参照してください。エッジランタイムは引き続きロードマップ上の作業です。
 
 ## MCP / LLM ツールエンドポイントのデコイ
 
@@ -157,7 +157,7 @@ HTML のない API については [API 専用ガイド](../scenarios/api-only.m
 | `crawler.resolver` | Node DNS；オフライン利用には `{ reverse, resolve }` を注入 |
 | `crawler.extraSuffixes` / `ipRangesFile` | 任意のクローラーファミリー接尾辞 / オフライン JSON `{ google: ['CIDR'] }` |
 | `allowlist` | 任意の完全一致 `ips`、IPv4/IPv6 `cidrs`、`uaPatterns`、完全一致 `headerToken` |
-| `alerts.adapters` | デフォルトの宛先なし；`webhookAdapter()` と `consoleAdapter()` を利用可能 |
+| `alerts.adapters` | 既定の送信先なし。webhook、console、Slack、Telegram、Feishu、SMTP/email アダプターを利用可能 |
 | `alerts.minSeverity` | デコイ/リプレイは `info`；明示値は probe/discovery のエスカレーションも有効化 |
 | `alerts.dedupeWindowSec` | 600；同一イベント + placement/ID + client key |
 | `alerts.ratePerMinute` | チャネルあたり 30；抑制件数は次のアラート要約に繰り越し |
@@ -166,17 +166,19 @@ HTML のない API については [API 専用ガイド](../scenarios/api-only.m
 | `clientIp` | ソケット IP；信頼できるプロキシを検証したあとでのみ上書き |
 | `onEvent` | 任意のオブザーバー；オブザーバー/sink の失敗は隔離される |
 
-`guard.robotsLines()` は手動の robots 統合を支援します。`guard.htmlCommentFor(path)` はオプトインコメントまたは null を返します。`guard.metrics()` はリクエスト/イベント/配送の件数と、有界な直近 inspect タイミング分位数を返します。スコアはインスタンスごとの有界な観測値であり、強制には使いません。クライアント状態：50k エントリ、30 分のアイドル TTL。クローラーキャッシュ：10k、陽性 24h / 陰性 1h。転送ヘッダーは自動的には信頼されません。
+`guard.robotsLines()` は手動の robots 統合を支援します。`guard.htmlCommentFor(path)` はオプトインコメントまたは null を返します。`guard.metrics()` はリクエスト/イベント/配送の件数と、有界な直近 inspect タイミング分位数を返します。タイミングスコアはインスタンスごとの有界な観測値です。検出スコアはオプトインの trap ゲートに使われる場合があります。クライアント状態：50k エントリ、30 分のアイドル TTL。クローラーキャッシュ：10k、陽性 24h / 陰性 1h。転送ヘッダーは自動的には信頼されません。
 
-D5 は常にログインを拒否し、決定的な 300–600ms の遅延を伴います。すべてのデコイは `noindex`、`no-store`、≤8KiB で、`.invalid` ホスト名のみを使い、cookie の作成、認証、業務サービス呼び出しは行いません。申告済み AI クローラーのデコイヒットは重大度 `info` です。検索クローラーの DNS 検査はデコイルート上でのみ行われます。エラー/タイムアウトは fail open し、ネイティブ 404 になります。
+detect モードでは、D5 は常にログインを拒否し、決定的な 300–600ms の遅延を伴います。すべてのデコイは `noindex`、`no-store`、≤8KiB で、既定では `.invalid` の架空ホスト名を使い（明示設定したセルフホストの callback URL は例外）、cookie の作成、認証、業務サービス呼び出しは行いません。申告済み AI クローラーのデコイヒットは重大度 `info` です。detect ではデコイルート上で検索クローラーの DNS 検証を行います。オプトインの trap と callback ハンドラーも検証を行い、クローラーを保護します。エラー/タイムアウトは fail open し、ネイティブ 404 になります。
 
 ## インシデント相関とカナリア伝播追跡
 
-v0.3a は同じ `client_key` の既存イベントに任意の `incident` を付加します。フィールドは `id`、順序付き `sequence`（例：`robots → D1 → D2`）、`first_seen`、`last_seen`、`confidence` です。`incident.windowMs` の既定値は 900000（最初の観測から固定 15 分）、0 は相関を無効化します。状態は 50k クライアントの LRU に収め、直近 32 観測を保持します。単独ヒットの反復は low、異なるデコイまたは発見とデコイの組み合わせは medium、`canary_replay` は high に上げます。同じ窓内で確信度は下がりません。robots の訪問は内部マーカーで、イベント型を追加しません。共有ネットワークではクライアントが統合され得ます。相関は観測情報の補足のみで、重大度、HTTP 応答、クローラーバイパス、デコイ判断を変更しません。`mode` は引き続き `detect` のみです。
+v0.3a は同じ `client_key` の既存イベントに任意の `incident` を付加します。フィールドは `id`、順序付き `sequence`（例：`robots → D1 → D2`）、`first_seen`、`last_seen`、`confidence` です。`incident.windowMs` の既定値は 900000（最初の観測から固定 15 分）、0 は相関を無効化します。状態は 50k クライアントの LRU に収め、直近 32 観測を保持します。単独ヒットの反復は low、異なるデコイまたは発見とデコイの組み合わせは medium、`canary_replay` は high に上げます。同じ窓内で確信度は下がりません。robots の訪問は内部マーカーで、イベント型を追加しません。共有ネットワークではクライアントが統合され得ます。相関は重大度を引き上げません。既定の detect では HTTP 応答とデコイ判断を維持しますが、v0.4a のオプトイン trap は high confidence をゲートに使えます。検証済みクローラーと allowlist は常に対象外です。[trap モード](../trap-mode.md) を参照してください。
 
 リプレイアラートは `canary.id`、`placement`、`env`、`found_in`、`field` を保ち、`leaked_at`（配置）、`replayed_at`（パス）、`dwell_ms`（最初のデコイ配信からの時間）、`client_keys_seen`（異なるリプレイクライアントキー数、最大 8）を追加します。返すデコイボディにトークンが含まれる場合だけ配信を記録し、HEAD とクローラーバイパスは数えません。追跡はプロセス内のみで、50k 件の LRU と 24 時間 TTL を使います。追い出し、再起動、組み込みデコイ以外での配信では時刻が不明となり、`dwell_ms` を省略します。これらの観測は身元や悪意の証明にはなりません。
 
 ## アラートと署名
+
+webhook と console に加え、`slackAdapter`、`telegramAdapter`、`feishuAdapter`、`smtpAdapter` を提供しています。送信先と認証情報は明示的に設定し、デフォルトではどれも有効になりません。新たなランタイム依存関係はありません。新しい HTTP アダプターは loopback 以外で HTTPS を要求し、リダイレクトを拒否します。SMTP は暗黙の TLS（465）、STARTTLS（587）、AUTH PLAIN/LOGIN に対応します。以下のキュー、重複排除、レート制限、`close()` による配送完了待ちを共有します。
 
 ```ts
 import { webhookAdapter, verifyWebhookSignature } from '@imwyvern/agent-guard';
@@ -255,16 +257,31 @@ v0.2 以降、Express、Node、Hono の主要な AC-10 測定は `npm run bench:
 
 測定ゲートの失敗は、ベンチマークを非ゼロ終了にします。`bench:latency` は各デモサーバーを専用の子プロセスで起動し、autocannon で負荷をかけます（100 connections、30 s、3 回実行の中央値）。ゲート対象外の固定レート実行と、スループットから導出したリクエストあたりオーバーヘッドの見積もりも記録します。Lighthouse のフルマトリックスには約 35 分かかります。サンドボックスがローカルソケットを禁じている場合、研究用ハーネスはメモリ上の Duplex ストリーム越しに実際の HTTP リクエスト/レスポンスオブジェクトを使います。TCP レイテンシは **未検証** のままです。Chrome の起動失敗は合格ではなく **スキップ** です。正確な環境上の制約は [ベンチマークレポート](../bench-v0.1.md) と [実装ノート](../implementation-notes.md) を参照してください。このライブラリにこのハーネスは含まれません。
 
-v0.3b 以降、`npm run bench:exhaust-sim` はスクリプト化された貪欲 agent に対する有界迷路のコスト比シミュレーションをメモリ上で実行し、`npm run bench:deception-lint` は現行のデコイ出力と決定論的なペルソナ原型を安全スキャンします。いずれのコマンドもランタイムの動作は変えず、`mode` は引き続き `detect` のみを受け付けます。[v0.3b のオフライン評価](../bench-v0.3b.md) を参照してください。
+v0.3b 以降、`npm run bench:exhaust-sim` はスクリプト化された貪欲 agent に対する有界迷路のコスト比シミュレーションをメモリ上で実行し、`npm run bench:deception-lint` は現行のデコイ出力と決定論的なペルソナ原型を安全スキャンします。いずれのコマンドも trap を有効にしません。v0.4a では別途、オプトインの trap と実験的な迷路が実装されています。[v0.3b のオフライン評価](../bench-v0.3b.md) を参照してください。
 
 ## 対象外であること
 
-WAF、DDoS 防御、認証システム、ボットブロッカー、本番デプロイ、検索エンジン動作の保証ではありません。自動ブロック、トラフィック制限、trap モード、迷路、リバースプロンプトインジェクション、外向きプロービング、実在ベンダーの認証情報、第三者コールバックの honeytoken はありません。Slack/Telegram/Feishu/email および Edge アダプターは今後の作業です。Hono アダプターはすでに Node ≥20 向けに提供されています。機械的タイミングと Prometheus エンドポイントは任意の設計アイデアであり、v0.1 では有効化されていません。
+WAF、DDoS 防御、認証システム、汎用ボットブロッカーではありません。この研究プロジェクトは本番デプロイを提供せず、検索エンジンの動作も保証しません。
+
+リバースプロンプトインジェクション / counter-injection（E4）は製品に一切含めません。外向きの探索や、guard が第三者に向けて開始するコールバックは行いません。外向きの通知は運用者が設定したアラートアダプターだけで、既存のクローラー識別用 DNS 検証は変わりません。カナリアは不活性な HMAC トークンであり、実在するベンダーの認証情報は使いません。第三者の honeytoken サービス（Canarytokens など）は利用せず、コールバックカナリアは運用者自身のホストでのみ受信します。
+
+Edge アダプター（Cloudflare Workers、Next.js middleware、Deno、Bun、Vercel Edge）は**今回のリリースには含まれず**、Web 標準コアとともに次の **v0.4b** で取り組む予定です。Hono はすでに **Node ≥20** 向けに提供されています。
+
+v0.4a には以下の**明示的なオプトインが必要で、デフォルトでは無効**の連携と制御が実装されています。既定のモードは `mode: 'detect'` のままです。
+
+- Slack、Telegram、Feishu、SMTP/email のアラートアダプター。新たなランタイム依存関係はなく、既定の送信先もありません。
+- `guard.prometheusText()` / `prometheusHandler(guard)` によるテキスト出力。エンドポイントは自動登録されず、パスの label は含みません。
+- `mode: 'trap'`。`delay`、`rateLimit`、`block`、**実験的**な `maze` は個別に切り替えます。検証済みクローラーと allowlist は trap の対象になりません。
+- `canary.callback.baseUrl` + `callbackHandler(guard)` によるセルフホスト型コールバックカナリア。ハンドラーは明示的に登録する必要があり、guard が `baseUrl` を fetch することはありません。
+
+機械的なリクエスト間隔の `automation_score` も実装済みですが、観測専用です。重大度を引き上げたり、単独で block/maze を発動させたりしません。現行コードは十分なサンプルが集まると自動でスコアを算出し、独立した有効化スイッチはありません。
+
+**実験的な迷路**を有効にする前に、運用者自身による実際の agent での測定が必要です。[v0.3b オフラインシミュレーション](../bench-v0.3b.md) では、スクリプト化された agent が **25 ms/request** のモデルで数百対一の時間比を示しましたが、**バイト比は 1:1 で、下限の 3:1 を下回りました**。実際の agent に対する費用削減を示す結果ではありません。[trap の設定とリスク](../trap-mode.md)、[Exhaust](../exhaust.md) を参照してください。
 
 ## ロードマップと設計ドキュメント
 
 - [コミュニティ](../community.md) — アダプター、検出シグネチャ、翻訳、RFC の貢献方法。
-- [ロードマップ](../roadmap.md) — 予定している v0.3/v0.4 の作業です。Exhaust と Deception は設計草案であり、デフォルトでは無効です。
-- [Exhaust](../exhaust.md) — 確認済みの悪意あるセッションに対する有界のコスト賦課（遅延、迷路、コンテキスト消費）。
+- [ロードマップ](../roadmap.md) — v0.4a の完了項目と v0.4b の Edge 計画。persona/deception の拡張は設計段階です。
+- [Exhaust](../exhaust.md) — 実装済みのオプトイン遅延と実験的な迷路。コンテキスト消費（E3）は未実装です。
 - [Deception](../deception.md) — デコイデータをより信じられるものにし、攻撃者の agent がそれを本物として扱う可能性を高める。
 - [設計](../design.md)、[契約](../codex-contract.md)、[KPI](../kpi.md)、[脅威モデル](../threat-model.md)。先行事例は概念の参考にすぎず、第三者プロジェクトのコードは複製していません。

@@ -1,28 +1,28 @@
 # agent-guard 设计文档（MVP = detect + canary）
 
 - 日期：2026-11-10（HKT）
-- 状态：草案，待 Dan 批准
+- 状态：保留 MVP 设计背景，已按 v0.4a（unreleased，2026-11-11 HKT）更新实现边界；完整 API 以 [src/types.ts](../src/types.ts) 为准。
 - 上游：`/workspace/security/bla-server-anti-ai-assessment-2026-11-10.md`、`docs/threat-model.md`、`docs/kpi.md`
-- 定位：通用 Node / Edge HTTP 中间件；纯开源研究项目，本仓库不部署到任何服务器，验证在本地 demo app 上完成。
+- 定位：Node ≥20 HTTP 中间件（Web-standard core / Edge 留待 v0.4b）；纯开源研究项目，本仓库不部署到任何服务器，验证在本地 demo app 上完成。
 
 ## 0. 一句话
 
-在应用进程内挂一层很薄的中间件：**放 3–5 个只读诱饵路由 + 唯一 inert canary 凭据**，谁碰诱饵、谁回放 canary 就**记录并告警**。MVP **不封禁、不限速、不 tarpit、不对对方下指令**。
+在应用进程内挂一层很薄的中间件：**放 3–5 个只读诱饵路由 + 唯一 inert canary 凭据**，谁碰诱饵、谁回放 canary 就**记录并告警**。MVP 与默认 `mode: 'detect'` **不封禁、不限速、不 tarpit、不对对方下指令**。v0.4a 接受显式 `mode: 'trap'`，delay / rateLimit / block / 实验性 maze 各自默认关闭；操作与风险见 [trap-mode.md](trap-mode.md)。
 
 ## 1. 设计原则
 
-1. **Alert-by-default, no auto-block**：MVP 唯一的"动作"是返回诱饵响应 + 告警。真实路由的行为永远不因 agent-guard 改变（无 cloaking）。
+1. **Alert-by-default**：detect 保留 MVP 的诱饵响应 + 告警行为。只有显式 opt-in 的 trap block 可对已确认的同一 client key 在 TTL 内返回 403（含真实路由）；delay / rateLimit 只作用于 D1–D5，maze 只作用于隔离的 archive 路径。
 2. **真人零误伤**：诱饵没有任何可见/可点击入口；canary 只出现在诱饵响应和（可选）HTML 注释里。
 3. **SEO 零回归**：诱饵 = noindex + X-Robots-Tag + robots Disallow + 不进 sitemap + verified-crawler bypass。
 4. **Inert canary**：canary 永不进入真实 IdP / secret store / DB；它不能登录任何东西。
 5. **隔离**：decoy handler 不调用任何业务代码 / DB / 外部服务。
-6. **零/极少依赖**：核心零运行时依赖；只用 Node 内置 `crypto`、`dns`（Edge 用 WebCrypto + DoH 可选）。
+6. **零/极少依赖**：核心零运行时依赖；只用 Node 内置 `crypto`、`dns`（WebCrypto / Edge 核心尚未实现，v0.4b 再议）。
 7. **借概念不借代码**：概念来自 BLA（Poison / Exhaust / Canary）、Snare（inert 凭据位）、Drosera（Lure/Detect/Trap/Canary 分层）、Beelzebub/Sundew/Oubliette（Agent 行为指纹）。**不复制任何代码**（Beelzebub 为 GPL-3.0，尤其不得复制）。
 
 ## 2. 架构
 
 ```
-request ──► [agent-guard core]
+request ──► [agent-guard core，以下为 detect 默认流程]
               ├─ 1. allowlist?（监控探针/自家 Bot）──► pass（仅 debug 日志）
               ├─ 2. canary scan（header / query / 小 body）──► 命中 → event=canary_replay → alert；请求继续交给 app（不改变行为）
               ├─ 3. path match decoy?
@@ -36,6 +36,10 @@ request ──► [agent-guard core]
 
 核心是框架无关的纯函数式 API：`core.inspect(AGRequest) → Promise<AGDecision>`，各运行时 adapter 只做请求/响应转换。告警投递异步、不阻塞响应。
 
+v0.4a 的 trap 闸门：verified crawler / allowlist 永不进入；canary replay 或 `incident.confidence === 'high'` 可确认会话；delay/rateLimit/maze 也接受「已有前次请求检测信号 + 检测分 ≥ `trap.gate.minScore`（默认 200）」。首次单次 `/.env` 不够；机械 `automation_score` 不计入闸门，检测分单独不能 block。block 默认 TTL 15 min、上限 24 h，8192 项 LRU（可配至 50k），每次 403 记录 `trap_block`，普通访问不续期。key 已含网络前缀 + UA，可能合并无关用户。
+
+运行时可用 `AGENT_GUARD_TRAP=off` 或 `guard.setTrapEnabled(false)` 关闭所有 trap；inspect p99 / 事件循环延迟超阈值则打开断路器、发 `trap_circuit_open` 并回到检测。`setTrapEnabled(true)` 重置断路器，但不能覆盖环境关闭或改变 mode/功能开关。迷宫有深度、页数、字节、时长与全局并发/字节预算；v0.3b 字节比 1:1，成本门槛未通过，详见 [Exhaust](exhaust.md)。
+
 ## 3. MVP 诱饵路由（固定 5 条）
 
 所有诱饵响应**统一**带：
@@ -45,7 +49,7 @@ request ──► [agent-guard core]
 - HTML 响应额外带 `<meta name="robots" content="noindex,nofollow,noarchive">`
 - 不设置任何 cookie，不读取/改变真实 session
 - 响应体内的假数据由 `projectSeed` 确定性生成（同一项目每次一致，不同项目不同 → 避免全网同指纹）
-- 响应体大小上限 8 KB（MVP 不做 Exhaust/maze）
+- 响应体大小上限 8 KB（v0.4a 迷宫 HTML 同样 ≤8 KiB）
 - 路径前缀可配置；下表为默认值
 
 | # | 路由（默认） | 方法 | 诱饵行为（精确） | 内含 canary | 事件 |
@@ -63,7 +67,7 @@ request ──► [agent-guard core]
 - **llms.txt**（默认关闭）：若站点已有 `llms.txt`，可追加一行指向 D4。
 - 真实页面中**不放**任何可见链接、隐藏 `<a>`、`display:none` 元素（避免无障碍工具误触、避免 Google 视为隐藏链接）。
 
-**真实登录接口的 canary 检测**：在 `canaryScan.bodyPaths`（默认 `["/login", "/api/auth/*"]`）上扫描已解析的 body（≤ 16 KB）。命中 canary 只告警，真实登录逻辑照常执行（canary 本来就不是有效凭据，必然失败）。
+**真实登录接口的 canary 检测**：在 `canaryScan.bodyPaths`（默认 `["/login", "/api/auth/*"]`）上扫描已解析的 body（≤ 16 KB）。detect 下命中 canary 只告警，真实登录逻辑照常执行；若已 opt-in trap block，可按确认闸门返回 403（canary 本来就不是有效凭据，必然失败）。
 
 ## 4. Canary 格式
 
@@ -92,7 +96,9 @@ ACME-CANARY-7K3M9QX2TB4P-H8Q2ZC        # 自定义 prefix = "ACME-CANARY-"（通
 
 CLI：`agent-guard canary new --env demo --placement "D3:password"`、`agent-guard canary list`、`agent-guard canary scan <path>`（扫描目录/文件，发现 canary 前缀出现在非白名单文件中即非零退出 → 用于 CI 防止 canary 混进真实配置）。
 
-### 4.3 Shaped 变体（opt-in，默认关闭）
+### 4.3 Shaped 变体（旧设计，v0.4a 未实现）
+
+以下仅保留设计背景，不是当前配置 API；v0.4a 只使用 inert HMAC canary，不生成真实厂商凭证或调用第三方 honeytoken 服务。
 
 有些投放位需要"像真的"（如 `sk_live_…`）。`shape: "stripe" | "jwt" | "hex32"` 时生成形似字符串，**完整字符串**写入 registry，检测走精确匹配。代价：CI 无法仅凭前缀识别 → 必须用 `canary scan --registry`。MVP 默认只用 canonical。
 
@@ -100,14 +106,14 @@ CLI：`agent-guard canary new --env demo --placement "D3:password"`、`agent-gua
 
 1. canary 不得写入任何真实 IdP、用户表、secret manager、云厂商 key 列表、CI secrets。
 2. D1 中的连接串主机名必须是 `.invalid`。
-3. 不使用任何会"回拨"第三方的 canary（如真实云 key 型 honeytoken 服务）——检测只发生在我们自己的服务器上。
+3. 不使用真实厂商凭证或任何第三方 honeytoken 服务（Canarytokens 等）。可 opt-in `canary.callback.baseUrl`，只放置运营者自托管的 inert HMAC URL；`callbackHandler(guard)` 必须显式挂载，guard 永不 fetch baseUrl。HTTPS 必需，仅显式 loopback 可用 HTTP。此入站处理器与 trap 独立，不是对第三方发起回连。
 4. `agent-guard canary scan` 应加入采用方 CI（文档给出 GitHub Actions 片段）。
 
 ## 5. Verified-crawler bypass
 
 目的：**Googlebot 等合规爬虫永远进不了任何诱饵/maze**。
 
-- 触发条件：请求命中 decoy 路由，且 UA 匹配已知爬虫（Googlebot、Google-InspectionTool、GoogleOther、Bingbot、Applebot、DuckDuckBot、YandexBot、Baiduspider）。只在这个窄路径上做 DNS，**普通流量零 DNS 开销**。
+- 触发条件：请求命中 decoy 路由，且 UA 匹配已知爬虫（Googlebot、Google-InspectionTool、GoogleOther、Bingbot、Applebot、DuckDuckBot、YandexBot、Baiduspider）。detect 默认只在这个窄路径上做 DNS；trap 还在 maze、回放确认/已阻断请求上校验声明的爬虫，callback handler 也会验证，确保其免于 trap/回调告警。
 - 校验：`dns.reverse(ip)` → 主机名后缀必须在白名单（`googlebot.com`、`google.com`、`googleusercontent.com`、`search.msn.com`、`applebot.apple.com`、`yandex.ru/.net/.com`、`baidu.com/.jp` 等，可配置）→ 再 `dns.resolve4/6(hostname)` 必须包含原 IP。
 - 缓存：LRU（默认 10k 条），通过 24 h，不通过 1 h。
 - 超时：300 ms；**超时/DNS 错误 → fail-safe 视为 verified**（宁可放过一个伪装者，也不让真 Googlebot 看到诱饵）。
@@ -127,18 +133,18 @@ CLI：`agent-guard canary new --env demo --placement "D3:password"`、`agent-gua
 | `ua_spoof_crawler` | +30 | 声称爬虫但 rDNS 失败 |
 | `ua_automation` | +10 | `curl/`、`python-requests`、`node-fetch`、`axios/`、`Go-http-client`、`HeadlessChrome`、空 UA |
 | `robots_then_disallowed` | +20 | 同一 client_key 读 robots.txt 后 60 s 内访问 Disallow 路径 |
-| `mechanical_timing` | +10 | 同一 client_key 10 个请求间隔方差极低（v0.1 可选，默认关） |
+| `automation_score` | 不加检测分 | v0.4a 自动观测最近 20 个请求间隔的规律性，样本足够才附加 0–1；无独立启用开关，不提升严重级别，不单独触发 block / maze |
 
 - `client_key = sha256(ip/24 或 ipv6/48 + UA)[0:16]`，不存原始 IP 到告警（日志可配置是否保留原 IP，默认保留在本地日志、告警中打码）。
 - 状态存内存 LRU（默认 50k client_key，TTL 30 min）；多实例部署时分数是 per-instance 近似值，MVP 接受此限制（不引入 Redis）。
 
-v0.3a / unreleased 新增的关联层独立于上述分数：同一 `client_key` 在默认固定 15 min 窗口内附加可选 `incident`（id、最近 32 项有序 sequence、first_seen/last_seen、low/medium/high confidence）。`incident.windowMs` 可配置，0 关闭；50k 客户端 LRU，序列以四位编码存储。置信度只升不降，不影响严重级别、HTTP 响应、诱饵选择或爬虫绕过。robots 只增加内部序列标记，不新增事件类型。共享网络下 client_key 不代表真实用户或登录会话。
+v0.3a / unreleased 新增的关联层独立于上述分数：同一 `client_key` 在默认固定 15 min 窗口内附加可选 `incident`（id、最近 32 项有序 sequence、first_seen/last_seen、low/medium/high confidence）。`incident.windowMs` 可配置，0 关闭；50k 客户端 LRU，序列以四位编码存储。置信度只升不降，不提升严重级别；detect 下不改变 HTTP 响应或诱饵决策，显式 trap 可将 high 用于确认闸门。爬虫与 allowlist 免疫始终优先。robots 只增加内部序列标记，不新增事件类型。共享网络下 client_key 不代表真实用户或登录会话。
 
 Canary propagation 只在返回的内置诱饵响应体中确实包含令牌时记录首次下发，HEAD / crawler bypass 不计。进程内 50k 记录 LRU、24h TTL，最多保留 8 个不同重放 client_key；重放附加 leaked_at、replayed_at、可选 dwell_ms 与 client_keys_seen。未知下发时间（重启、淘汰或宿主自定义响应）必须省略 dwell_ms，不使用 registry.createdAt 替代。完整可选字段以 [event.v1.json](../schema/event.v1.json) 与 [类型定义](../src/types.ts) 为准。
 
 ## 7. 结构化日志（JSON schema）
 
-每个事件一行 JSON（默认 stdout，可自定义 sink）。
+每个事件一行 JSON（默认 stdout，可自定义 sink）。下例保留 MVP schema 形状；v0.4a 的新增 trap/callback 事件、`automation_score` 与可选 incident/传播字段以 [event.v1.json](../schema/event.v1.json) 为准。
 
 ```json
 {
@@ -202,7 +208,7 @@ v0.1（MVP）只内置两个（零依赖）：
 | `webhook` | 通用 JSON POST（Node 内置 `fetch`）；`X-AgentGuard-Signature: sha256=<hex HMAC-SHA256(timestamp + "." + body, webhookSecret)>`；`X-AgentGuard-Timestamp`（Unix 秒）防重放；附导出 `verifyWebhookSignature()` 供接收端使用 |
 | `console` | 把告警以单行 JSON 写到 stderr（或注入的 stream），用于本地 demo / 开发 |
 
-**Future adapters（v0.2+，不在 MVP）**：`slack`（Incoming Webhook）、`telegram`（Bot API）、`feishu`（飞书/Lark 机器人）、`email`（注入 send 函数）。在此之前可用 `webhook` + 用户自建转发实现，或自行实现 `AlertAdapter` 接口。
+**v0.4a 已实现（opt-in、零新增运行时依赖）**：`slackAdapter`（Incoming Webhook）、`telegramAdapter`（Bot API）、`feishuAdapter`（机器人，可配 secret）与 `smtpAdapter`（SMTP/email，465 隐式 TLS / 587 STARTTLS，AUTH PLAIN/LOGIN）。无默认目的地；配置 URL/凭据，不硬编码。新增 HTTP adapters 除 loopback 外要求 HTTPS、拒绝重定向；SMTP 要求 TLS（仅显式本地测试可例外）。不记录 bot/SMTP 密钥，不发送 body/Cookie/Authorization，沿用 Dispatcher 队列、去重、限流和 `close()`。
 
 规则：
 
@@ -211,20 +217,23 @@ v0.1（MVP）只内置两个（零依赖）：
 - 全局限速：默认 30 条/分钟/通道，超出合并为一条摘要。
 - 投递：超时 5 s，指数退避重试 2 次；失败记 `alert_failed`，**绝不阻塞或影响请求响应**。
 - 告警内容 IP 默认打码（`1.2.3.x`），日志里保留完整 IP。
-- 除配置的告警 URL 外，agent-guard 不发起任何出站网络请求（DNS 校验爬虫除外）。
+- 不向请求方或第三方发起探测/回连。运营者配置的告警 adapters 是唯一出站通知例外；DNS 爬虫身份验证维持原边界。callback 仅为入站处理器，不连接第三方 honeytoken 服务。
 
 ## 9. 配置面（Config surface）
+
+以下是设计摘录；全部字段与默认值以 [src/types.ts](../src/types.ts) 为准，trap 配置示例见 [trap-mode.md](trap-mode.md)。`mode` 必填，默认使用示例中的 detect。
 
 ```ts
 export interface AgentGuardConfig {
   project: string;                       // "acme-demo"
   env: string;                           // "demo"
-  mode: "detect";                        // MVP 仅此值；"trap" 预留，v0.1 传入即抛错
+  mode: "detect" | "trap";               // 默认使用 detect；trap 各功能须独立 opt-in
   projectSeed: string;                   // 决定假数据与默认诱饵内容
   canary: {
     prefix?: string;                     // 默认 "AG-CANARY-"
     secret: string;                      // HMAC key，来自真实 secret store
     registry: CanaryRegistry | string;   // 对象或 json 路径
+    callback?: { baseUrl: string };      // opt-in，运营者自托管 HTTPS（loopback 可 HTTP）
   };
   decoys?: {
     enabled?: Array<"D1"|"D2"|"D3"|"D4"|"D5">;  // 默认全开
@@ -252,10 +261,10 @@ export interface AgentGuardConfig {
     resolver?: { reverse(ip: string): Promise<string[]>; resolve(host: string): Promise<string[]> }; // 可注入（测试 / demo 模拟爬虫用），默认 node:dns/promises
   };
   allowlist?: { ips?: string[]; cidrs?: string[]; uaPatterns?: RegExp[]; headerToken?: { name: string; value: string } };
-  alerts?: { adapters: AlertAdapter[];   // v0.1: webhookAdapter / consoleAdapter
+  alerts?: { adapters: AlertAdapter[];   // webhook / console / slack / telegram / feishu / smtp
               minSeverity?: Severity; dedupeWindowSec?: number; ratePerMinute?: number; redactIp?: boolean };
   log?: { sink?: (e: AgentGuardEvent) => void; level?: Severity; keepIp?: boolean };
-  clientIp?: (req: AGRequest) => string; // 默认读 x-forwarded-for 第一个可信跳 / cf-connecting-ip，需配置 trustProxy
+  clientIp?: (req: AGRequest) => string; // 默认 socket IP；仅在验证可信代理后显式覆盖
 }
 ```
 
@@ -269,20 +278,20 @@ export interface AgentGuardConfig {
 | v0.1 | `agent-guard/node`（原生 `http`） | `(req, res, next)` 兼容层 + `wrap(handler)`，供原生 http / Next.js custom server / Koa 等 |
 | v0.2（已完成） | `agent-guard/hono` | Node ≥20；有界克隆请求体扫描；edge 仍未实现 |
 | v0.3a / unreleased（已完成） | `agent-guard/fastify`、`agent-guard/koa` | Fastify preHandler / Koa 宿主解析后检查；共享验收、原生 crawler 404 与可选 lure 变换 |
-| v0.3+ | `agent-guard/cloudflare`、`agent-guard/vercel-edge` | 用 WebCrypto；rDNS 改为 DoH（需显式配置 DoH 端点，否则 Edge 上 crawler 校验依赖平台 `cf.verifiedBot` 等字段） |
+| v0.4b（未实现） | `agent-guard/cloudflare`、`agent-guard/vercel-edge` | 用 WebCrypto；rDNS 改为 DoH（需显式配置 DoH 端点，否则 Edge 上 crawler 校验依赖平台 `cf.verifiedBot` 等字段） |
 
 ## 11. 可观测性
 
 - `guard.metrics()` 返回内存计数器：`requests_inspected`、`decoy_hits{decoy}`、`canary_replays`、`crawler_bypass`、`alerts_sent/failed`、`inspect_ns_p50/p99`。
-- 可选 `/__agent-guard/metrics`（Prometheus text），**默认关闭**，开启需 headerToken。
+- 已实现 `guard.prometheusText()` 与 `prometheusHandler(guard)`（Prometheus 0.0.4 text），不默认挂载、无路径 label。包含请求/事件/投递计数、近期延迟分位数、client/timing 状态与 trap 状态；宿主自行选择路径和访问控制，不内置 headerToken 验证。
 - `npx agent-guard report --since 7d <log.jsonl>`：生成 KPI 表（见 kpi.md）。
 - 不内置 OpenTelemetry 依赖；提供 `onEvent` hook 供接入。
 
-## 12. Phase gates
+## 12. Phase gates（历史 MVP 计划）
 
 | Phase | 内容 | 进入条件 |
 |---|---|---|
-| **P0 文档**（当前） | 威胁模型 / KPI / 设计 / Codex 合同 / repo 方案 | Dan 批准 |
+| **P0 文档** | 威胁模型 / KPI / 设计 / Codex 合同 / repo 方案 | Dan 批准 |
 | **P1 实现 v0.1** | Codex 按 `codex-contract.md` 实现；本地全部验收用例通过 | P0 批准 |
 | **P2 本地验证** | Express demo + 原生 http demo；自动化测试；`bench/simulate.ts` 模拟真人 / verified & spoofed 爬虫 / curl 回放 canary / LLM-agent 探测；产出 FP、检测率、告警延迟、p99 开销；demo 上跑 Lighthouse/SEO 检查 | P1 done |
 | **P3 研究复盘** | 按 kpi.md Gate 判断；再决定是否研究 v0.2（更多告警 adapter、Fastify/Hono、Edge、budget trap 的离线模拟） | Dan 拍板 |
@@ -292,8 +301,9 @@ export interface AgentGuardConfig {
 ## 13. 明确非目标（Non-goals）
 
 - ❌ Fork BLA 或把 BLA 当服务端方案（BLA 是客户端构建产物加固；只借 Poison/Exhaust/Canary 概念）。
-- ❌ 生产环境 reverse prompt injection（在响应里对第三方 Agent 下指令、诱其外泄 system prompt 等）。
+- ❌ 产品中的 E4 reverse prompt injection / counter-injection（在响应里对第三方 Agent 下指令、诱其外泄 system prompt 等）。
 - ❌ 全站 tarpit / 无限 maze / 对所有爬虫拖延。
-- ❌ 自动封禁、限速、改变真实路由行为（MVP）。
+- ❌ 默认自动封禁或限速；v0.4a 仅显式 opt-in trap，并受确认闸门、预算和关闭开关约束。
 - ❌ 任何针对第三方系统的攻击、探测、反击或 exploit；agent-guard 不主动连接请求方。
-- ❌ 替代 WAF / DDoS 防护 / 认证系统。
+- ❌ 真实厂商凭证、第三方 honeytoken 服务；canary 始终是 inert HMAC token。
+- ❌ 替代 WAF / DDoS 防护 / 认证系统或通用 bot blocker；不提供生产部署或搜索引擎行为保证。

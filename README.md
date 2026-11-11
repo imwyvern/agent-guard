@@ -11,7 +11,7 @@ An AI-agent honeypot middleware for Node and the edge.
 - Detection is alert-only by default: the middleware records events and sends asynchronous alerts; it does not block, throttle, or retaliate.
 - Zero runtime dependencies, with optional Express, Hono, Fastify, and Koa peers. It ships for Node ≥20 today; edge runtimes are on the roadmap.
 
-**What it is / is not.** agent-guard detects, traps, and observes hostile or exploratory AI-agent traffic on your APIs. It does not hack back or attack anyone. See [What it is NOT](#what-it-is-not) for the full list of non-goals.
+**What it is / is not.** agent-guard detects, traps, and observes hostile or exploratory AI-agent traffic on your APIs. It does not hack back or attack anyone. See [What it is NOT](#what-it-is-not) for non-goals, opt-in features and experimental limits.
 
 HTTP middleware for Node ≥20: five isolated decoy routes and inert canary credentials detect credential replay and exploratory scanning. It records events and sends asynchronous alerts. Zero runtime dependencies; optional Express peer. Apache-2.0, copyright 2026 Wesley Wang.
 
@@ -90,7 +90,7 @@ Opt-in robots/HTML/llms transformations buffer at most 1 MiB on selected paths; 
 
 ## Hono (Node runtime)
 
-The v0.2 Hono adapter is available as `@imwyvern/agent-guard/hono`, with an optional `hono` peer. It requires Node ≥20: the shared core still uses `node:crypto` and Node DNS. Edge runtimes and a WebCrypto core are roadmap v0.3 work.
+The v0.2 Hono adapter is available as `@imwyvern/agent-guard/hono`, with an optional `hono` peer. It requires Node ≥20: the shared core still uses `node:crypto` and Node DNS. Edge runtimes and a WebCrypto core remain v0.4b work.
 
 ```ts
 import { Hono } from 'hono';
@@ -108,11 +108,11 @@ serve({ fetch: app.fetch, hostname: '127.0.0.1', port: 3000 });
 
 Install Hono and your Node server integration in the consuming app. This repository installs both only as dev dependencies; the adapter adds no runtime dependencies. `agentGuard` accepts a guard or config, scans eligible bodies from a cloned request up to the configured body cap (default 16 KiB), and leaves the original body available to downstream handlers. JSON and form bodies are supported; malformed/truncated input is scanned as bounded text. The host remains responsible for wire-size limits and body-read deadlines. `@hono/node-server` supplies the socket IP; forwarded headers require an explicit trusted `clientIp` callback.
 
-Detection remains alert-only: canary replay continues to the host, decoys have noindex/no-store headers, and verified crawlers reach the host's native missing-route handler. Opt-in robots/HTML/llms transforms preserve the existing 1 MiB buffer limit. Run `npm run demo:hono` (`PORT` and `AGENT_GUARD=off` work as in the other catalog demos). Hono runs the same shared acceptance suite as Express and Node.
+In default `mode: 'detect'`, detection remains alert-only: canary replay continues to the host, decoys have noindex/no-store headers, and verified crawlers reach the host's native missing-route handler. Opt-in robots/HTML/llms transforms preserve the existing 1 MiB buffer limit. Run `npm run demo:hono` (`PORT` and `AGENT_GUARD=off` work as in the other catalog demos). Hono runs the same shared acceptance suite as Express and Node.
 
 ## Fastify and Koa (Node runtime)
 
-v0.3a (unreleased) adds `agentGuard` at `@imwyvern/agent-guard/fastify` and `@imwyvern/agent-guard/koa`, accepting the same guard or config. Register the Fastify plugin with `await app.register(agentGuard(guard))` before routes; inspection runs in `preHandler` after body parsing. Use `app.use(agentGuard(guard))` in Koa after your bounded body parser. Neither adapter consumes the request stream. Both preserve native crawler 404s, alert-only replay, and opt-in lure transforms; frameworks are optional peers and the core adds no runtime dependencies. See the [Fastify demo](examples/fastify-demo/server.ts), [Koa demo](examples/koa-demo/server.ts), and [adapter guide](docs/community.md). Edge runtimes remain roadmap work.
+v0.3a (unreleased) adds `agentGuard` at `@imwyvern/agent-guard/fastify` and `@imwyvern/agent-guard/koa`, accepting the same guard or config. Register the Fastify plugin with `await app.register(agentGuard(guard))` before routes; inspection runs in `preHandler` after body parsing. Use `app.use(agentGuard(guard))` in Koa after your bounded body parser. Neither adapter consumes the request stream. Both preserve native crawler 404s, alert-only replay in detect mode, and opt-in lure transforms; frameworks are optional peers and the core adds no runtime dependencies. See the [Fastify demo](examples/fastify-demo/server.ts), [Koa demo](examples/koa-demo/server.ts), and [adapter guide](docs/community.md). Edge runtimes remain roadmap work.
 
 ## MCP / LLM tool endpoint decoy
 
@@ -155,7 +155,7 @@ Every public field has defaults documented in [src/types.ts](src/types.ts). Requ
 | `crawler.resolver` | Node DNS; inject `{ reverse, resolve }` for offline use |
 | `crawler.extraSuffixes` / `ipRangesFile` | Optional crawler-family suffixes / offline JSON `{ google: ['CIDR'] }` |
 | `allowlist` | Optional exact `ips`, IPv4/IPv6 `cidrs`, `uaPatterns`, exact `headerToken` |
-| `alerts.adapters` | No default destinations; `webhookAdapter()` and `consoleAdapter()` available |
+| `alerts.adapters` | No default destinations; webhook, console, Slack, Telegram, Feishu and SMTP/email adapters available |
 | `alerts.minSeverity` | `info` for decoy/replay; explicit value also enables probe/discovery escalation |
 | `alerts.dedupeWindowSec` | 600; same event + placement/ID + client key |
 | `alerts.ratePerMinute` | 30 per channel; suppressed counts carried in the next alert summary |
@@ -164,17 +164,19 @@ Every public field has defaults documented in [src/types.ts](src/types.ts). Requ
 | `clientIp` | Socket IP; override only after validating a trusted proxy |
 | `onEvent` | Optional observer; observer/sink failures are isolated |
 
-`guard.robotsLines()` supports manual robots integration. `guard.htmlCommentFor(path)` returns the opt-in comment or null. `guard.metrics()` returns request/event/delivery counts and bounded recent inspect timing quantiles. Scores are bounded per-instance observations, never enforcement. Client state: 50k entries, 30-minute idle TTL; crawler cache: 10k, positive 24h / negative 1h. No forwarded header is trusted automatically.
+`guard.robotsLines()` supports manual robots integration. `guard.htmlCommentFor(path)` returns the opt-in comment or null. `guard.metrics()` returns request/event/delivery counts and bounded recent inspect timing quantiles. Timing scores are bounded per-instance observations; detection scores may qualify opt-in trap gates. Client state: 50k entries, 30-minute idle TTL; crawler cache: 10k, positive 24h / negative 1h. No forwarded header is trusted automatically.
 
-D5 always denies login with a deterministic 300–600ms delay. All decoys are `noindex`, `no-store`, ≤8KiB, use only `.invalid` hostnames, and never create cookies, authenticate, or call business services. Declared AI crawler decoy hits have `info` severity. Search crawler DNS checks occur only on decoy routes. Errors/timeouts fail open to a native 404.
+In detect mode, D5 always denies login with a deterministic 300–600ms delay. All decoys are `noindex`, `no-store`, ≤8KiB, use `.invalid` fake hostnames by default (an explicitly configured self-hosted callback URL is the exception), and never create cookies, authenticate, or call business services. Declared AI crawler decoy hits have `info` severity. In detect mode, search crawler DNS checks occur on decoy routes; opted-in trap and callback handling extend verification to preserve crawler immunity. Errors/timeouts fail open to a native 404.
 
 ## Incident correlation and canary propagation
 
-v0.3a attaches optional `incident` metadata to existing events for the same `client_key`: `id`, ordered `sequence` (for example `robots → D1 → D2`), `first_seen`, `last_seen`, and `confidence`. `incident.windowMs` defaults to 900000 (15 minutes from the first observation); 0 disables correlation. State uses a 50k-client LRU and retains the latest 32 observations. Repeated isolated hits have low confidence; distinct decoys or discovery plus a decoy raise it to medium; `canary_replay` raises it to high. Confidence never falls within the window. Robots visits are internal markers and add no new event type. Shared networks can merge clients; correlation only enriches observations and never changes severity, HTTP responses, crawler bypass, or decoy decisions. `mode` remains only `detect`.
+v0.3a attaches optional `incident` metadata to existing events for the same `client_key`: `id`, ordered `sequence` (for example `robots → D1 → D2`), `first_seen`, `last_seen`, and `confidence`. `incident.windowMs` defaults to 900000 (15 minutes from the first observation); 0 disables correlation. State uses a 50k-client LRU and retains the latest 32 observations. Repeated isolated hits have low confidence; distinct decoys or discovery plus a decoy raise it to medium; `canary_replay` raises it to high. Confidence never falls within the window. Robots visits are internal markers and add no new event type. Shared networks can merge clients; correlation does not raise severity. In default detect mode it preserves HTTP responses and decoy decisions; opt-in v0.4a trap can use high confidence as a gate. Verified crawlers and allowlists remain immune. See [trap mode](docs/trap-mode.md).
 
 Replay alerts retain `canary.id`, `placement`, `env`, `found_in`, and `field`, adding `leaked_at` (placement), `replayed_at` (pathname), `dwell_ms` (time since first decoy delivery), and `client_keys_seen` (distinct replaying client keys, capped at 8). Issuance starts when a returned decoy body contains the token; HEAD and crawler bypass do not count. Tracing is process-local, with a 50k-entry LRU and 24-hour TTL. Eviction, restart, or delivery outside built-in decoys leaves issuance unknown, so `dwell_ms` is omitted. These observations do not prove identity or malicious intent.
 
 ## Alerts and signatures
+
+First-party adapters now include `slackAdapter`, `telegramAdapter`, `feishuAdapter` and `smtpAdapter`, alongside webhook and console. Configure destinations and credentials explicitly; none is enabled by default, and they add zero runtime dependencies. The new HTTP adapters require HTTPS except loopback and refuse redirects; SMTP supports implicit TLS (465) and STARTTLS (587), with AUTH PLAIN/LOGIN. They share the queue, deduplication, rate limits and `close()` flush described below.
 
 ```ts
 import { webhookAdapter, verifyWebhookSignature } from '@imwyvern/agent-guard';
@@ -253,16 +255,31 @@ From v0.2, `npm run bench:latency:hr` is the primary AC-10 measurement for Expre
 
 Measured gate failures produce a nonzero benchmark exit. `bench:latency` runs each demo server in its own child process and drives it with autocannon (100 connections, 30 s, median of 3 runs); it also records a non-gating fixed-rate run and a throughput-derived per-request overhead estimate. Lighthouse needs about 35 minutes for the full matrix. If a sandbox forbids local sockets, the research harness uses actual HTTP request/response objects over in-memory Duplex streams; TCP latency remains **unvalidated**. Chrome startup failures are **skipped**, not passed. See [benchmark report](docs/bench-v0.1.md) and [implementation notes](docs/implementation-notes.md) for the exact environment limitations. The library does not include this harness.
 
-From v0.3b, `npm run bench:exhaust-sim` runs an in-memory cost-ratio simulation of a bounded maze against scripted greedy agents, and `npm run bench:deception-lint` safety-scans current decoy output plus a deterministic persona prototype. Neither command changes runtime behavior; `mode` still accepts only `detect`. See [v0.3b offline evaluation](docs/bench-v0.3b.md).
+From v0.3b, `npm run bench:exhaust-sim` runs an in-memory cost-ratio simulation of a bounded maze against scripted greedy agents, and `npm run bench:deception-lint` safety-scans current decoy output plus a deterministic persona prototype. Neither command enables trap features; v0.4a now separately ships opt-in trap mode with an experimental maze. See [v0.3b offline evaluation](docs/bench-v0.3b.md).
 
 ## What it is NOT
 
-A WAF, DDoS defense, authentication system, bot blocker, production deployment, or guarantee of search-engine behavior. There is no auto-block, traffic throttling, trap mode, maze, reverse prompt injection, outbound probing, real vendor credential, or third-party callback honeytoken. Slack/Telegram/Feishu/email and Edge adapters remain future work. A Hono adapter already ships for Node ≥20. Mechanical timing and a Prometheus endpoint are optional design ideas and are not enabled in v0.1.
+It is not a WAF, DDoS defense, authentication system or general bot blocker. This research project provides neither a production deployment nor a guarantee of search-engine behavior.
+
+Reverse prompt injection / counter-injection (E4) is never in the product. There is no outbound probing or guard-initiated callback toward third parties; operator-configured alert adapters are the only outbound notification exception. Existing crawler-identity DNS checks remain unchanged. Canaries stay inert HMAC tokens, never real vendor credentials. No third-party honeytoken service (Canarytokens, etc.) is used; the callback canary is operator-hosted only.
+
+Edge adapters (Cloudflare Workers, Next.js middleware, Deno, Bun and Vercel Edge) are **not in this release**; they and the Web-standard core are the next batch, **v0.4b**. Hono already ships for **Node ≥20**.
+
+v0.4a ships these **opt-in, default-off** integrations and controls. Default mode remains `mode: 'detect'`:
+
+- Slack, Telegram, Feishu and SMTP/email alert adapters, with zero new runtime dependencies and no default destinations.
+- Prometheus text export via `guard.prometheusText()` / `prometheusHandler(guard)`: no endpoint is mounted by default, and there are no path labels.
+- `mode: 'trap'` with independently switched `delay`, `rateLimit`, `block` and **experimental** `maze`; verified crawlers and allowlists are never trapped.
+- Self-hosted callback canaries via `canary.callback.baseUrl` + `callbackHandler(guard)`. The handler must be mounted explicitly; the guard never fetches `baseUrl`.
+
+Mechanical timing `automation_score` also ships as an observation only: it never promotes severity or triggers block/maze by itself. The current code collects timing automatically after enough samples and has no separate enable flag.
+
+The **experimental maze** needs the operator's own real-agent measurement before enabling it. In the [v0.3b offline simulation](docs/bench-v0.3b.md), scripted agents showed time ratios of hundreds-to-one under a **25 ms/request** model, but a **1:1 byte ratio**, below the **3:1 floor**. This does not establish real-agent cost savings. See [trap controls and risks](docs/trap-mode.md) and [Exhaust](docs/exhaust.md).
 
 ## Roadmap & design docs
 
 - [Community](docs/community.md) — how to contribute adapters, signatures, translations, and RFCs.
-- [Roadmap](docs/roadmap.md) — planned v0.3/v0.4 work. Exhaust and Deception are design drafts and stay off by default.
-- [Exhaust](docs/exhaust.md) — bounded cost imposition (delay, maze, context burn) for confirmed-malicious sessions.
+- [Roadmap](docs/roadmap.md) — v0.4a completion and v0.4b Edge plans; persona/deception extensions remain design work.
+- [Exhaust](docs/exhaust.md) — implemented opt-in delay and experimental maze; context burn (E3) remains unimplemented.
 - [Deception](docs/deception.md) — making decoy data believable so an attacker’s agent may treat it as real.
 - [Design](docs/design.md), [contract](docs/codex-contract.md), [KPI](docs/kpi.md), and [threat model](docs/threat-model.md). Prior art informed concepts only; no third-party project code was copied.

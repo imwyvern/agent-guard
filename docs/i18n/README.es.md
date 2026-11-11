@@ -13,7 +13,7 @@ An AI-agent honeypot middleware for Node and the edge.
 - Por defecto solo detecta y alerta: el middleware registra eventos y envía alertas de forma asíncrona; no bloquea, limita ni toma represalias.
 - Cero dependencias de tiempo de ejecución; Express, Hono, Fastify y Koa son peers opcionales. Hoy funciona en Node ≥20; los runtimes de edge están en la hoja de ruta.
 
-**Qué es y qué no es.** agent-guard detecta, atrae y observa el tráfico de agentes de IA hostiles o exploratorios que llegan a tus API. No contraataca ni ataca a nadie. La lista completa de no objetivos está en [Lo que NO es](#lo-que-no-es).
+**Qué es y qué no es.** agent-guard detecta, atrae y observa el tráfico de agentes de IA hostiles o exploratorios que llegan a tus API. No contraataca ni ataca a nadie. Los no objetivos, las funciones opt-in y sus límites experimentales se explican en [Lo que NO es](#lo-que-no-es).
 
 Middleware HTTP para Node ≥20: cinco rutas señuelo aisladas y credenciales canario inertes detectan la reutilización de credenciales y el escaneo exploratorio. Registra eventos y envía alertas asíncronas. Cero dependencias de runtime; Express es un peer opcional. Apache-2.0, copyright 2026 Wesley Wang.
 
@@ -92,7 +92,7 @@ Las transformaciones opt-in de robots/HTML/llms almacenan en búfer como máximo
 
 ## Hono (runtime de Node)
 
-El adaptador Hono de v0.2 está disponible como `@imwyvern/agent-guard/hono`, con un peer `hono` opcional. Requiere Node ≥20: el núcleo compartido sigue usando `node:crypto` y el DNS de Node. Los runtimes edge y un núcleo WebCrypto son trabajo de la hoja de ruta para v0.3.
+El adaptador Hono de v0.2 está disponible como `@imwyvern/agent-guard/hono`, con un peer `hono` opcional. Requiere Node ≥20: el núcleo compartido sigue usando `node:crypto` y el DNS de Node. Los runtimes edge y un núcleo WebCrypto quedan pendientes para v0.4b.
 
 ```ts
 import { Hono } from 'hono';
@@ -110,11 +110,11 @@ serve({ fetch: app.fetch, hostname: '127.0.0.1', port: 3000 });
 
 Instale Hono y su integración de servidor Node en la aplicación consumidora. Este repositorio instala ambos solo como dependencias de desarrollo; el adaptador no añade dependencias de runtime. `agentGuard` acepta un guard o un config, examina los cuerpos elegibles de una petición clonada hasta el tope de cuerpo configurado (16 KiB por defecto) y deja el cuerpo original disponible para los manejadores posteriores. Se admiten cuerpos JSON y de formulario; la entrada malformada o truncada se examina como texto acotado. El anfitrión sigue siendo responsable de los límites de tamaño en el cable y de los plazos de lectura del cuerpo. `@hono/node-server` proporciona la IP del socket; las cabeceras reenviadas requieren una devolución de llamada `clientIp` explícitamente de confianza.
 
-La detección sigue siendo solo de alerta: la reutilización de canarios continúa hacia el anfitrión, los señuelos llevan cabeceras noindex/no-store, y los rastreadores verificados llegan al manejador nativo de ruta inexistente del anfitrión. Las transformaciones opt-in de robots/HTML/llms conservan el tope de búfer existente de 1 MiB. Ejecute `npm run demo:hono` (`PORT` y `AGENT_GUARD=off` funcionan como en las demás demos del catálogo). Hono ejecuta la misma suite de aceptación compartida que Express y Node.
+En el modo predeterminado `mode: 'detect'`, la detección sigue siendo solo de alerta: la reutilización de canarios continúa hacia el anfitrión, los señuelos llevan cabeceras noindex/no-store, y los rastreadores verificados llegan al manejador nativo de ruta inexistente del anfitrión. Las transformaciones opt-in de robots/HTML/llms conservan el tope de búfer existente de 1 MiB. Ejecute `npm run demo:hono` (`PORT` y `AGENT_GUARD=off` funcionan como en las demás demos del catálogo). Hono ejecuta la misma suite de aceptación compartida que Express y Node.
 
 ## Fastify y Koa (runtime de Node)
 
-v0.3a (sin publicar) añade `agentGuard` en `@imwyvern/agent-guard/fastify` y `@imwyvern/agent-guard/koa`, con el mismo guard o config. Registre el plugin Fastify con `await app.register(agentGuard(guard))` antes de las rutas; inspecciona en `preHandler` después de analizar el cuerpo. En Koa, use `app.use(agentGuard(guard))` después de su analizador de cuerpo acotado. Ninguno consume el flujo de la petición. Ambos preservan los 404 nativos para rastreadores, las alertas de reutilización y las transformaciones opt-in; los frameworks son peers opcionales y el núcleo no añade dependencias de runtime. Consulte la [demo Fastify](../../examples/fastify-demo/server.ts), la [demo Koa](../../examples/koa-demo/server.ts) y la [guía de adaptadores](../community.md). Los runtimes edge siguen en la hoja de ruta.
+v0.3a (sin publicar) añade `agentGuard` en `@imwyvern/agent-guard/fastify` y `@imwyvern/agent-guard/koa`, con el mismo guard o config. Registre el plugin Fastify con `await app.register(agentGuard(guard))` antes de las rutas; inspecciona en `preHandler` después de analizar el cuerpo. En Koa, use `app.use(agentGuard(guard))` después de su analizador de cuerpo acotado. Ninguno consume el flujo de la petición. Ambos preservan los 404 nativos para rastreadores, las alertas de reutilización en modo detect y las transformaciones opt-in; los frameworks son peers opcionales y el núcleo no añade dependencias de runtime. Consulte la [demo Fastify](../../examples/fastify-demo/server.ts), la [demo Koa](../../examples/koa-demo/server.ts) y la [guía de adaptadores](../community.md). Los runtimes edge siguen en la hoja de ruta.
 
 ## Señuelo de endpoint de herramientas MCP / LLM
 
@@ -157,7 +157,7 @@ Todos los campos públicos tienen valores por defecto documentados en [src/types
 | `crawler.resolver` | DNS de Node; inyecte `{ reverse, resolve }` para uso sin conexión |
 | `crawler.extraSuffixes` / `ipRangesFile` | Sufijos opcionales de familia de rastreadores / JSON sin conexión `{ google: ['CIDR'] }` |
 | `allowlist` | Opcionales: `ips` exactas, `cidrs` IPv4/IPv6, `uaPatterns`, `headerToken` exacto |
-| `alerts.adapters` | Sin destinos por defecto; están disponibles `webhookAdapter()` y `consoleAdapter()` |
+| `alerts.adapters` | Sin destinos predeterminados; adaptadores webhook, console, Slack, Telegram, Feishu y SMTP/email disponibles |
 | `alerts.minSeverity` | `info` para señuelo/reutilización; un valor explícito también habilita la escalada de probe/discovery |
 | `alerts.dedupeWindowSec` | 600; mismo evento + placement/ID + client key |
 | `alerts.ratePerMinute` | 30 por canal; los recuentos suprimidos se trasladan al siguiente resumen de alerta |
@@ -166,17 +166,19 @@ Todos los campos públicos tienen valores por defecto documentados en [src/types
 | `clientIp` | IP del socket; sobrescriba solo después de validar un proxy de confianza |
 | `onEvent` | Observador opcional; los fallos del observador/sink se aíslan |
 
-`guard.robotsLines()` admite la integración manual de robots. `guard.htmlCommentFor(path)` devuelve el comentario opt-in o null. `guard.metrics()` devuelve recuentos de peticiones/eventos/entrega y cuantiles acotados de temporización reciente de inspect. Las puntuaciones son observaciones acotadas por instancia, nunca un mecanismo de imposición. Estado del cliente: 50k entradas, TTL de inactividad de 30 minutos; caché de rastreadores: 10k, positivo 24h / negativo 1h. Ninguna cabecera reenviada se considera de confianza de forma automática.
+`guard.robotsLines()` admite la integración manual de robots. `guard.htmlCommentFor(path)` devuelve el comentario opt-in o null. `guard.metrics()` devuelve recuentos de peticiones/eventos/entrega y cuantiles acotados de temporización reciente de inspect. Las puntuaciones de temporización son observaciones acotadas por instancia; las de detección pueden satisfacer los criterios del trap opt-in. Estado del cliente: 50k entradas, TTL de inactividad de 30 minutos; caché de rastreadores: 10k, positivo 24h / negativo 1h. Ninguna cabecera reenviada se considera de confianza de forma automática.
 
-D5 siempre deniega el inicio de sesión con un retraso determinista de 300–600ms. Todos los señuelos son `noindex`, `no-store`, ≤8KiB, usan solo nombres de host `.invalid` y nunca crean cookies, autentican ni llaman a servicios de negocio. Los aciertos de señuelo de rastreadores de IA declarados tienen gravedad `info`. Las comprobaciones DNS de rastreadores de búsqueda ocurren solo en las rutas señuelo. Los errores/tiempos de espera fallan de forma abierta hacia un 404 nativo.
+En modo detect, D5 siempre deniega el inicio de sesión con un retraso determinista de 300–600ms. Todos los señuelos son `noindex`, `no-store`, ≤8KiB, usan nombres de host ficticios `.invalid` por defecto (excepto la URL de callback autoalojada que se configure explícitamente) y nunca crean cookies, autentican ni llaman a servicios de negocio. Los aciertos de señuelo de rastreadores de IA declarados tienen gravedad `info`. En detect, las verificaciones DNS de rastreadores se realizan en las rutas señuelo; trap y el manejador de callback opt-in amplían la verificación para mantener su inmunidad. Los errores/tiempos de espera fallan de forma abierta hacia un 404 nativo.
 
 ## Correlación de incidentes y seguimiento de propagación
 
-v0.3a adjunta metadatos `incident` opcionales a los eventos existentes del mismo `client_key`: `id`, `sequence` ordenada (por ejemplo `robots → D1 → D2`), `first_seen`, `last_seen` y `confidence`. `incident.windowMs` vale 900000 por defecto (15 minutos fijos desde la primera observación); 0 desactiva la correlación. El estado usa una LRU de 50k clientes y conserva las últimas 32 observaciones. Los aciertos aislados repetidos tienen confianza low; distintos señuelos o descubrimiento más un señuelo la elevan a medium; `canary_replay` la eleva a high. La confianza no baja dentro de la ventana. Las visitas a robots son marcas internas y no añaden tipos de evento. Las redes compartidas pueden agrupar clientes; la correlación solo enriquece observaciones y nunca cambia la gravedad, las respuestas HTTP, el bypass de rastreadores ni las decisiones sobre señuelos. `mode` sigue admitiendo solo `detect`.
+v0.3a adjunta metadatos `incident` opcionales a los eventos existentes del mismo `client_key`: `id`, `sequence` ordenada (por ejemplo `robots → D1 → D2`), `first_seen`, `last_seen` y `confidence`. `incident.windowMs` vale 900000 por defecto (15 minutos fijos desde la primera observación); 0 desactiva la correlación. El estado usa una LRU de 50k clientes y conserva las últimas 32 observaciones. Los aciertos aislados repetidos tienen confianza low; distintos señuelos o descubrimiento más un señuelo la elevan a medium; `canary_replay` la eleva a high. La confianza no baja dentro de la ventana. Las visitas a robots son marcas internas y no añaden tipos de evento. Las redes compartidas pueden agrupar clientes; la correlación no eleva la gravedad. En el modo detect predeterminado conserva las respuestas HTTP y las decisiones sobre señuelos; trap opt-in de v0.4a puede usar high confidence como criterio de entrada. Los rastreadores verificados y las listas de permitidos conservan su inmunidad. Consulte el [modo trap](../trap-mode.md).
 
 Las alertas de reutilización conservan `canary.id`, `placement`, `env`, `found_in` y `field`, añadiendo `leaked_at` (ubicación), `replayed_at` (ruta), `dwell_ms` (tiempo desde la primera entrega del señuelo) y `client_keys_seen` (claves distintas de clientes que reutilizan el token, máximo 8). Solo se registra la entrega si el cuerpo señuelo devuelto contiene el token; HEAD y bypass de rastreadores no cuentan. El seguimiento vive en memoria del proceso, con una LRU de 50k entradas y TTL de 24 horas. La expulsión, el reinicio o la entrega fuera de señuelos integrados dejan el momento desconocido, por lo que se omite `dwell_ms`. Estas observaciones no prueban identidad ni intención maliciosa.
 
 ## Alertas y firmas
+
+Además de webhook y console, se incluyen `slackAdapter`, `telegramAdapter`, `feishuAdapter` y `smtpAdapter`. Configure los destinos y las credenciales explícitamente; ninguno se activa por defecto y no añaden dependencias de runtime. Los nuevos adaptadores HTTP exigen HTTPS salvo en loopback y rechazan redirecciones; SMTP admite TLS implícito (465), STARTTLS (587) y AUTH PLAIN/LOGIN. Comparten la cola, deduplicación, límites de envío y vaciado con `close()` descritos a continuación.
 
 ```ts
 import { webhookAdapter, verifyWebhookSignature } from '@imwyvern/agent-guard';
@@ -255,16 +257,31 @@ Desde v0.2, `npm run bench:latency:hr` es la medición principal de AC-10 para E
 
 Los fallos medidos del umbral producen una salida distinta de cero de la prueba comparativa. `bench:latency` ejecuta cada servidor de demo en su propio proceso hijo y lo impulsa con autocannon (100 connections, 30 s, mediana de 3 ejecuciones); también registra una ejecución de tasa fija que no actúa como umbral y una estimación de sobrecarga por petición derivada del rendimiento. Lighthouse necesita unos 35 minutos para la matriz completa. Si un entorno aislado prohíbe los sockets locales, el arnés de investigación usa objetos reales de petición/respuesta HTTP sobre flujos Duplex en memoria; la latencia TCP permanece **sin validar**. Los fallos de arranque de Chrome se **omiten**, no se dan por superados. Véase el [informe de pruebas comparativas](../bench-v0.1.md) y las [notas de implementación](../implementation-notes.md) para las limitaciones exactas del entorno. La biblioteca no incluye este arnés.
 
-Desde v0.3b, `npm run bench:exhaust-sim` ejecuta en memoria una simulación de ratio de coste de un laberinto acotado frente a agentes codiciosos programados, y `npm run bench:deception-lint` examina por seguridad la salida actual de los señuelos y un prototipo de persona determinista. Ningún comando cambia el comportamiento en tiempo de ejecución; `mode` sigue aceptando solo `detect`. Véase la [evaluación fuera de línea de v0.3b](../bench-v0.3b.md).
+Desde v0.3b, `npm run bench:exhaust-sim` ejecuta en memoria una simulación de ratio de coste de un laberinto acotado frente a agentes codiciosos programados, y `npm run bench:deception-lint` examina por seguridad la salida actual de los señuelos y un prototipo de persona determinista. Ningún comando activa trap; v0.4a incluye por separado el modo trap opt-in y un laberinto experimental. Véase la [evaluación fuera de línea de v0.3b](../bench-v0.3b.md).
 
 ## Lo que NO es
 
-Un WAF, una defensa DDoS, un sistema de autenticación, un bloqueador de bots, un despliegue en producción ni una garantía del comportamiento de los buscadores. No hay bloqueo automático, limitación de tráfico, modo trap, laberinto, inyección inversa de indicaciones, sondeo de salida, credencial real de un proveedor ni honeytoken de devolución de llamada de terceros. Slack/Telegram/Feishu/email y los adaptadores Edge siguen siendo trabajo futuro. Un adaptador de Hono ya se distribuye para Node ≥20. El temporizado mecánico y un endpoint de Prometheus son ideas de diseño opcionales y no están habilitados en v0.1.
+No es un WAF, una defensa DDoS, un sistema de autenticación ni un bloqueador general de bots. Este proyecto de investigación no proporciona un despliegue en producción ni garantiza el comportamiento de los buscadores.
+
+La inyección inversa de prompts / contrainyección (E4) nunca formará parte del producto. No realiza sondeos de salida ni inicia callbacks hacia terceros; los adaptadores de alertas configurados por el operador son la única excepción para notificaciones salientes. Se mantienen las verificaciones DNS de identidad de los rastreadores. Los canarios son tokens HMAC inertes, nunca credenciales reales de proveedores. No se usa ningún servicio de honeytokens de terceros (Canarytokens, etc.); el canario de callback solo se aloja en infraestructura del operador.
+
+Los adaptadores Edge (Cloudflare Workers, Next.js middleware, Deno, Bun y Vercel Edge) **no están en esta entrega**; quedan para el siguiente lote, **v0.4b**, junto con el núcleo basado en estándares web. Hono ya está disponible para **Node ≥20**.
+
+v0.4a incluye estas integraciones y controles **opt-in, desactivados por defecto**. El modo predeterminado sigue siendo `mode: 'detect'`:
+
+- Adaptadores de alertas Slack, Telegram, Feishu y SMTP/email, sin nuevas dependencias de runtime ni destinos predeterminados.
+- Exportación de texto mediante `guard.prometheusText()` / `prometheusHandler(guard)`: ningún endpoint se monta automáticamente y no hay etiquetas de rutas.
+- `mode: 'trap'` con interruptores independientes para `delay`, `rateLimit`, `block` y `maze` **experimental**. Los rastreadores verificados y las listas de permitidos nunca quedan sujetos a trap.
+- Canarios de callback autoalojados mediante `canary.callback.baseUrl` + `callbackHandler(guard)`. El manejador debe montarse explícitamente; el guard nunca hace fetch de `baseUrl`.
+
+También se incluye `automation_score` para observar la regularidad mecánica de las peticiones: nunca eleva la gravedad ni activa block/maze por sí solo. El código actual recopila intervalos automáticamente y calcula la puntuación cuando hay suficientes muestras, sin un interruptor de activación independiente.
+
+El **laberinto experimental** requiere mediciones del operador con agentes reales antes de activarse. En la [simulación fuera de línea de v0.3b](../bench-v0.3b.md), los agentes programados mostraron ratios de tiempo de cientos a uno bajo un modelo de **25 ms/petición**, pero el **ratio de bytes fue 1:1, por debajo del mínimo de 3:1**. Esto no demuestra un ahorro de costes con agentes reales. Consulte [controles y riesgos de trap](../trap-mode.md) y [Exhaust](../exhaust.md).
 
 ## Hoja de ruta y documentos de diseño
 
 - [Comunidad](../community.md) — cómo contribuir adaptadores, firmas de detección, traducciones y RFC.
-- [Hoja de ruta](../roadmap.md) — trabajo previsto para v0.3/v0.4. Exhaust y Deception son borradores de diseño y permanecen desactivados por defecto.
-- [Exhaust](../exhaust.md) — imposición de coste acotada (retraso, laberinto, consumo de contexto) sobre sesiones maliciosas confirmadas.
+- [Hoja de ruta](../roadmap.md) — elementos completados en v0.4a y planes Edge para v0.4b; las extensiones persona/deception siguen en diseño.
+- [Exhaust](../exhaust.md) — retraso opt-in y laberinto experimental ya implementados; el consumo de contexto (E3) sigue sin implementarse.
 - [Deception](../deception.md) — hacer que los datos señuelo resulten creíbles para que el agente del atacante pueda tratarlos como reales.
 - [Diseño](../design.md), [contrato](../codex-contract.md), [KPI](../kpi.md) y [modelo de amenazas](../threat-model.md). El trabajo previo solo informó los conceptos; no se copió código de ningún proyecto de terceros.

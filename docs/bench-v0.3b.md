@@ -1,5 +1,7 @@
 # agent-guard v0.3b 离线评估
 
+> 历史报告：下文「未加入运行时」「mode 只接受 detect」描述 v0.3b 当时的范围。v0.4a 已加入默认关闭的实验性迷宫，运行时的节点格式、预算窗口与断路器默认值以 [trap-mode.md](trap-mode.md) 为准；本报告的模拟结果不是其真实 agent 实测。
+
 开始：2026-11-11T12:11:38.025+08:00；结束：2026-11-11T12:11:40.394+08:00（HKT / UTC+8）；wall time 2.370 s。
 
 Node v24.22.1；CPU Intel(R) Xeon(R) Processor；8 logical CPUs；linux 6.12.113+ x64。

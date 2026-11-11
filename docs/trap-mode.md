@@ -1,6 +1,8 @@
-# Trap mode (v0.4a, runs 3–4)
+# Trap mode (v0.4a, unreleased)
 
 `mode` is required and accepts `detect` or `trap`. The demos remain in `detect` mode. All trap feature flags default to false. Express, Node, Hono, Fastify and Koa inherit trap decisions from `inspect()`.
+
+Start with detection and review local events before enabling individual controls. Shared network prefixes and UAs can merge unrelated clients into one key: block can deny their real application requests, while delay, rate limiting and maze consume your own connections and bandwidth. Reserve the decoy/archive routes, configure allowlists, and measure normal-route latency and memory under your own load. These controls are not a WAF, DDoS defense or a guarantee of search-engine behavior. See [Exhaust](exhaust.md) for cost criteria and [Deception](deception.md) for content safety and remaining design work.
 
 To opt in, add this to an existing valid guard configuration:
 
@@ -18,13 +20,13 @@ trap: {
 
 The values shown are defaults, except for the explicit delay and rate-limit opt-ins. Numeric options must be safe integers. Delay is limited to 3000 ms; block TTL is positive and limited to 24 hours; block keys and delay concurrency are limited to 50000. Rate-limit capacity and delay concurrency must be positive; refill can be zero.
 
-Verified crawlers and IP/CIDR/UA/header-token allowlists bypass trap controls. The gate requires a previous canary replay, incident confidence `high`, or detection score at least `minScore` (default 200) with a detection signal from an earlier request. A fresh `/.env` hit scores 50, or 60 with an automation UA, and does not qualify even if the configured threshold is zero. Mechanical `automation_score` is independent and never qualifies by itself. Keep the score threshold conservative when overriding it.
+Verified crawlers and IP/CIDR/UA/header-token allowlists bypass trap controls. The gate requires a canary replay, incident confidence `high`, or detection score at least `minScore` (default 200) with a detection signal from an earlier request. A fresh `/.env` hit scores 50, or 60 with an automation UA, and does not qualify even if the configured threshold is zero. Mechanical `automation_score` is independent and never qualifies by itself. Keep the score threshold conservative when overriding it.
 
 Delay and token buckets apply only to D1–D5 decoy paths. Real pages never receive their delay or 429. The existing D5 login delay remains and the trap delay stacks after it. At the delay concurrency cap, requests skip the extra delay. Confirmation and token buckets each retain at most 8192 keys, with a 30-minute idle TTL.
 
-Block requires a canary replay or high-confidence incident; detection score alone cannot block. Each 403 logs `trap_block`, and responses have `no-store`, no cookies and an empty body for HEAD. Blocks apply to exactly the existing client key, with a fixed TTL and LRU eviction. Ordinary requests do not renew the TTL. Client keys already combine a network prefix and UA; they are approximate client identities and can be shared. Trap never broadens a key into another CIDR rule.
+Block requires a canary replay or high-confidence incident; detection score alone cannot block. Each 403 logs `trap_block`, and responses have `no-store`, no cookies and an empty body for HEAD. Blocks apply to exactly the existing client key, with a fixed TTL and LRU eviction. Ordinary requests do not renew the TTL; a new canary replay can renew it. Client keys already combine a network prefix and UA; they are approximate client identities and can be shared. Trap never broadens a key into another CIDR rule.
 
-`AGENT_GUARD_TRAP=off` is checked at runtime. Other environment values do not force features on. `guard.setTrapEnabled(false)` also disables trap; `true` reenables it and resets an open circuit. Pending trap delays are released by manual disable, circuit opening and guard shutdown. Existing blocks and token buckets remain bounded in memory while disabled, but cannot affect responses.
+`AGENT_GUARD_TRAP=off` is checked at runtime in the running process. Other environment values do not force features on. `guard.setTrapEnabled(false)` also disables trap; `true` reenables configured features and resets an open circuit, but cannot override the environment switch, change `detect` into `trap`, or enable a feature whose flag is false. Pending trap delays are released by manual disable, circuit opening and guard shutdown; the environment switch is observed at the next inspection. Existing blocks and token buckets remain bounded in memory while disabled, but cannot affect responses.
 
 The circuit checks inspect p99 at most every 250 ms during inspection, using the existing latency samples, and tracks event-loop drift with an unreferenced 250 ms interval. The first inspect observing an exceeded threshold opens the circuit, emits `trap_circuit_open` once, and returns to detection. Manual reenable or restart resets the circuit. The default p99 threshold includes intentional D5 and trap delays. Trap events use the existing alert adapters and their delivery deduplication and rate limits; per-403 local logging remains independent.
 
@@ -32,7 +34,7 @@ Prometheus exports effective `agent_guard_trap_enabled`, the current block count
 
 ## Experimental bounded maze
 
-The maze is experimental and defaults off. The v0.3b simulation showed a **1:1 byte ratio**; there has been **no real-agent measurement**. It is a bounded local decoy surface, with no LLM generation or context-poison content.
+The maze is **experimental** and defaults off. The [v0.3b offline simulation](bench-v0.3b.md) reported time ratios of hundreds-to-one for scripted agents under a 25 ms/request model, but a **1:1 byte ratio**, below the **3:1 floor**. These are simulated agent costs against a host CPU-time proxy, not real LLM latency or billing. There has been **no real-agent measurement**; operators should keep the maze off until their own real-agent measurement justifies its cost. It is a bounded local decoy surface, with no LLM generation or context-poison content (E3 is unimplemented; E4 reverse/counter-injection is forbidden in the product).
 
 ```ts
 mode: 'trap',
@@ -55,7 +57,7 @@ While effectively enabled, D1–D4 contain a relative entry path under `{decoys.
 
 Nodes use **`canary.secret`**, with domain-separated HMAC-SHA256 over `maze:v1|parent|index|depth`. Their fixed 43-character Crockford base32 form carries a two-character depth, a 20-character parent MAC, a one-character child index, and a truncated 20-character (100-bit) MAC. The entry has a fixed zero parent and index. Routing data is signed, so topology verification needs no node registry and clients cannot change depth. Changing the secret invalidates existing links. Forged, truncated or otherwise invalid nodes return plain `404 Not Found` for gated clients; for unconfirmed clients they pass through to the host's native missing route. Neither case changes maze budgets or emits exhaustion events.
 
-Pages substitute metadata into a fixed small HTML template and contain ten relative links with `rel="nofollow"`. They stay below 8 KiB, use `decoyHeaders('text/html')`, have `noindex`, `nofollow`, and `no-store`, and contain no cookies or absolute external URLs. Callback URLs are confined to D1–D4 and never appear in maze HTML.
+Maze HTML pages substitute metadata into a fixed small template and contain ten relative links with `rel="nofollow"`. They stay below 8 KiB, use `decoyHeaders('text/html')`, have `noindex`, `nofollow`, and `no-store`, and contain no cookies or external URLs. Terminal maze 404s are plain `Not Found` responses, without the maze HTML safety headers. Callback URLs are confined to D1–D4 and never appear in maze HTML.
 
 If block is also enabled, a blocked client receives the existing 403 for valid maze paths; malformed nodes still return 404 without spending maze budgets. Delay and rate-limit options retain their D1–D5 scope.
 
@@ -94,4 +96,4 @@ The shared Node demo includes this explicit mount when its supplied configuratio
 
 Valid GET/HEAD requests return empty 204 with `no-store` and no cookies, and emit high-severity `canary_callback`. Invalid tokens, other methods/paths, closed guards and handler errors return 404. Verified crawlers and allowlisted clients receive the valid-token 204 without callback events or alerts. Event metadata includes only the ID and placement; the recorded path uses the ID, never the token. Callback events use Dispatcher deduplication and rate limits, and are counted in Prometheus without incident-sequence steps. The guard never fetches the callback URL; there is no third-party honeytoken service.
 
-Placement lint keeps its strict default host rules. For operator callback output, supply the exact configured hostname as `lintSample({ name, body, capBytes: 8192, allowedHosts: [new URL(baseUrl).hostname] })`, or `lintFiles(path, allowedHosts)` / `lintPlacement(path, allowedHosts)`. This adds only those exact hosts, including loopback only when explicitly supplied; subdomains and other hosts remain violations. Vendor prefixes, hidden characters, imperatives and size limits are still checked. Built-in samples and CLI lint need no allowance.
+Placement lint keeps its strict default host rules. For operator callback output, supply the exact configured hostname as `lintSample({ name, body, capBytes: 8192, allowedHosts: [new URL(baseUrl).hostname] })`, or `lintFiles(path, allowedHosts)` / `lintPlacement(path, allowedHosts)`. This adds only those exact hosts, including loopback only when explicitly supplied; subdomains and other hosts remain violations. Vendor prefixes, hidden characters and imperatives are still checked; `lintSample` also enforces the supplied byte cap. Built-in samples and CLI lint need no allowance.

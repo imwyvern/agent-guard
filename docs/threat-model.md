@@ -1,6 +1,6 @@
-# agent-guard 威胁模型（v0.1 草案）
+# agent-guard 威胁模型（MVP 背景与 v0.4a 边界）
 
-- 日期：2026-11-10（HKT, UTC+8）
+- 日期：初稿 2026-11-10；v0.4a 更新 2026-11-11（HKT, UTC+8）
 - 来源：`/workspace/security/bla-server-anti-ai-assessment-2026-11-10.md`（权威起点）
 - 范围：HTTP/API 运行时（Node 中间件优先，Edge 后续）。**不是** WAF、不是 DDoS 防护、不是客户端反逆向（那是 BLA 的本职）。
 - 性质：纯开源研究项目，本仓库不部署到任何服务器；验证全部在本地 demo app 上进行。
@@ -40,25 +40,31 @@
 
 ## 4. 信任边界
 
-- agent-guard 运行在应用进程内，**只读** 请求、**只写** 诱饵响应和日志/告警。
+- agent-guard 运行在应用进程内，**只读** 请求；detect 默认只写诱饵响应和日志/告警。v0.4a 显式 trap 可增加诱饵延迟/429、maze 响应及同一 client key 的 403（包括真实路由），不调用业务服务。
 - 诱饵响应与真实业务数据完全隔离：decoy handler 不调用任何业务 service / DB。
 - canary 只存在于：agent-guard 配置 + 诱饵响应。**永不** 进入真实 IdP、secret manager、DB 用户表。
 
-## 5. Out-of-scope（MVP 明确不管）
+## 5. Out-of-scope 与 v0.4a 显式 opt-in 边界
 
 - 国家级/专职人工渗透；经典 CVE 利用（交给 WAF / 补丁）；DDoS / 流量清洗。
 - 客户端 bundle 反逆向（BLA 的领域，独立评估）。
-- 自动封禁 / 限速 / tarpit（MVP 只告警）。
-- 生产环境 reverse prompt injection（对第三方 Agent 下指令、诱其外泄 system prompt）。
-- 对任何第三方系统的反击、探测、"hack back"。
+- 默认仍为 MVP 的 detect + alert only。v0.4a 已实现独立 opt-in 的 trap delay / rateLimit / block 与实验性有界 maze；全站 tarpit、无限迷宫和通用 bot 阻断仍不做。
+- E4 reverse prompt injection / counter-injection 永不进入产品（对第三方 Agent 下指令、诱其外泄 system prompt）。
+- 对任何第三方系统的反击、出站探测、主动回连或 "hack back"。运营者配置的告警 adapters 是唯一出站通知例外，原有爬虫 DNS 身份验证不变。
+- 真实厂商凭证与第三方 honeytoken 服务（Canarytokens 等）。自托管 callback 只接收入站：`canary.callback.baseUrl` 要求 HTTPS（显式 loopback 可 HTTP），`callbackHandler` 不默认挂载，guard 永不 fetch baseUrl，token 仍为 inert HMAC。
 - 假 MCP server / 假 LLM API 独立蜜罐机（Phase 2 再议）。
+
+trap 的准入与自保：verified crawler / allowlist 永不被 trap；单次 `/.env` 命中不够。canary replay 或 high incident 可确认；已有前次检测信号且检测分 ≥ 阈值可进入 delay/rateLimit/maze，但不能单凭检测分 block。机械 `automation_score` 只观测、不提升严重级别、不单独触发 block/maze。block 使用固定 TTL（默认 15 min，上限 24 h）和有界 LRU（默认 8192、上限 50k），每次 403 记录日志，不扩大到 CIDR。client key 本身是网络前缀 + UA，可能合并多人，不能当作身份凭据。
+
+`AGENT_GUARD_TRAP=off` 与 `guard.setTrapEnabled(false)` 可运行时关闭；inspect p99 / 事件循环延迟超阈值时断路器发 `trap_circuit_open` 并回到检测。迷宫每会话/全局预算有界，耗尽返回普通 404；HTML 页面带 noindex/nofollow/no-store、无 cookie/外部 URL。v0.3b 在 25 ms/request 模型下时间比数百比一，字节比却为 1:1，低于 3:1 下限；运营者未做自己的真实 agent 测量前不应启用实验性迷宫。配置和风险见 [trap-mode.md](trap-mode.md) 与 [exhaust.md](exhaust.md)。
 
 ## 6. 主要风险（防御方自伤）
 
 | 风险 | 缓解 |
 |---|---|
-| 误伤真人 | 诱饵无可见入口；trap 类动作（Phase 2）需双信号 |
+| 误伤真人 | 诱饵无可见入口；trap 默认关且受确认闸门、allowlist/crawler 免疫、TTL/LRU 约束；共享 key 仍可能误伤 |
 | 伤 SEO | noindex + X-Robots-Tag + robots disallow + 不进 sitemap + verified-crawler bypass |
 | 误把 canary 当真密钥用 | 固定前缀 + checksum；CI 扫描禁止 canary 前缀进入 secret store |
 | 告警风暴 | 同一 (canary_id, src_ip) 去重窗口 + 速率上限 |
+| 自我资源耗尽 | delay 并发上限、maze 字节/页数/时长预算、断路器与运行时关闭；成本收益须自测 |
 | 品牌尴尬 | 假数据不含可识别真人 PII，风格为"内部样例" |

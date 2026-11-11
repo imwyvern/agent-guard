@@ -13,7 +13,7 @@ An AI-agent honeypot middleware for Node and the edge.
 - 默认仅检测并告警：中间件记录事件并发送异步告警，不会阻断、限流或反击。
 - 零运行时依赖；Express、Hono、Fastify 与 Koa 为可选 peer。当前面向 Node ≥20；边缘运行时已列入路线图。
 
-**它是什么 / 不是什么。** agent-guard 用于检测、诱捕并观察针对你的 API 的敌对或探测性 AI agent 流量。它不会反击或攻击任何人。完整的非目标清单见[它不是什么](#它不是什么)。
+**它是什么 / 不是什么。** agent-guard 用于检测、诱捕并观察针对你的 API 的敌对或探测性 AI agent 流量。它不会反击或攻击任何人。非目标、可选功能与实验性限制见[它不是什么](#它不是什么)。
 
 面向 Node ≥20 的 HTTP 中间件：五条隔离的诱饵路由和惰性金丝雀凭证，用于检测凭证重放与探测式扫描。它记录事件并发送异步告警。零运行时依赖；Express 为可选 peer。Apache-2.0，版权 2026 Wesley Wang。
 
@@ -92,7 +92,7 @@ const listener = wrap(guard, (_req, res) => res.end('Hello'));
 
 ## Hono（Node 运行时）
 
-v0.2 的 Hono 适配器以 `@imwyvern/agent-guard/hono` 提供，并带可选的 `hono` peer。它要求 Node ≥20：共享核心仍使用 `node:crypto` 和 Node DNS。Edge 运行时与 WebCrypto 核心属于路线图中的 v0.3 工作。
+v0.2 的 Hono 适配器以 `@imwyvern/agent-guard/hono` 提供，并带可选的 `hono` peer。它要求 Node ≥20：共享核心仍使用 `node:crypto` 和 Node DNS。Edge 运行时与 WebCrypto 核心仍留待 v0.4b。
 
 ```ts
 import { Hono } from 'hono';
@@ -110,11 +110,11 @@ serve({ fetch: app.fetch, hostname: '127.0.0.1', port: 3000 });
 
 请在消费应用中安装 Hono 以及你的 Node 服务器集成。本仓库仅将二者作为开发依赖安装；适配器不增加运行时依赖。`agentGuard` 接受 guard 或 config，从克隆的请求中扫描符合条件的请求体，上限为配置的 body cap（默认 16 KiB），并让下游处理函数仍可使用原始请求体。支持 JSON 和表单请求体；格式错误或被截断的输入会按有界文本扫描。宿主仍负责传输大小限制和读 body 的截止时间。`@hono/node-server` 提供套接字 IP；转发头需要显式受信任的 `clientIp` 回调。
 
-检测仍然仅为告警：金丝雀重放会继续到达宿主，诱饵带有 noindex/no-store 头，已验证的爬虫会到达宿主原生的缺失路由处理。可选的 robots/HTML/llms 变换保留现有的 1 MiB 缓冲上限。运行 `npm run demo:hono`（`PORT` 和 `AGENT_GUARD=off` 的用法与其他目录演示相同）。Hono 运行与 Express 和 Node 相同的共享验收套件。
+默认 `mode: 'detect'` 下仍仅检测并告警：金丝雀重放会继续到达宿主，诱饵带有 noindex/no-store 头，已验证的爬虫会到达宿主原生的缺失路由处理。可选的 robots/HTML/llms 变换保留现有的 1 MiB 缓冲上限。运行 `npm run demo:hono`（`PORT` 和 `AGENT_GUARD=off` 的用法与其他目录演示相同）。Hono 运行与 Express 和 Node 相同的共享验收套件。
 
 ## Fastify 与 Koa（Node 运行时）
 
-v0.3a（未发布）新增 `@imwyvern/agent-guard/fastify` 与 `@imwyvern/agent-guard/koa` 的 `agentGuard`，接受相同的 guard 或 config。在路由之前通过 `await app.register(agentGuard(guard))` 注册 Fastify 插件；检查在请求体解析后的 `preHandler` 中执行。Koa 使用 `app.use(agentGuard(guard))`，放在有界请求体解析器之后。两个适配器均不消费请求流，并保留宿主原生的爬虫 404、仅告警的重放检测和可选 lure 变换；框架为可选 peer，核心不增加运行时依赖。见 [Fastify 演示](../../examples/fastify-demo/server.ts)、[Koa 演示](../../examples/koa-demo/server.ts)和[适配器指南](../community.md)。边缘运行时仍属路线图工作。
+v0.3a（未发布）新增 `@imwyvern/agent-guard/fastify` 与 `@imwyvern/agent-guard/koa` 的 `agentGuard`，接受相同的 guard 或 config。在路由之前通过 `await app.register(agentGuard(guard))` 注册 Fastify 插件；检查在请求体解析后的 `preHandler` 中执行。Koa 使用 `app.use(agentGuard(guard))`，放在有界请求体解析器之后。两个适配器均不消费请求流，并保留宿主原生的爬虫 404、detect 模式下仅告警的重放检测和可选 lure 变换；框架为可选 peer，核心不增加运行时依赖。见 [Fastify 演示](../../examples/fastify-demo/server.ts)、[Koa 演示](../../examples/koa-demo/server.ts)和[适配器指南](../community.md)。边缘运行时仍属路线图工作。
 
 ## MCP / LLM 工具端点诱饵
 
@@ -157,7 +157,7 @@ v0.3a 导出 `graphqlDecoys()` 与 `inspectGraphqlRequest(guard, request)`。将
 | `crawler.resolver` | Node DNS；可注入 `{ reverse, resolve }` 以供离线使用 |
 | `crawler.extraSuffixes` / `ipRangesFile` | 可选的爬虫家族后缀 / 离线 JSON `{ google: ['CIDR'] }` |
 | `allowlist` | 可选的精确 `ips`、IPv4/IPv6 `cidrs`、`uaPatterns`、精确 `headerToken` |
-| `alerts.adapters` | 无默认目的地；提供 `webhookAdapter()` 和 `consoleAdapter()` |
+| `alerts.adapters` | 无默认目的地；提供 webhook、console、Slack、Telegram、飞书与 SMTP/email adapters |
 | `alerts.minSeverity` | 诱饵/重放为 `info`；显式取值还会启用 probe/discovery 升级 |
 | `alerts.dedupeWindowSec` | 600；同一事件 + placement/ID + client key |
 | `alerts.ratePerMinute` | 每通道 30；被抑制的计数会带到下一条告警摘要中 |
@@ -166,17 +166,19 @@ v0.3a 导出 `graphqlDecoys()` 与 `inspectGraphqlRequest(guard, request)`。将
 | `clientIp` | 套接字 IP；仅在校验受信任代理之后再覆盖 |
 | `onEvent` | 可选观察者；观察者/sink 失败会被隔离 |
 
-`guard.robotsLines()` 支持手动 robots 集成。`guard.htmlCommentFor(path)` 返回可选注释或 null。`guard.metrics()` 返回请求/事件/投递计数，以及有界的近期 inspect 时延分位数。分数是按实例的有界观测值，从不用于强制执行。客户端状态：50k 条目，30 分钟空闲 TTL；爬虫缓存：10k，阳性 24h / 阴性 1h。任何转发头都不会被自动信任。
+`guard.robotsLines()` 支持手动 robots 集成。`guard.htmlCommentFor(path)` 返回可选注释或 null。`guard.metrics()` 返回请求/事件/投递计数，以及有界的近期 inspect 时延分位数。节奏分数只作按实例的有界观测；检测分可用于 opt-in trap 闸门。客户端状态：50k 条目，30 分钟空闲 TTL；爬虫缓存：10k，阳性 24h / 阴性 1h。任何转发头都不会被自动信任。
 
-D5 始终拒绝登录，并带有确定性的 300–600ms 延迟。所有诱饵均为 `noindex`、`no-store`，≤8KiB，只使用 `.invalid` 主机名，且从不创建 cookie、进行认证或调用业务服务。已声明的 AI 爬虫诱饵命中严重级别为 `info`。搜索爬虫的 DNS 检查仅发生在诱饵路由上。错误/超时会失败开放到原生 404。
+detect 模式下，D5 始终拒绝登录，并带有确定性的 300–600ms 延迟。所有诱饵均为 `noindex`、`no-store`，≤8KiB，默认使用 `.invalid` 假主机名（显式配置的自托管 callback URL 除外），且从不创建 cookie、进行认证或调用业务服务。已声明的 AI 爬虫诱饵命中严重级别为 `info`。detect 下搜索爬虫 DNS 检查在诱饵路由上进行；opt-in trap 和 callback handler 扩展验证范围以保持爬虫免疫。错误/超时会失败开放到原生 404。
 
 ## 事件关联与金丝雀传播追踪
 
-v0.3a 为同一 `client_key` 的既有事件附加可选 `incident`：`id`、有序 `sequence`（例如 `robots → D1 → D2`）、`first_seen`、`last_seen` 和 `confidence`。`incident.windowMs` 默认为 900000（从首次观察起固定 15 分钟）；0 关闭关联。状态使用 50k 客户端 LRU，保留最近 32 次观察。重复的孤立命中置信度为 low；不同诱饵或发现加诱饵升为 medium；`canary_replay` 升为 high。同一窗口内置信度不会降低。robots 访问仅作内部标记，不增加事件类型。共享网络可能合并客户端；关联只补充观察信息，永不改变严重级别、HTTP 响应、爬虫绕过或诱饵决策。`mode` 仍只接受 `detect`。
+v0.3a 为同一 `client_key` 的既有事件附加可选 `incident`：`id`、有序 `sequence`（例如 `robots → D1 → D2`）、`first_seen`、`last_seen` 和 `confidence`。`incident.windowMs` 默认为 900000（从首次观察起固定 15 分钟）；0 关闭关联。状态使用 50k 客户端 LRU，保留最近 32 次观察。重复的孤立命中置信度为 low；不同诱饵或发现加诱饵升为 medium；`canary_replay` 升为 high。同一窗口内置信度不会降低。robots 访问仅作内部标记，不增加事件类型。共享网络可能合并客户端；关联不提升严重级别；默认 detect 下保留 HTTP 响应和诱饵决策，v0.4a opt-in trap 可将 high confidence 用于闸门。verified crawler 与 allowlist 始终免疫。见 [trap 模式](../trap-mode.md)。
 
 重放告警保留 `canary.id`、`placement`、`env`、`found_in`、`field`，新增 `leaked_at`（放置位置）、`replayed_at`（路径）、`dwell_ms`（首次诱饵下发至重放的时间）和 `client_keys_seen`（不同重放客户端键的数量，上限 8）。仅当返回的诱饵响应体包含令牌时记录下发；HEAD 与爬虫绕过不计。追踪仅存在于进程内，使用 50k 条目 LRU 和 24 小时 TTL。淘汰、重启或内置诱饵之外的下发会使时间未知，因此省略 `dwell_ms`。这些观察不能证明身份或恶意意图。
 
 ## 告警与签名
+
+除 webhook 与 console 外，现已提供 `slackAdapter`、`telegramAdapter`、`feishuAdapter` 与 `smtpAdapter`。目的地与凭据必须显式配置，默认均不开启，零新增运行时依赖。新增 HTTP adapters 除 loopback 外要求 HTTPS，拒绝重定向；SMTP 支持 465 隐式 TLS、587 STARTTLS 与 AUTH PLAIN/LOGIN。它们共用下述队列、去重、限流与 `close()` 刷新。
 
 ```ts
 import { webhookAdapter, verifyWebhookSignature } from '@imwyvern/agent-guard';
@@ -255,16 +257,31 @@ curl -s -H "Authorization: Bearer $TOKEN" http://127.0.0.1:3000/api/internal/adm
 
 测量门禁失败会使基准测试以非零退出码退出。`bench:latency` 在各自的子进程中运行每个演示服务器，并用 autocannon 驱动（100 connections，30 s，3 次运行的中位数）；它还会记录一次非门禁的固定速率运行，以及由吞吐量推导的每请求开销估计。完整矩阵的 Lighthouse 大约需要 35 分钟。若沙箱禁止本地套接字，研究工具会在内存 Duplex 流上使用实际的 HTTP 请求/响应对象；TCP 延迟仍为 **未验证**。Chrome 启动失败会被 **跳过**，而不是记为通过。确切的环境限制见 [基准测试报告](../bench-v0.1.md) 和 [实现说明](../implementation-notes.md)。本库不包含该测试工具。
 
-自 v0.3b 起，`npm run bench:exhaust-sim` 在内存中用脚本化的贪婪 agent 对有界迷宫做成本比模拟，`npm run bench:deception-lint` 则对现有诱饵输出和确定性人设原型做安全扫描。这两条命令都不改变运行时行为；`mode` 仍只接受 `detect`。见 [v0.3b 离线评估](../bench-v0.3b.md)。
+自 v0.3b 起，`npm run bench:exhaust-sim` 在内存中用脚本化的贪婪 agent 对有界迷宫做成本比模拟，`npm run bench:deception-lint` 则对现有诱饵输出和确定性人设原型做安全扫描。这两条命令不会开启 trap；v0.4a 已另行实现 opt-in trap 与实验性迷宫。见 [v0.3b 离线评估](../bench-v0.3b.md)。
 
 ## 它不是什么
 
-它不是 WAF、DDoS 防护、认证系统、机器人拦截器、生产部署，也不保证搜索引擎行为。没有自动阻断、流量限流、trap 模式、迷宫、反向提示注入、出站探测、真实厂商凭证，或第三方回调 honeytoken。Slack/Telegram/Feishu/email 以及 Edge 适配器仍属后续工作。Hono 适配器已面向 Node ≥20 提供。机械计时和 Prometheus 端点是可选的设计想法，在 v0.1 中未启用。
+它不是 WAF、DDoS 防护、认证系统或通用机器人拦截器。本研究项目不提供生产部署，也不保证搜索引擎行为。
+
+反向提示注入 / counter-injection（E4）永不进入产品。不做出站探测，也不由 guard 主动向第三方回连；运营者配置的告警 adapters 是唯一的出站通知例外，既有爬虫身份 DNS 校验不变。金丝雀始终是 inert HMAC 令牌，不是真实厂商凭证。不使用第三方 honeytoken 服务（Canarytokens 等）；callback canary 仅由运营者自托管。
+
+Edge 适配器（Cloudflare Workers、Next.js middleware、Deno、Bun、Vercel Edge）**不在本次发布范围内**，与 Web-standard core 一并留待下一批 **v0.4b**。Hono 已支持 **Node ≥20**。
+
+v0.4a 已实现以下**显式 opt-in、默认关闭**的集成与控制；默认仍为 `mode: 'detect'`：
+
+- Slack、Telegram、飞书和 SMTP/email 告警 adapters，零新增运行时依赖、无默认目的地。
+- `guard.prometheusText()` / `prometheusHandler(guard)` 文本导出器，不默认挂载端点、无路径 label。
+- `mode: 'trap'`，`delay`、`rateLimit`、`block` 与**实验性** `maze` 独立开关；verified crawler 与 allowlist 永不被 trap。
+- `canary.callback.baseUrl` + `callbackHandler(guard)` 自托管回调金丝雀。handler 必须显式挂载，guard 永不 fetch `baseUrl`。
+
+机械节奏 `automation_score` 也已实现，但仅用于观测：不提升严重级别，不单独触发 block/maze。当前代码在样本足够后自动产生分数，没有独立启用开关。
+
+**实验性迷宫**应在运营者完成自己的真实 agent 测量后才考虑启用。[v0.3b 离线模拟](../bench-v0.3b.md) 中，脚本 agent 在 **25 ms/request** 模型下的时间比为数百比一，但**字节比为 1:1，低于 3:1 下限**，不能证明真实 agent 的成本收益。配置与风险见 [trap-mode.md](../trap-mode.md) 和 [Exhaust](../exhaust.md)。
 
 ## 路线图与设计文档
 
 - [社区参与](../community.md) — 如何贡献适配器、检测特征、译本和 RFC。
-- [路线图](../roadmap.md) — 规划中的 v0.3/v0.4 工作。Exhaust 与 Deception 目前是设计草案，默认关闭。
-- [Exhaust](../exhaust.md) — 对已确认恶意会话的有界成本施加（延迟、迷宫、上下文消耗）。
+- [路线图](../roadmap.md) — v0.4a 完成项与 v0.4b Edge 计划；persona/deception 扩展仍属设计。
+- [Exhaust](../exhaust.md) — 已实现的 opt-in 延迟与实验性迷宫；上下文消耗（E3）尚未实现。
 - [Deception](../deception.md) — 提高诱饵数据的可信度，让攻击者的 agent 可能把它当成真实数据。
 - [设计](../design.md)、[合同](../codex-contract.md)、[KPI](../kpi.md)和[威胁模型](../threat-model.md)。先前工作仅用于启发概念；未复制任何第三方项目代码。

@@ -13,7 +13,7 @@ An AI-agent honeypot middleware for Node and the edge.
 - 기본값은 탐지와 알림뿐입니다. 미들웨어는 이벤트를 기록하고 비동기 알림을 보내며, 차단하거나 제한하거나 보복하지 않습니다.
 - 런타임 의존성은 없습니다. Express, Hono, Fastify, Koa는 선택적 peer입니다. 현재는 Node ≥20를 지원하며, 엣지 런타임은 로드맵에 있습니다.
 
-**이것이 하는 일 / 하지 않는 일.** agent-guard는 API를 향한 적대적이거나 탐색적인 AI agent 트래픽을 탐지하고, 유인하며, 관찰합니다. 역공하거나 누구를 공격하지 않습니다. 자세한 내용은 [이것이 아닌 것](#이것이-아닌-것)을 참고하세요.
+**이것이 하는 일 / 하지 않는 일.** agent-guard는 API를 향한 적대적이거나 탐색적인 AI agent 트래픽을 탐지하고, 유인하며, 관찰합니다. 역공하거나 누구를 공격하지 않습니다. 비목표, 옵트인 기능과 실험적 한계는 [이것이 아닌 것](#이것이-아닌-것)을 참고하세요.
 
 Node ≥20용 HTTP 미들웨어입니다. 격리된 다섯 개의 디코이 라우트와 비활성 카나리아 자격 증명으로 자격 증명 재사용(replay)과 탐색적 스캔을 탐지합니다. 이벤트를 기록하고 비동기로 알림을 보냅니다. 런타임 의존성은 없으며, Express는 선택적 peer입니다. Apache-2.0, 저작권 2026 Wesley Wang.
 
@@ -92,7 +92,7 @@ const listener = wrap(guard, (_req, res) => res.end('Hello'));
 
 ## Hono(Node 런타임)
 
-v0.2 Hono 어댑터는 `@imwyvern/agent-guard/hono`로 제공되며, 선택적 `hono` peer를 가집니다. Node ≥20이 필요합니다. 공유 코어는 여전히 `node:crypto`와 Node DNS를 사용합니다. 에지 런타임과 WebCrypto 코어는 로드맵의 v0.3 작업입니다.
+v0.2 Hono 어댑터는 `@imwyvern/agent-guard/hono`로 제공되며, 선택적 `hono` peer를 가집니다. Node ≥20이 필요합니다. 공유 코어는 여전히 `node:crypto`와 Node DNS를 사용합니다. 에지 런타임과 WebCrypto 코어는 v0.4b 작업으로 남아 있습니다.
 
 ```ts
 import { Hono } from 'hono';
@@ -110,11 +110,11 @@ serve({ fetch: app.fetch, hostname: '127.0.0.1', port: 3000 });
 
 사용하는 앱에 Hono와 Node 서버 통합을 설치하세요. 이 저장소는 둘 다 개발 의존성으로만 설치하며, 어댑터는 런타임 의존성을 추가하지 않습니다. `agentGuard`는 guard 또는 config를 받고, 복제된 요청에서 대상 본문을 설정된 본문 상한(기본 16 KiB)까지 스캔하며, 원본 본문은 다운스트림 핸들러가 계속 사용할 수 있게 둡니다. JSON과 폼 본문을 지원하며, 형식이 잘못되었거나 잘린 입력은 유계 텍스트로 스캔합니다. 전송 크기 제한과 본문 읽기 기한은 여전히 호스트의 책임입니다. `@hono/node-server`가 소켓 IP를 제공하며, 전달 헤더를 쓰려면 명시적으로 신뢰하는 `clientIp` 콜백이 필요합니다.
 
-탐지는 여전히 알림만 수행합니다. 카나리아 재사용은 호스트로 계속 진행되고, 디코이에는 noindex/no-store 헤더가 붙으며, 검증된 크롤러는 호스트 고유의 없는 라우트 핸들러에 도달합니다. 옵트인 robots/HTML/llms 변환은 기존 1 MiB 버퍼 상한을 유지합니다. `npm run demo:hono`를 실행하세요(`PORT`와 `AGENT_GUARD=off`는 다른 카탈로그 데모와 동일하게 동작합니다). Hono는 Express 및 Node와 동일한 공유 인수 테스트 스위트를 실행합니다.
+기본 `mode: 'detect'`에서 탐지는 여전히 알림만 수행합니다. 카나리아 재사용은 호스트로 계속 진행되고, 디코이에는 noindex/no-store 헤더가 붙으며, 검증된 크롤러는 호스트 고유의 없는 라우트 핸들러에 도달합니다. 옵트인 robots/HTML/llms 변환은 기존 1 MiB 버퍼 상한을 유지합니다. `npm run demo:hono`를 실행하세요(`PORT`와 `AGENT_GUARD=off`는 다른 카탈로그 데모와 동일하게 동작합니다). Hono는 Express 및 Node와 동일한 공유 인수 테스트 스위트를 실행합니다.
 
 ## Fastify와 Koa(Node 런타임)
 
-v0.3a(미출시)는 `@imwyvern/agent-guard/fastify`와 `@imwyvern/agent-guard/koa`의 `agentGuard`를 추가하며 동일한 guard 또는 config를 받습니다. Fastify 플러그인은 라우트보다 앞에 `await app.register(agentGuard(guard))`로 등록하고, 본문 파싱 후 `preHandler`에서 검사합니다. Koa에서는 크기를 제한하는 본문 파서 뒤에 `app.use(agentGuard(guard))`를 배치합니다. 두 어댑터 모두 요청 스트림을 소비하지 않으며, 호스트 고유의 크롤러 404, 알림만 수행하는 재사용 탐지, 옵트인 lure 변환을 보존합니다. 프레임워크는 선택적 peer이며 코어 런타임 의존성은 늘지 않습니다. [Fastify 데모](../../examples/fastify-demo/server.ts), [Koa 데모](../../examples/koa-demo/server.ts), [어댑터 가이드](../community.md)를 참고하세요. 엣지 런타임은 계속 로드맵에 있습니다.
+v0.3a(미출시)는 `@imwyvern/agent-guard/fastify`와 `@imwyvern/agent-guard/koa`의 `agentGuard`를 추가하며 동일한 guard 또는 config를 받습니다. Fastify 플러그인은 라우트보다 앞에 `await app.register(agentGuard(guard))`로 등록하고, 본문 파싱 후 `preHandler`에서 검사합니다. Koa에서는 크기를 제한하는 본문 파서 뒤에 `app.use(agentGuard(guard))`를 배치합니다. 두 어댑터 모두 요청 스트림을 소비하지 않으며, 호스트 고유의 크롤러 404, detect 모드에서 알림만 수행하는 재사용 탐지, 옵트인 lure 변환을 보존합니다. 프레임워크는 선택적 peer이며 코어 런타임 의존성은 늘지 않습니다. [Fastify 데모](../../examples/fastify-demo/server.ts), [Koa 데모](../../examples/koa-demo/server.ts), [어댑터 가이드](../community.md)를 참고하세요. 엣지 런타임은 계속 로드맵에 있습니다.
 
 ## MCP / LLM 도구 엔드포인트 디코이
 
@@ -157,7 +157,7 @@ HTML이 없는 API는 [API 전용 가이드](../scenarios/api-only.md)를 참고
 | `crawler.resolver` | Node DNS; 오프라인 사용을 위해 `{ reverse, resolve }`를 주입 |
 | `crawler.extraSuffixes` / `ipRangesFile` | 선택적 크롤러 계열 접미사 / 오프라인 JSON `{ google: ['CIDR'] }` |
 | `allowlist` | 선택적 정확 일치 `ips`, IPv4/IPv6 `cidrs`, `uaPatterns`, 정확 일치 `headerToken` |
-| `alerts.adapters` | 기본 대상 없음; `webhookAdapter()`와 `consoleAdapter()` 사용 가능 |
+| `alerts.adapters` | 기본 전송 대상 없음. webhook, console, Slack, Telegram, Feishu, SMTP/email 어댑터 제공 |
 | `alerts.minSeverity` | 디코이/재사용은 `info`; 명시적 값은 probe/discovery 에스컬레이션도 활성화 |
 | `alerts.dedupeWindowSec` | 600; 동일 이벤트 + placement/ID + client key |
 | `alerts.ratePerMinute` | 채널당 30; 억제된 횟수는 다음 알림 요약으로 이월 |
@@ -166,17 +166,19 @@ HTML이 없는 API는 [API 전용 가이드](../scenarios/api-only.md)를 참고
 | `clientIp` | 소켓 IP; 신뢰할 수 있는 프록시를 검증한 뒤에만 재정의 |
 | `onEvent` | 선택적 관찰자; 관찰자/sink 실패는 격리됨 |
 
-`guard.robotsLines()`는 수동 robots 통합을 지원합니다. `guard.htmlCommentFor(path)`는 옵트인 주석 또는 null을 반환합니다. `guard.metrics()`는 요청/이벤트/전달 횟수와 유계의 최근 inspect 타이밍 분위수를 반환합니다. 점수는 인스턴스별 유계 관측값이며, 강제에는 쓰이지 않습니다. 클라이언트 상태: 50k 항목, 30분 유휴 TTL. 크롤러 캐시: 10k, 양성 24h / 음성 1h. 전달 헤더는 자동으로 신뢰되지 않습니다.
+`guard.robotsLines()`는 수동 robots 통합을 지원합니다. `guard.htmlCommentFor(path)`는 옵트인 주석 또는 null을 반환합니다. `guard.metrics()`는 요청/이벤트/전달 횟수와 유계의 최근 inspect 타이밍 분위수를 반환합니다. 타이밍 점수는 인스턴스별로 범위가 제한된 관측값입니다. 탐지 점수는 옵트인 trap의 진입 조건에 사용될 수 있습니다. 클라이언트 상태: 50k 항목, 30분 유휴 TTL. 크롤러 캐시: 10k, 양성 24h / 음성 1h. 전달 헤더는 자동으로 신뢰되지 않습니다.
 
-D5는 항상 로그인을 거부하며 결정적인 300–600ms 지연을 둡니다. 모든 디코이는 `noindex`, `no-store`, ≤8KiB이며, `.invalid` 호스트 이름만 사용하고, cookie를 만들거나 인증하거나 업무 서비스를 호출하지 않습니다. 선언된 AI 크롤러의 디코이 적중 심각도는 `info`입니다. 검색 크롤러 DNS 검사는 디코이 라우트에서만 수행됩니다. 오류/시간 초과는 fail open되어 네이티브 404가 됩니다.
+detect 모드에서 D5는 항상 로그인을 거부하며 결정적인 300–600ms 지연을 둡니다. 모든 디코이는 `noindex`, `no-store`, ≤8KiB이며, 기본적으로 `.invalid` 가상 호스트 이름을 사용하며(명시적으로 설정한 자체 호스팅 callback URL은 예외), cookie를 만들거나 인증하거나 업무 서비스를 호출하지 않습니다. 선언된 AI 크롤러의 디코이 적중 심각도는 `info`입니다. detect에서는 디코이 라우트에서 검색 크롤러 DNS 검증을 수행합니다. 옵트인 trap과 callback 핸들러도 검증하여 크롤러를 보호합니다. 오류/시간 초과는 fail open되어 네이티브 404가 됩니다.
 
 ## 사건 상관관계와 카나리아 전파 추적
 
-v0.3a는 동일한 `client_key`의 기존 이벤트에 선택적 `incident`를 붙입니다. 필드는 `id`, 순서 있는 `sequence`(예: `robots → D1 → D2`), `first_seen`, `last_seen`, `confidence`입니다. `incident.windowMs` 기본값은 900000(첫 관측부터 고정 15분)이며 0이면 상관관계를 끕니다. 상태는 50k 클라이언트 LRU와 최근 32개 관측으로 제한됩니다. 단일 적중의 반복은 low, 서로 다른 디코이나 발견과 디코이의 조합은 medium, `canary_replay`는 high로 올립니다. 같은 시간 창에서 신뢰도는 내려가지 않습니다. robots 방문은 내부 표식이며 이벤트 타입을 추가하지 않습니다. 공유 네트워크에서는 클라이언트가 합쳐질 수 있습니다. 상관관계는 관측 정보만 보충하며 심각도, HTTP 응답, 크롤러 우회, 디코이 결정을 바꾸지 않습니다. `mode`는 계속 `detect`만 허용합니다.
+v0.3a는 동일한 `client_key`의 기존 이벤트에 선택적 `incident`를 붙입니다. 필드는 `id`, 순서 있는 `sequence`(예: `robots → D1 → D2`), `first_seen`, `last_seen`, `confidence`입니다. `incident.windowMs` 기본값은 900000(첫 관측부터 고정 15분)이며 0이면 상관관계를 끕니다. 상태는 50k 클라이언트 LRU와 최근 32개 관측으로 제한됩니다. 단일 적중의 반복은 low, 서로 다른 디코이나 발견과 디코이의 조합은 medium, `canary_replay`는 high로 올립니다. 같은 시간 창에서 신뢰도는 내려가지 않습니다. robots 방문은 내부 표식이며 이벤트 타입을 추가하지 않습니다. 공유 네트워크에서는 클라이언트가 합쳐질 수 있습니다. 상관관계는 심각도를 올리지 않습니다. 기본 detect에서는 HTTP 응답과 디코이 결정을 유지하지만, v0.4a 옵트인 trap은 high confidence를 진입 조건으로 사용할 수 있습니다. 검증된 크롤러와 allowlist는 항상 보호됩니다. [trap 모드](../trap-mode.md)를 참고하세요.
 
 재사용 알림은 `canary.id`, `placement`, `env`, `found_in`, `field`를 유지하고 `leaked_at`(배치 위치), `replayed_at`(경로), `dwell_ms`(첫 디코이 전달부터의 시간), `client_keys_seen`(서로 다른 재사용 클라이언트 키 수, 최대 8)을 추가합니다. 반환하는 디코이 본문에 토큰이 있을 때만 전달을 기록하며 HEAD와 크롤러 우회는 제외합니다. 추적은 프로세스 메모리에만 있고 50k 항목 LRU와 24시간 TTL을 사용합니다. 퇴출, 재시작, 내장 디코이 이외의 전달로 시점을 알 수 없으면 `dwell_ms`를 생략합니다. 이 관측은 신원이나 악의의 증거를 확정하지 않습니다.
 
 ## 알림과 서명
+
+webhook과 console 외에 `slackAdapter`, `telegramAdapter`, `feishuAdapter`, `smtpAdapter`를 제공합니다. 전송 대상과 자격 증명을 명시적으로 설정해야 하며 기본으로 켜지는 어댑터는 없습니다. 새 런타임 의존성도 없습니다. 새 HTTP 어댑터는 loopback 외에는 HTTPS를 요구하고 리디렉션을 거부합니다. SMTP는 암시적 TLS(465), STARTTLS(587), AUTH PLAIN/LOGIN을 지원합니다. 아래의 큐, 중복 제거, 전송 속도 제한, `close()` 시 전송 완료 대기를 공유합니다.
 
 ```ts
 import { webhookAdapter, verifyWebhookSignature } from '@imwyvern/agent-guard';
@@ -255,16 +257,31 @@ v0.2부터 Express, Node, Hono의 기본 AC-10 측정은 `npm run bench:latency:
 
 측정 게이트 실패는 벤치마크를 0이 아닌 종료 코드로 끝냅니다. `bench:latency`는 각 데모 서버를 자체 자식 프로세스에서 실행하고 autocannon으로 구동합니다(100 connections, 30 s, 3회 실행의 중앙값). 게이트 대상이 아닌 고정 속도 실행과 처리량에서 유도한 요청당 오버헤드 추정치도 기록합니다. Lighthouse 전체 매트릭스에는 약 35분이 필요합니다. 샌드박스가 로컬 소켓을 금지하면, 연구용 하네스는 메모리 Duplex 스트림 위로 실제 HTTP 요청/응답 객체를 사용합니다. TCP 지연은 **검증되지 않음**으로 남습니다. Chrome 시작 실패는 통과가 아니라 **건너뜀**입니다. 정확한 환경 제한은 [벤치마크 보고서](../bench-v0.1.md)와 [구현 노트](../implementation-notes.md)를 참고하세요. 이 라이브러리는 해당 하네스를 포함하지 않습니다.
 
-v0.3b부터 `npm run bench:exhaust-sim`은 스크립트화된 탐욕 agent를 대상으로 유계 미로의 비용비 시뮬레이션을 메모리에서 실행하고, `npm run bench:deception-lint`는 현재 디코이 출력과 결정적 페르소나 프로토타입을 안전 검사합니다. 두 명령 모두 런타임 동작을 바꾸지 않으며, `mode`는 여전히 `detect`만 받습니다. [v0.3b 오프라인 평가](../bench-v0.3b.md)를 참고하세요.
+v0.3b부터 `npm run bench:exhaust-sim`은 스크립트화된 탐욕 agent를 대상으로 유계 미로의 비용비 시뮬레이션을 메모리에서 실행하고, `npm run bench:deception-lint`는 현재 디코이 출력과 결정적 페르소나 프로토타입을 안전 검사합니다. 두 명령은 trap을 켜지 않습니다. v0.4a에는 별도로 옵트인 trap과 실험적 미로가 구현되어 있습니다. [v0.3b 오프라인 평가](../bench-v0.3b.md)를 참고하세요.
 
 ## 이것이 아닌 것
 
-WAF, DDoS 방어, 인증 시스템, 봇 차단기, 프로덕션 배포, 검색 엔진 동작에 대한 보장이 아닙니다. 자동 차단, 트래픽 제한, trap 모드, 미로, 리버스 프롬프트 인젝션, 외부 프로빙, 실제 벤더 자격 증명, 제3자 콜백 honeytoken은 없습니다. Slack/Telegram/Feishu/email과 Edge 어댑터는 이후 작업으로 남아 있습니다. Hono 어댑터는 이미 Node ≥20용으로 제공됩니다. 기계적 타이밍과 Prometheus 엔드포인트는 선택적 설계 아이디어이며 v0.1에서는 활성화되어 있지 않습니다.
+WAF, DDoS 방어, 인증 시스템이나 범용 봇 차단기가 아닙니다. 이 연구 프로젝트는 프로덕션 배포를 제공하지 않으며 검색 엔진의 동작을 보장하지 않습니다.
+
+리버스 프롬프트 인젝션 / counter-injection(E4)은 제품에 절대 포함하지 않습니다. 외부 프로빙이나 guard가 제3자에게 먼저 보내는 콜백은 수행하지 않습니다. 운영자가 설정한 알림 어댑터만 외부 알림 전송의 예외이며, 기존 크롤러 신원 확인용 DNS 검증은 유지합니다. 카나리아는 비활성 HMAC 토큰이며 실제 벤더 자격 증명을 사용하지 않습니다. 제3자 honeytoken 서비스(Canarytokens 등)를 사용하지 않으며 콜백 카나리아는 운영자가 직접 호스팅해야 합니다.
+
+Edge 어댑터(Cloudflare Workers, Next.js middleware, Deno, Bun, Vercel Edge)는 **이번 릴리스에 포함되지 않습니다**. Web 표준 코어와 함께 다음 작업인 **v0.4b**로 남아 있습니다. Hono는 이미 **Node ≥20**에서 지원됩니다.
+
+v0.4a는 다음 연동과 제어를 **명시적 옵트인, 기본 꺼짐**으로 제공합니다. 기본 모드는 여전히 `mode: 'detect'`입니다.
+
+- Slack, Telegram, Feishu, SMTP/email 알림 어댑터. 새 런타임 의존성이 없으며 기본 전송 대상도 없습니다.
+- `guard.prometheusText()` / `prometheusHandler(guard)` 텍스트 내보내기. 엔드포인트는 자동으로 등록되지 않으며 경로 label이 없습니다.
+- `mode: 'trap'`과 독립적으로 켜는 `delay`, `rateLimit`, `block`, **실험적** `maze`. 검증된 크롤러와 allowlist는 trap 대상이 되지 않습니다.
+- `canary.callback.baseUrl` + `callbackHandler(guard)`를 통한 자체 호스팅 콜백 카나리아. 핸들러는 명시적으로 등록해야 하며 guard는 `baseUrl`을 fetch하지 않습니다.
+
+기계적인 요청 간격을 나타내는 `automation_score`도 구현되어 있지만 관측용입니다. 심각도를 올리거나 단독으로 block/maze를 실행하지 않습니다. 현재 코드는 충분한 표본이 모이면 자동으로 점수를 산출하며 별도의 활성화 플래그는 없습니다.
+
+**실험적 미로**는 운영자가 실제 agent로 직접 측정한 뒤에야 활성화를 고려해야 합니다. [v0.3b 오프라인 시뮬레이션](../bench-v0.3b.md)에서 스크립트 agent의 시간 비율은 **25 ms/request** 모델에서 수백 대 일이었지만, **바이트 비율은 1:1로 하한인 3:1에 미치지 못했습니다**. 실제 agent의 비용 절감이 입증된 것은 아닙니다. [trap 설정과 위험](../trap-mode.md), [Exhaust](../exhaust.md)를 참고하세요.
 
 ## 로드맵 및 설계 문서
 
 - [커뮤니티](../community.md) — 어댑터, 탐지 시그니처, 번역, RFC 기여 방법.
-- [로드맵](../roadmap.md) — 계획 중인 v0.3/v0.4 작업입니다. Exhaust와 Deception은 설계 초안이며 기본값은 꺼짐입니다.
-- [Exhaust](../exhaust.md) — 확인된 악성 세션에 대한 유계 비용 부과(지연, 미로, 컨텍스트 소모).
+- [로드맵](../roadmap.md) — v0.4a 완료 항목과 v0.4b Edge 계획입니다. persona/deception 확장은 설계 단계입니다.
+- [Exhaust](../exhaust.md) — 구현된 옵트인 지연과 실험적 미로. 컨텍스트 소모(E3)는 아직 구현되지 않았습니다.
 - [Deception](../deception.md) — 디코이 데이터의 신뢰도를 높여 공격자의 agent가 이를 실제 데이터로 여길 수 있게 합니다.
 - [설계](../design.md), [계약](../codex-contract.md), [KPI](../kpi.md), [위협 모델](../threat-model.md). 선행 사례는 개념만 참고했으며, 제3자 프로젝트 코드는 복사하지 않았습니다.

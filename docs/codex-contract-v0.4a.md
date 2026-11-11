@@ -49,5 +49,5 @@
 - 默认配置回归：`bench:latency:hr` 重跑，Δp50 ≤ 200 µs、Δp99 ≤ 1000 µs、50k client 堆 ≤ 10 MB（新增 timing/trap 状态后仍须满足，若不满足需如实写入报告并说明）。
 - `bench:exhaust-sim` 仍可运行；`bench:deception-lint` 0 违规；`agent-guard lint` 对内置输出 0 违规。
 - `npm audit --omit=dev` = 0；`npm pack --dry-run` 内容干净。
-- grep `liandaai|练答` = 0；六个 README 代码块一致、相对链接可用。
+- 文档中不得出现已移除的站点/产品名称；六个 README 代码块一致、相对链接可用。
 - 正常提交、`git push origin main`。

@@ -14,7 +14,7 @@ The core interface is `AgentGuard.inspect(req): Promise<AGDecision>` in [`src/ty
 - Node `http` ([`node.ts`](../src/adapters/node.ts)) maps the request to `AGRequest`, calls `inspect`, writes a decoy response or calls `next()`, and optionally installs lure transforms.
 - Fastify ([`fastify.ts`](../src/adapters/fastify.ts), v0.3a / unreleased) uses `preHandler` after body parsing and `onSend` for opted-in lure transforms.
 - Koa ([`koa.ts`](../src/adapters/koa.ts), v0.3a / unreleased) inspects after the host body parser and applies opted-in transforms after downstream handlers.
-- Hono ([`hono.ts`](../src/adapters/hono.ts)) does the same on Hono's Web-standard `Request`/`Response`, still on Node ≥20. The shared core uses `node:crypto` and Node DNS; edge runtimes are roadmap work.
+- Hono ([`hono.ts`](../src/adapters/hono.ts)) does the same on Hono's Web-standard `Request`/`Response`, still on Node ≥20. The shared core uses `node:crypto` and Node DNS; the Web-standard core and Edge adapters remain v0.4b work.
 
 A new adapter should follow that contract, not invent a second inspection API:
 
@@ -48,9 +48,17 @@ app.use(agentGuard(guard));
 app.use(async ctx => { ctx.body = { status: 'ok' }; });
 ```
 
-Both accept a config or an existing guard, preserve alert-only canary replay and verified-crawler native 404s, and add no runtime dependencies. Run `npm run demo:fastify` or `npm run demo:koa`; full integrations are in [fastify-demo](../examples/fastify-demo/server.ts) and [koa-demo](../examples/koa-demo/server.ts). Close the guard on shutdown to flush alerts.
+Both accept a config or an existing guard, preserve alert-only canary replay in default detect mode and verified-crawler native 404s, and add no runtime dependencies. They also forward opt-in trap decisions from the shared core. Run `npm run demo:fastify` or `npm run demo:koa`; full integrations are in [fastify-demo](../examples/fastify-demo/server.ts) and [koa-demo](../examples/koa-demo/server.ts). Close the guard on shutdown to flush alerts.
 
 A Next.js middleware or edge adapter should say clearly which signals require Node (`node:crypto`, Node DNS, in-memory client state) and which degrade in a stateless edge runtime; a complete Edge port waits for the Web-standard core on the [roadmap](roadmap.md).
+
+### Alerts, metrics and opt-in trap controls
+
+v0.4a adds first-party `slackAdapter`, `telegramAdapter`, `feishuAdapter` and `smtpAdapter` (email), alongside webhook and console. All destinations require explicit operator configuration and add zero runtime dependencies. They share the bounded asynchronous queue, deduplication, rate limits and `close()` flush. The new HTTP adapters require HTTPS except loopback and refuse redirects; SMTP supports implicit TLS and STARTTLS. Alert text contains request metadata and canary IDs, never request bodies, Cookie/Authorization values or adapter credentials.
+
+`guard.prometheusText()` and the exported Node listener `prometheusHandler(guard)` provide Prometheus text without path labels. No metrics route is mounted automatically; routing and access controls belong to the host. The self-hosted callback canary similarly requires `canary.callback.baseUrl` and an explicit `callbackHandler(guard)` mount. Its HMAC tokens are inert, HTTPS is required except loopback, and the guard never fetches `baseUrl` or contacts a third-party honeytoken service.
+
+Default `mode: 'detect'` remains alert-only. `mode: 'trap'` exposes independent, default-off delay, rateLimit, block and **experimental** maze flags. Verified crawlers and allowlists are immune, a single `/.env` hit is insufficient, and runtime kill switches and a circuit breaker stop trap actions. Block can affect real routes for a confirmed client key. Read [trap-mode.md](trap-mode.md) and [exhaust.md](exhaust.md) before enabling controls; the v0.3b simulation's byte ratio was 1:1, below the 3:1 floor, so maze needs the operator's own real-agent measurement. Mechanical `automation_score` is automatically observed after enough samples, has no enable flag, and never raises severity or triggers block/maze by itself.
 
 ### Persona / scenario pack (roadmap)
 
@@ -60,7 +68,7 @@ Until then, scenario work should stay as documented examples plus tests, followi
 
 ### Detection signatures
 
-Useful contributions include crawler-family suffixes, user-agent patterns, and regression fixtures that improve classification without changing default enforcement. Please include tests and anonymized or synthetic samples only. Behavioral scores must not, by themselves, label a client as an agent or block it. The optional incident field correlates up to 32 observations per client in a fixed 15-minute window (50k-client cap); confidence may rise, but response decisions and severity stay unchanged. Canary propagation is process-local (50k records, 24-hour TTL, at most 8 replaying client keys); unknown issuance must omit dwell time. Verified crawlers and allowlisted clients must continue to fail open to the host.
+Useful contributions include crawler-family suffixes, user-agent patterns, and regression fixtures that improve classification without changing default enforcement. Please include tests and anonymized or synthetic samples only. Behavioral scores must not, by themselves, label a client as an agent or block it. The optional incident field correlates up to 32 observations per client in a fixed 15-minute window (50k-client cap); confidence may rise without changing severity. Detect responses stay unchanged; opt-in trap can use high confidence as a gate. Canary propagation is process-local (50k records, 24-hour TTL, at most 8 replaying client keys); unknown issuance must omit dwell time. Verified crawlers and allowlisted clients must continue to bypass trap controls.
 
 ### Benchmarks and simulations
 
@@ -91,11 +99,11 @@ Use existing labels such as `bug`, `enhancement`, and `documentation` when they 
 These are not optional. Pull requests that cross them will be rejected:
 
 - Canaries stay **inert**: they never authenticate and never enter real identity providers, user databases, secret stores, cloud key lists, or CI secrets.
-- No outbound probing, callbacks to a requester, retaliation, or attacks on third-party systems. No third-party callback honeytokens. Fake hosts use `.invalid`, `.example`, or reserved documentation address space only.
-- No reverse prompt injection in production. Lure and decoy text is data, not instructions, and must not contain imperative "ignore previous instructions" language, hidden characters, or inducements to call out.
+- No outbound probing, callbacks initiated toward a requester, retaliation, or attacks on third-party systems. Operator-configured alert adapters are the only outbound notification exception; existing crawler DNS verification retains its identity-checking scope. An operator-hosted callback **handler** may receive requests, but the library must never fetch its URL, call third-party honeytoken services (including Canarytokens), or probe attackers. Fake hosts use `.invalid`, `.example`, or reserved documentation address space; the configured self-hosted callback URL is the only decoy URL exception. Programmatic lint permits explicitly supplied exact `allowedHosts`, without relaxing the other safety rules.
+- No reverse prompt injection or counter-injection (E4) in the product. Lure and decoy text is data, not instructions, and must not contain imperative "ignore previous instructions" language, hidden characters, or inducements to call out.
 - No real credentials, real user data, or real business records in decoys, fixtures, issues, or logs.
 - Verified crawlers (and, when implemented, verified agents) never enter decoys. Preserve fail-open crawler verification and the host's native missing-route response.
-- Default remains detect + alert only. Any future delay, maze, or budget trap must be explicitly opt-in and disabled by default.
+- Default remains detect + alert only. Shipped delay, rateLimit, block and experimental maze controls must remain explicitly opt-in and disabled by default, with crawler/allowlist immunity, bounded state/budgets, kill switches and circuit protection.
 
 ## Maintainers
 
