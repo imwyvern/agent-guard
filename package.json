@@ -5,6 +5,7 @@
   "description": "HTTP runtime decoy routes + inert canary credentials that alert when AI agents or scanners take the bait.",
   "license": "Apache-2.0",
   "type": "module",
+  "sideEffects": false,
   "engines": {
     "node": ">=20"
   },
@@ -103,6 +104,45 @@
         "types": "./dist/koa.d.cts",
         "default": "./dist/koa.cjs"
       }
+    },
+    "./web": {
+      "types": "./dist/web.d.ts",
+      "import": "./dist/web.js"
+    },
+    "./workers": {
+      "types": "./dist/workers.d.ts",
+      "import": "./dist/workers.js"
+    },
+    "./next": {
+      "types": "./dist/next.d.ts",
+      "import": "./dist/next.js"
+    },
+    "./deno": {
+      "types": "./dist/deno.d.ts",
+      "import": "./dist/deno.js"
+    },
+    "./bun": {
+      "types": "./dist/bun.d.ts",
+      "import": "./dist/bun.js"
+    },
+    "./hono-web": {
+      "types": "./dist/hono-web.d.ts",
+      "import": "./dist/hono-web.js"
+    }
+  },
+  "typesVersions": {
+    "*": {
+      "express": ["dist/express.d.ts"],
+      "node": ["dist/node.d.ts"],
+      "hono": ["dist/hono.d.ts"],
+      "fastify": ["dist/fastify.d.ts"],
+      "koa": ["dist/koa.d.ts"],
+      "web": ["dist/web.d.ts"],
+      "workers": ["dist/workers.d.ts"],
+      "next": ["dist/next.d.ts"],
+      "deno": ["dist/deno.d.ts"],
+      "bun": ["dist/bun.d.ts"],
+      "hono-web": ["dist/hono-web.d.ts"]
     }
   },
   "peerDependencies": {
@@ -126,7 +166,8 @@
     }
   },
   "scripts": {
-    "build": "tsup",
+    "build": "tsx scripts/build.ts",
+    "check:neutral": "tsx scripts/check-neutral.ts",
     "typecheck": "tsc --noEmit",
     "lint": "tsc --noEmit --noUnusedLocals --noUnusedParameters",
     "test": "vitest run",

@@ -20,7 +20,7 @@ import { WebState, stateTtl } from './state.js';
 import { WebTrap, trapResponse, notFound } from './trap.js';
 import { WebMaze } from './maze.js';
 import { scanRequest, matchesPath } from './scan.js';
-import { webRequest } from './request.js';
+import { configIp, webRequest } from './request.js';
 
 export { memoryStore } from '../state/store.js';
 export type { StateStore } from '../state/store.js';
@@ -30,7 +30,11 @@ export interface WebGuardConfig extends Omit<AgentGuardConfig, 'mode'> {
     store?: StateStore;
     ipHeader?: string;
 }
-export interface WebContext { waitUntil(promise: Promise<unknown>): void }
+export interface WebContext {
+    waitUntil?(promise: Promise<unknown>): void;
+    /** Direct connection address; used only when no ipHeader is configured. */
+    clientIp?: string;
+}
 export interface WebGuard {
     handle(request: Request, ctx?: WebContext): Promise<Response | null>;
     inspect(request: Request | AGRequest): Promise<AGDecision>;
@@ -76,10 +80,10 @@ export function createWebGuard(input: WebGuardConfig): WebGuard {
         let enqueued = false;
         try {
             if (closed) throw new Error('agent-guard is closed');
-            const inputReq = inputRequest instanceof Request ? await webRequest(inputRequest, { ...config, ...('ipHeader' in input ? { ipHeader: input.ipHeader } : {}) }, decoys) : inputRequest;
+            const inputReq = inputRequest instanceof Request ? await webRequest(inputRequest, { ...config, ...('ipHeader' in input ? { ipHeader: input.ipHeader } : {}) }, decoys, ctx?.clientIp) : inputRequest;
             const req = boundRequest(inputReq, limits), pathTruncated = inputReq.path.length > limits.maxUrlLength;
             req.path = req.path.split('?', 1)[0]!;
-            req.ip = (config.clientIp?.(inputReq) ?? (inputRequest instanceof Request ? req.ip : input.ipHeader ? String(req.headers[input.ipHeader.toLowerCase()] ?? 'unknown') : req.ip)).slice(0, 128);
+            req.ip = (config.clientIp?.(inputReq) ?? (inputRequest instanceof Request ? req.ip : input.ipHeader ? configIp(String(req.headers[input.ipHeader.toLowerCase()] ?? ''), input.ipHeader) : req.ip)).slice(0, 128);
             const ua = String(req.headers['user-agent'] ?? '').slice(0, 512);
             if (allowed(req, ua)) return { action: 'pass', events: [] };
             if (lastIp !== req.ip || lastUa !== ua || !lastKey) { lastIp = req.ip; lastUa = ua; lastKey = clientKeyAsync(req.ip, ua, webCrypto); }
@@ -167,7 +171,7 @@ export function createWebGuard(input: WebGuardConfig): WebGuard {
         catch (error) { if (closed) throw error; return { action: 'pass', events: [] }; }
         finally {
             metrics.request((performance.now() - start) * 1e6);
-            if (enqueued && ctx) { const delivery = alerts.flush().catch(() => {}); try { ctx.waitUntil(delivery); } catch { /* Host lifecycle errors cannot affect responses. */ } }
+            if (enqueued && ctx?.waitUntil) { const delivery = alerts.flush().catch(() => {}); try { ctx.waitUntil(delivery); } catch { /* Host lifecycle errors cannot affect responses. */ } }
         }
     };
     return {

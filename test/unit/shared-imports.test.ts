@@ -9,6 +9,7 @@ const shared = [
     'core/client-key-core.ts', 'core/maze-nodes.ts', 'core/incidents-core.ts', 'core/limits.ts', 'core/signals.ts', 'crawler/ua.ts',
     'canary/format-core.ts', 'canary/registry-core.ts', 'canary/callback-core.ts', 'canary/tracing.ts',
     'crypto/web.ts', 'state/store.ts',
+    'adapters/workers.ts', 'adapters/next.ts', 'adapters/deno.ts', 'adapters/bun.ts', 'adapters/hono-web.ts',
     ...readdirSync(fileURLToPath(new URL('../../src/web/', import.meta.url)), { recursive: true, encoding: 'utf8' }).filter(f => f.endsWith('.ts')).map(f => 'web/' + f),
     'decoys/responses.ts', 'decoys/fake-data-core.ts', 'alerts/signing.ts', 'alerts/format.ts', 'alerts/shared.ts', 'lures/html-comment.ts',
 ];
