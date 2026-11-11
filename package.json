@@ -22,6 +22,7 @@
     "graphql": "^16.15.0",
     "hono": "^4.13.17",
     "koa": "^3.3.0",
+    "miniflare": "4.20260426.0",
     "tsup": "^9.0.0",
     "tsx": "^4.23.15",
     "typescript": "^5.9.3",
@@ -132,17 +133,39 @@
   },
   "typesVersions": {
     "*": {
-      "express": ["dist/express.d.ts"],
-      "node": ["dist/node.d.ts"],
-      "hono": ["dist/hono.d.ts"],
-      "fastify": ["dist/fastify.d.ts"],
-      "koa": ["dist/koa.d.ts"],
-      "web": ["dist/web.d.ts"],
-      "workers": ["dist/workers.d.ts"],
-      "next": ["dist/next.d.ts"],
-      "deno": ["dist/deno.d.ts"],
-      "bun": ["dist/bun.d.ts"],
-      "hono-web": ["dist/hono-web.d.ts"]
+      "express": [
+        "dist/express.d.ts"
+      ],
+      "node": [
+        "dist/node.d.ts"
+      ],
+      "hono": [
+        "dist/hono.d.ts"
+      ],
+      "fastify": [
+        "dist/fastify.d.ts"
+      ],
+      "koa": [
+        "dist/koa.d.ts"
+      ],
+      "web": [
+        "dist/web.d.ts"
+      ],
+      "workers": [
+        "dist/workers.d.ts"
+      ],
+      "next": [
+        "dist/next.d.ts"
+      ],
+      "deno": [
+        "dist/deno.d.ts"
+      ],
+      "bun": [
+        "dist/bun.d.ts"
+      ],
+      "hono-web": [
+        "dist/hono-web.d.ts"
+      ]
     }
   },
   "peerDependencies": {
@@ -178,6 +201,10 @@
     "bench:simulate": "node --import tsx bench/simulate.ts",
     "bench:latency": "node --import tsx bench/latency.ts",
     "bench:latency:hr": "node --import tsx bench/latency-hr.ts",
+    "bench:latency:web": "node --import tsx bench/latency-web.ts",
+    "smoke:workers": "node --import tsx scripts/smoke-workers.ts",
+    "smoke:bun": "bun scripts/smoke-bun.ts",
+    "smoke:deno": "deno run --allow-net=127.0.0.1 scripts/smoke-deno.ts",
     "lhci": "node --import tsx bench/lighthouse.ts",
     "demo:express": "node --import tsx examples/express-demo/server.ts",
     "demo:node": "node --import tsx examples/node-http-demo/server.ts",

@@ -4,7 +4,7 @@ import { utf8ByteLength } from '../crypto/bytes.js';
 import { matchesPath } from './scan.js';
 import type { WebDecoys } from './decoys.js';
 
-export async function webRequest(request: Request, config: AgentGuardConfig & { ipHeader?: string }, decoys: WebDecoys, connectionIp?: string): Promise<AGRequest> {
+export async function webRequest(request: Request, config: AgentGuardConfig & { ipHeader?: string }, decoys: WebDecoys, connectionIp?: string, contextBody = false): Promise<AGRequest> {
     const limits = inspectionLimits(config), url = new URL(request.url);
     const headers = Object.create(null) as AGRequest['headers'], query = Object.create(null) as AGRequest['query'];
     let count = 0, remainingBytes = limits.maxHeaderBytes;
@@ -34,7 +34,7 @@ export async function webRequest(request: Request, config: AgentGuardConfig & { 
     const path = url.pathname + url.search;
     const ip = config.ipHeader ? configIp(request.headers.get(config.ipHeader), config.ipHeader) : connectionIp?.trim() || 'unknown';
     const req: AGRequest = { method: request.method, path, query, headers, ip: config.clientIp ? 'unknown' : ip };
-    const scanBody = decoys.match(url.pathname, request.method) === 'D5' || (config.canaryScan?.bodyPaths ?? ['/login', '/api/auth/*']).some(p => matchesPath(url.pathname, p));
+    const scanBody = contextBody || decoys.match(url.pathname, request.method) === 'D5' || (config.canaryScan?.bodyPaths ?? ['/login', '/api/auth/*']).some(p => matchesPath(url.pathname, p));
     if (path.length <= limits.maxUrlLength && scanBody && limits.maxBodyBytes > 0 && limits.maxCanaryCandidates > 0 && request.body) {
         const reader = request.clone().body!.getReader(), decoder = new TextDecoder();
         let remaining = limits.maxBodyBytes, body = '';

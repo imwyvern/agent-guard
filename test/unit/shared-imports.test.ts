@@ -5,6 +5,7 @@ import ts from 'typescript';
 import { expect, it } from 'vitest';
 
 const shared = [
+    'scenarios/mcp.ts', 'scenarios/graphql.ts',
     'crypto/types.ts', 'crypto/bytes.ts', 'core/ulid-core.ts', 'core/security-core.ts', 'core/ip-parse.ts',
     'core/client-key-core.ts', 'core/maze-nodes.ts', 'core/incidents-core.ts', 'core/limits.ts', 'core/signals.ts', 'crawler/ua.ts',
     'canary/format-core.ts', 'canary/registry-core.ts', 'canary/callback-core.ts', 'canary/tracing.ts',

@@ -21,6 +21,9 @@ import { WebTrap, trapResponse, notFound } from './trap.js';
 import { WebMaze } from './maze.js';
 import { scanRequest, matchesPath } from './scan.js';
 import { configIp, webRequest } from './request.js';
+import { mcpDecoyTools } from '../scenarios/mcp.js';
+import { graphqlDecoys, graphqlForbiddenResponse } from '../scenarios/graphql.js';
+import { decoyHeaders } from '../decoys/headers.js';
 
 export { memoryStore } from '../state/store.js';
 export type { StateStore } from '../state/store.js';
@@ -35,9 +38,13 @@ export interface WebContext {
     /** Direct connection address; used only when no ipHeader is configured. */
     clientIp?: string;
 }
+export interface WebInspectContext {
+    mcp?: { toolName?: string };
+    graphql?: { fieldName?: string };
+}
 export interface WebGuard {
     handle(request: Request, ctx?: WebContext): Promise<Response | null>;
-    inspect(request: Request | AGRequest): Promise<AGDecision>;
+    inspect(request: Request | AGRequest, context?: WebInspectContext): Promise<AGDecision>;
     prometheusText(): string;
     setTrapEnabled(enabled: boolean): void;
     close(): Promise<void>;
@@ -75,12 +82,12 @@ export function createWebGuard(input: WebGuardConfig): WebGuard {
     };
     let lastIp: string | undefined, lastUa: string | undefined, lastKey: Promise<string> | undefined;
     let closed = false;
-    const inspect = async (inputRequest: Request | AGRequest, ctx?: WebContext): Promise<AGDecision> => {
+    const inspect = async (inputRequest: Request | AGRequest, ctx?: WebContext, context?: WebInspectContext): Promise<AGDecision> => {
         const start = performance.now();
         let enqueued = false;
         try {
             if (closed) throw new Error('agent-guard is closed');
-            const inputReq = inputRequest instanceof Request ? await webRequest(inputRequest, { ...config, ...('ipHeader' in input ? { ipHeader: input.ipHeader } : {}) }, decoys, ctx?.clientIp) : inputRequest;
+            const inputReq = inputRequest instanceof Request ? await webRequest(inputRequest, { ...config, ...('ipHeader' in input ? { ipHeader: input.ipHeader } : {}) }, decoys, ctx?.clientIp, !!(context?.mcp || context?.graphql)) : inputRequest;
             const req = boundRequest(inputReq, limits), pathTruncated = inputReq.path.length > limits.maxUrlLength;
             req.path = req.path.split('?', 1)[0]!;
             req.ip = (config.clientIp?.(inputReq) ?? (inputRequest instanceof Request ? req.ip : input.ipHeader ? configIp(String(req.headers[input.ipHeader.toLowerCase()] ?? ''), input.ipHeader) : req.ip)).slice(0, 128);
@@ -89,7 +96,9 @@ export function createWebGuard(input: WebGuardConfig): WebGuard {
             if (lastIp !== req.ip || lastUa !== ua || !lastKey) { lastIp = req.ip; lastUa = ua; lastKey = clientKeyAsync(req.ip, ua, webCrypto); }
             const key = await lastKey, events: AgentGuardEvent[] = [], signals: string[] = [];
             let uaClass: UAClass = classifyUA(ua);
-            const id = pathTruncated ? undefined : decoys.match(req.path, req.method), mazePath = !pathTruncated && !!maze?.matches(req.path), probe = pathSignal(req.path);
+            const id = context?.mcp ? 'MCP' : context?.graphql ? 'GQL' : pathTruncated ? undefined : decoys.match(req.path, req.method);
+            const mazePath = !context?.mcp && !context?.graphql && !pathTruncated && !!maze?.matches(req.path), probe = pathSignal(req.path);
+            const decoyHit = id && (id === 'MCP' ? mcpDecoyTools.some(tool => tool.name === context?.mcp?.toolName) : id === 'GQL' ? graphqlDecoys().some(decoy => decoy.field.name === context?.graphql?.fieldName) : true);
             const claimed = claimedCrawler(ua);
             let crawler: AgentGuardEvent['crawler'];
             if (claimed) {
@@ -101,10 +110,10 @@ export function createWebGuard(input: WebGuardConfig): WebGuard {
                     emit(event);
                     return id || mazePath ? { action: 'respond', response: notFound(req.method === 'HEAD'), events: [event] } : { action: 'pass', events: [event] };
                 }
-                if (id || mazePath || trap.enabled) { uaClass = 'spoofed_crawler'; signals.push('ua_spoof_crawler'); }
+                if (config.crawler?.verify === 'custom' || id || mazePath || trap.enabled) { uaClass = 'spoofed_crawler'; signals.push('ua_spoof_crawler'); }
             }
             if (uaClass === 'automation') signals.push('ua_automation');
-            const scanBody = id === 'D5' || (config.canaryScan?.bodyPaths ?? ['/login', '/api/auth/*']).some(p => matchesPath(req.path, p));
+            const scanBody = id === 'MCP' || id === 'GQL' || id === 'D5' || (config.canaryScan?.bodyPaths ?? ['/login', '/api/auth/*']).some(p => matchesPath(req.path, p));
             const hits = await scanRequest(req, registry, config, scanBody);
             const callback = await decoys.callback(req.path);
             if (hits.length) signals.push('canary_replay');
@@ -112,7 +121,9 @@ export function createWebGuard(input: WebGuardConfig): WebGuard {
                 req: { method: req.method, path: req.path, query_keys: Object.keys(req.query), ip: req.ip, client_key: key, ua, ua_class: uaClass, has_session: req.headers.cookie !== undefined }, score, signals: [...signals] });
             const result = await state.run(key, async client => {
                 const previous = client.score, now = Date.now(), automation = state.timing(client);
-                if (id) { signals.push('decoy_path'); if (client.robotsAt !== undefined && now - client.robotsAt < 60_000) signals.push('robots_then_disallowed'); }
+                if (id) {
+                    if (decoyHit) { signals.push('decoy_path'); if (client.robotsAt !== undefined && now - client.robotsAt < 60_000) signals.push('robots_then_disallowed'); }
+                }
                 else if (probe) signals.push(probe === 'probe' ? 'probe_path' : 'ai_discovery_path');
                 client.score = Math.min(1023, client.score + signals.reduce((n, signal) => n + (weights[signal] ?? 0), 0));
                 if (input.store && req.path === '/robots.txt') { client.robotsAt = now; state.incident(client, 'robots'); }
@@ -138,11 +149,11 @@ export function createWebGuard(input: WebGuardConfig): WebGuard {
                     return { response: { status: 204, headers: { 'Cache-Control': 'no-store' }, body: '' }, gated: false };
                 }
                 const blocked = trap.enabled && input.store && config.trap?.block?.enabled && (client.blockedUntil ?? 0) > now;
-                const gated = trap.enabled && ((client.confirmedUntil ?? 0) > now || hits.length > 0 || previous > 0 && client.score >= (config.trap?.gate?.minScore ?? 200));
+                const gated = trap.enabled && id !== 'MCP' && id !== 'GQL' && ((client.confirmedUntil ?? 0) > now || hits.length > 0 || previous > 0 && client.score >= (config.trap?.gate?.minScore ?? 200));
                 if (!mazePath && blocked) { push(make('trap_block', 'high', client.score)); return { response: trapResponse(403, req.method === 'HEAD'), gated }; }
-                if (id) {
+                if (decoyHit) {
                     const status = id === 'D2' ? (signalPatterns.bearer.test(String(req.headers.authorization ?? '')) ? 403 : 401) : id === 'D5' ? req.method === 'POST' ? 401 : 405 : 200;
-                    push({ ...make('decoy_hit', uaClass === 'declared_ai_crawler' ? 'info' : id === 'D1' || id === 'D3' ? 'high' : 'medium', client.score), decoy: { id, status }, ...(crawler ? { crawler } : {}) });
+                    push({ ...make('decoy_hit', uaClass === 'declared_ai_crawler' && id !== 'GQL' ? 'info' : id === 'D1' || id === 'D3' ? 'high' : 'medium', client.score), decoy: { id, status }, ...(crawler ? { crawler } : {}) });
                     if (gated && state.limited(client)) return { response: trapResponse(429, req.method === 'HEAD'), gated };
                 } else if (probe && !mazePath) push(make(probe, 'info', client.score));
                 return { gated, blocked, score: client.score };
@@ -160,9 +171,9 @@ export function createWebGuard(input: WebGuardConfig): WebGuard {
                 if (page.spent) { const event = sanitizeEvent(make('exhaust_budget_spent', 'high', result.score ?? 0)); events.push(event); emit(event); alerts.enqueue(event); enqueued = true; }
                 return { action: 'respond', response: page.response, events };
             }
-            if (id) {
-                const response = await decoys.respond(id, req, result.gated && input.store ? await maze?.entry() : undefined);
-                if (result.gated) await trap.delay();
+            if (decoyHit) {
+                const response = id === 'MCP' ? { status: 200, headers: decoyHeaders('application/json'), body: JSON.stringify({ error: 'permission denied' }) } : id === 'GQL' ? graphqlForbiddenResponse() : await decoys.respond(id, req, result.gated && input.store ? await maze?.entry() : undefined);
+                if (result.gated && input.store) await trap.delay();
                 if (req.method === 'HEAD') response.body = '';
                 return { action: 'respond', response, events };
             }
@@ -175,7 +186,7 @@ export function createWebGuard(input: WebGuardConfig): WebGuard {
         }
     };
     return {
-        inspect: request => inspect(request),
+        inspect: (request, context) => inspect(request, undefined, context),
         async handle(request, ctx) {
             const decision = await inspect(request, ctx);
             if (decision.action === 'pass') return null;

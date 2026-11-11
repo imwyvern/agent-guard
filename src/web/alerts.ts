@@ -13,12 +13,14 @@ export function webhookAdapter(o: { url: string; secret: string; timeoutMs?: num
     return { name: 'webhook', async send(alert, signal) {
         const body = JSON.stringify({ ...alert, event: sanitizeEvent(alert.event) }), timestamp = String(Math.floor(Date.now() / 1000));
         const signature = await signWebhookAsync(body, timestamp, o.secret, webCrypto);
-        const response = await fetch(url, { method: 'POST', redirect: 'error', body,
+        const response = await fetch(url, { method: 'POST', redirect: 'manual', body,
             headers: { 'Content-Type': 'application/json', 'X-AgentGuard-Signature': signature, 'X-AgentGuard-Timestamp': timestamp },
             signal: AbortSignal.any([signal, AbortSignal.timeout(timeoutMs)]),
         });
+        const status = response.status;
         await response.body?.cancel();
-        return { ok: response.ok, status: response.status };
+        if (status >= 300 && status < 400) return { ok: false };
+        return { ok: response.ok, status };
     } };
 }
 export function feishuAdapter(o: { url: string; secret?: string; timeoutMs?: number }): AlertAdapter {
