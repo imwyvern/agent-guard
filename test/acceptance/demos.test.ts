@@ -147,7 +147,7 @@ for (const kind of ['express', 'node', 'hono', 'fastify', 'koa'] as const)
             let lookups = 0;
             await using({ crawler: { resolver: { reverse: async () => { lookups++; return []; }, resolve: async () => { throw Error('must not forward invalid suffix'); } } } }, async (on) => { await fetch(on.url + '/'); expect(lookups).toBe(0); await fetch(on.url + '/.env', { headers: { 'user-agent': 'Googlebot' } }); expect(lookups).toBe(1); });
         });
-        it('AC-12: invalid mode throws AgentGuardConfigError', () => { expect(() => createAgentGuard(config({ mode: 'trap' as 'detect' }))).toThrow(AgentGuardConfigError); });
+        it('AC-12: invalid mode throws AgentGuardConfigError', () => { expect(() => createAgentGuard(config({ mode: 'enforce' as 'detect' }))).toThrow(AgentGuardConfigError); });
         it('AC-13: hanging 30s-style receiver does not block decoy (<50ms), records failure', async () => {
             const r = await receiver([], true);
             try {

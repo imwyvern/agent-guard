@@ -65,7 +65,7 @@ it('ULID, deterministic fake data, bounded lures', () => {
     expect(appendRobots('original\n', ['Disallow: /.env'])).toContain('original\nDisallow');
 });
 it('validates detect-only configuration and unsafe fields', () => {
-    for (const override of [{ mode: 'trap' }, { project: '' }, { env: '' }, { projectSeed: '' }, { canary: { secret: '', registry: { version: 1, prefix: 'AG-CANARY-', canaries: [] } } }, { canary: { secret: 's', prefix: 'bad', registry: { version: 1, prefix: 'AG-CANARY-', canaries: [] } } }, { decoys: { siteName: 'real.example' } }, { decoys: { paths: { D1: 'relative' } } }, { decoys: { basePath: '<bad>' } }, { alerts: { adapters: [], ratePerMinute: -1 } }])
+    for (const override of [{ mode: 'enforce' }, { project: '' }, { env: '' }, { projectSeed: '' }, { canary: { secret: '', registry: { version: 1, prefix: 'AG-CANARY-', canaries: [] } } }, { canary: { secret: 's', prefix: 'bad', registry: { version: 1, prefix: 'AG-CANARY-', canaries: [] } } }, { decoys: { siteName: 'real.example' } }, { decoys: { paths: { D1: 'relative' } } }, { decoys: { basePath: '<bad>' } }, { alerts: { adapters: [], ratePerMinute: -1 } }])
         expect(() => createAgentGuard(config(override as never))).toThrow(AgentGuardConfigError);
 });
 it('allowlists exact IP, CIDR, UA and header token; never trusts forwarded headers implicitly', async () => {

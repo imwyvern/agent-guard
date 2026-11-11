@@ -38,7 +38,7 @@ export interface AgentGuardEvent {
     v: 1;
     ts: string;
     event_id: string;
-    event: 'decoy_hit' | 'canary_replay' | 'probe' | 'ai_discovery' | 'crawler_bypass' | 'alert_sent' | 'alert_failed';
+    event: 'decoy_hit' | 'canary_replay' | 'probe' | 'ai_discovery' | 'crawler_bypass' | 'alert_sent' | 'alert_failed' | 'trap_block' | 'trap_circuit_open';
     severity: Severity;
     project: string;
     env: string;
@@ -126,7 +126,15 @@ export interface AgentGuardConfig {
     /** Limits: safe defaults are documented on InspectionLimits. */ limits?: InspectionLimits;
     /** Required project label; no default. */ project: string;
     /** Required environment label; no default. */ env: string;
-    /** Required; v0.1 only accepts detect. */ mode: 'detect';
+    /** Required; detect preserves the default alert-only behavior. */ mode: 'detect' | 'trap';
+    trap?: {
+        delay?: { enabled?: boolean; /** Default 1000, maximum 3000 ms. */ ms?: number; /** Default 20. */ maxConcurrent?: number };
+        rateLimit?: { enabled?: boolean; /** Default 10. */ capacity?: number; /** Default 1; 0 disables refill. */ refillPerSec?: number };
+        block?: { enabled?: boolean; /** Default 15 minutes, maximum 24 hours. */ ttlMs?: number; /** Default 8192, maximum 50000. */ maxKeys?: number };
+        /** Reserved for run 4; accepted but inert. */ maze?: { enabled?: boolean };
+        gate?: { /** Detection score only; default 200. Timing scores never qualify. */ minScore?: number };
+        circuit?: { /** Default 5 seconds in nanoseconds, including intentional delays. */ inspectP99Ns?: number; /** Default 1000 ms. */ eventLoopDelayMs?: number };
+    };
     /** Required seed for deterministic fake data; no default. */ projectSeed: string;
     incident?: {
         /** Fixed window from first_seen; default 900000 ms (15 minutes). 0 disables correlation. */ windowMs?: number;
@@ -206,5 +214,7 @@ export interface AgentGuard {
     metrics(): AgentGuardMetrics;
     /** Prometheus 0.0.4 text; the host must explicitly mount prometheusHandler. */
     prometheusText(): string;
+    /** Runtime kill switch. true also resets an open circuit; the environment switch still wins. */
+    setTrapEnabled(enabled: boolean): void;
     close(): Promise<void>;
 }

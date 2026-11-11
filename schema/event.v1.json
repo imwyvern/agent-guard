@@ -34,7 +34,9 @@
         "ai_discovery",
         "crawler_bypass",
         "alert_sent",
-        "alert_failed"
+        "alert_failed",
+        "trap_block",
+        "trap_circuit_open"
       ]
     },
     "severity": {
