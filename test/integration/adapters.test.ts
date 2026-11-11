@@ -4,7 +4,7 @@ import { startDemo } from '../../examples/shared/site.js';
 import { listenLocal } from '../../examples/shared/loopback.js';
 import { wrap } from '../../src/adapters/node.js';
 import { config } from '../helpers.js';
-for (const kind of ['express', 'node', 'hono'] as const)
+for (const kind of ['express', 'node', 'hono', 'fastify', 'koa'] as const)
     it(`${kind}: request matrix, dotenv aliases, 401/403/405 and inert fake OpenAPI`, async () => {
         const demo = await startDemo(kind, config());
         try {

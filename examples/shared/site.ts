@@ -95,9 +95,10 @@ export interface Demo {
     url: string;
     close(): Promise<void>;
 }
-export async function startDemo(kind: 'express' | 'node' | 'hono', config: AgentGuardConfig | false = demoConfig(), port = 0): Promise<Demo> {
+export async function startDemo(kind: 'express' | 'node' | 'hono' | 'fastify' | 'koa', config: AgentGuardConfig | false = demoConfig(), port = 0): Promise<Demo> {
     const guard = config ? createAgentGuard(config) : undefined;
     let server: Server;
+    let closeRuntime: (() => Promise<void>) | undefined;
     if (kind === 'express') {
         const { default: express } = await import('express');
         const { agentGuard } = await import('../../src/adapters/express.js');
@@ -109,6 +110,38 @@ export async function startDemo(kind: 'express' | 'node' | 'hono', config: Agent
             app.use(agentGuard(guard));
         app.use(site);
         server = createServer(app);
+    }
+    else if (kind === 'fastify') {
+        const { default: fastify } = await import('fastify');
+        const { agentGuard } = await import('../../src/adapters/fastify.js');
+        const app = fastify({ bodyLimit: 16384 });
+        app.addContentTypeParser('application/x-www-form-urlencoded', { parseAs: 'string' }, async (_req: import('fastify').FastifyRequest, body: string) => Object.fromEntries(new URLSearchParams(body)));
+        if (guard) await app.register(agentGuard(guard));
+        app.all('/*', async (req, reply) => {
+            const response = siteResponse(new URL(req.url, 'http://local.invalid').pathname, req.method, req.body);
+            return reply.headers(response.headers).code(response.status).send(req.method === 'HEAD' ? '' : response.body);
+        });
+        await app.ready();
+        server = app.server;
+        closeRuntime = () => app.close();
+    }
+    else if (kind === 'koa') {
+        const { default: Koa } = await import('koa');
+        const { agentGuard } = await import('../../src/adapters/koa.js');
+        const app = new Koa();
+        app.use(async (ctx, next) => {
+            try { (ctx.req as ParsedRequest).body = await parseBody(ctx.req); }
+            catch { ctx.status = 400; ctx.body = 'Bad Request\n'; return; }
+            await next();
+        });
+        if (guard) app.use(agentGuard(guard));
+        app.use(ctx => {
+            const response = siteResponse(ctx.path, ctx.method, (ctx.req as ParsedRequest).body);
+            ctx.body = response.body;
+            ctx.set(response.headers);
+            ctx.status = response.status;
+        });
+        server = createServer(app.callback());
     }
     else if (kind === 'hono') {
         const { Hono } = await import('hono');
@@ -143,5 +176,5 @@ export async function startDemo(kind: 'express' | 'node' | 'hono', config: Agent
         });
     }
     const local = await listenLocal(server, port);
-    return { server, guard, url: local.url, async close() { await guard?.close(); await local.close(); } };
+    return { server, guard, url: local.url, async close() { await guard?.close(); await local.close(); await closeRuntime?.(); } };
 }

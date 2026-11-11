@@ -12,11 +12,15 @@
     "@hono/node-server": "^2.1.6",
     "@lhci/cli": "^0.16.0",
     "@types/express": "^5.0.6",
+    "@types/koa": "^3.0.3",
     "@types/node": "^26.6.6",
     "@vitest/coverage-v8": "^5.1.0",
     "autocannon": "^9.0.0",
     "express": "^5.3.0",
+    "fastify": "^5.12.8",
+    "graphql": "^16.15.0",
     "hono": "^4.13.17",
+    "koa": "^3.3.0",
     "tsup": "^9.0.0",
     "tsx": "^4.23.15",
     "typescript": "^5.9.3",
@@ -79,17 +83,45 @@
         "types": "./dist/hono.d.cts",
         "default": "./dist/hono.cjs"
       }
+    },
+    "./fastify": {
+      "import": {
+        "types": "./dist/fastify.d.ts",
+        "default": "./dist/fastify.js"
+      },
+      "require": {
+        "types": "./dist/fastify.d.cts",
+        "default": "./dist/fastify.cjs"
+      }
+    },
+    "./koa": {
+      "import": {
+        "types": "./dist/koa.d.ts",
+        "default": "./dist/koa.js"
+      },
+      "require": {
+        "types": "./dist/koa.d.cts",
+        "default": "./dist/koa.cjs"
+      }
     }
   },
   "peerDependencies": {
     "express": ">=4",
-    "hono": ">=4"
+    "fastify": ">=4",
+    "hono": ">=4",
+    "koa": ">=2"
   },
   "peerDependenciesMeta": {
     "express": {
       "optional": true
     },
     "hono": {
+      "optional": true
+    },
+    "fastify": {
+      "optional": true
+    },
+    "koa": {
       "optional": true
     }
   },
@@ -109,6 +141,9 @@
     "demo:express": "node --import tsx examples/express-demo/server.ts",
     "demo:node": "node --import tsx examples/node-http-demo/server.ts",
     "demo:hono": "node --import tsx examples/hono-demo/server.ts",
-    "demo:mcp": "node --import tsx examples/mcp-decoy/server.ts"
+    "demo:fastify": "node --import tsx examples/fastify-demo/server.ts",
+    "demo:koa": "node --import tsx examples/koa-demo/server.ts",
+    "demo:mcp": "node --import tsx examples/mcp-decoy/server.ts",
+    "demo:graphql": "node --import tsx examples/graphql-demo/server.ts"
   }
 }
