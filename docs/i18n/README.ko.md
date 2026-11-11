@@ -190,6 +190,8 @@ npm run demo:express
 PORT=3001 npm run demo:node
 AGENT_GUARD=off npm run demo:express
 npm run bench:simulate
+npm run bench:exhaust-sim
+npm run bench:deception-lint
 npm run bench:latency
 npm run bench:latency:hr
 npm run lhci
@@ -215,8 +217,15 @@ v0.2부터 Express, Node, Hono의 기본 AC-10 측정은 `npm run bench:latency:
 
 측정 게이트 실패는 벤치마크를 0이 아닌 종료 코드로 끝냅니다. `bench:latency`는 각 데모 서버를 자체 자식 프로세스에서 실행하고 autocannon으로 구동합니다(100 connections, 30 s, 3회 실행의 중앙값). 게이트 대상이 아닌 고정 속도 실행과 처리량에서 유도한 요청당 오버헤드 추정치도 기록합니다. Lighthouse 전체 매트릭스에는 약 35분이 필요합니다. 샌드박스가 로컬 소켓을 금지하면, 연구용 하네스는 메모리 Duplex 스트림 위로 실제 HTTP 요청/응답 객체를 사용합니다. TCP 지연은 **검증되지 않음**으로 남습니다. Chrome 시작 실패는 통과가 아니라 **건너뜀**입니다. 정확한 환경 제한은 [벤치마크 보고서](../bench-v0.1.md)와 [구현 노트](../implementation-notes.md)를 참고하세요. 이 라이브러리는 해당 하네스를 포함하지 않습니다.
 
+v0.3b부터 `npm run bench:exhaust-sim`은 스크립트화된 탐욕 agent를 대상으로 유계 미로의 비용비 시뮬레이션을 메모리에서 실행하고, `npm run bench:deception-lint`는 현재 디코이 출력과 결정적 페르소나 프로토타입을 안전 검사합니다. 두 명령 모두 런타임 동작을 바꾸지 않으며, `mode`는 여전히 `detect`만 받습니다. [v0.3b 오프라인 평가](../bench-v0.3b.md)를 참고하세요.
+
 ## 이것이 아닌 것
 
 WAF, DDoS 방어, 인증 시스템, 봇 차단기, 프로덕션 배포, 검색 엔진 동작에 대한 보장이 아닙니다. 자동 차단, 트래픽 제한, trap 모드, 미로, 리버스 프롬프트 인젝션, 외부 프로빙, 실제 벤더 자격 증명, 제3자 콜백 honeytoken은 없습니다. Slack/Telegram/Feishu/email과 Edge/Fastify/Hono 어댑터는 이후 작업으로 남아 있습니다. 기계적 타이밍과 Prometheus 엔드포인트는 선택적 설계 아이디어이며 v0.1에서는 활성화되어 있지 않습니다.
 
-[설계](../design.md), [계약](../codex-contract.md), [KPI](../kpi.md), [위협 모델](../threat-model.md)을 참고하세요. 선행 사례는 개념만 참고했으며, 제3자 프로젝트 코드는 복사하지 않았습니다.
+## 로드맵 및 설계 문서
+
+- [로드맵](../roadmap.md) — 계획 중인 v0.3/v0.4 작업입니다. Exhaust와 Deception은 설계 초안이며 기본값은 꺼짐입니다.
+- [Exhaust](../exhaust.md) — 확인된 악성 세션에 대한 유계 비용 부과(지연, 미로, 컨텍스트 소모).
+- [Deception](../deception.md) — 디코이 데이터의 신뢰도를 높여 공격자의 agent가 이를 실제 데이터로 여길 수 있게 합니다.
+- [설계](../design.md), [계약](../codex-contract.md), [KPI](../kpi.md), [위협 모델](../threat-model.md). 선행 사례는 개념만 참고했으며, 제3자 프로젝트 코드는 복사하지 않았습니다.

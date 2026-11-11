@@ -190,6 +190,8 @@ npm run demo:express
 PORT=3001 npm run demo:node
 AGENT_GUARD=off npm run demo:express
 npm run bench:simulate
+npm run bench:exhaust-sim
+npm run bench:deception-lint
 npm run bench:latency
 npm run bench:latency:hr
 npm run lhci
@@ -215,8 +217,15 @@ From v0.2, `npm run bench:latency:hr` is the primary AC-10 measurement for Expre
 
 Measured gate failures produce a nonzero benchmark exit. `bench:latency` runs each demo server in its own child process and drives it with autocannon (100 connections, 30 s, median of 3 runs); it also records a non-gating fixed-rate run and a throughput-derived per-request overhead estimate. Lighthouse needs about 35 minutes for the full matrix. If a sandbox forbids local sockets, the research harness uses actual HTTP request/response objects over in-memory Duplex streams; TCP latency remains **unvalidated**. Chrome startup failures are **skipped**, not passed. See [benchmark report](docs/bench-v0.1.md) and [implementation notes](docs/implementation-notes.md) for the exact environment limitations. The library does not include this harness.
 
+From v0.3b, `npm run bench:exhaust-sim` runs an in-memory cost-ratio simulation of a bounded maze against scripted greedy agents, and `npm run bench:deception-lint` safety-scans current decoy output plus a deterministic persona prototype. Neither command changes runtime behavior; `mode` still accepts only `detect`. See [v0.3b offline evaluation](docs/bench-v0.3b.md).
+
 ## What it is NOT
 
 A WAF, DDoS defense, authentication system, bot blocker, production deployment, or guarantee of search-engine behavior. There is no auto-block, traffic throttling, trap mode, maze, reverse prompt injection, outbound probing, real vendor credential, or third-party callback honeytoken. Slack/Telegram/Feishu/email and Edge/Fastify/Hono adapters remain future work. Mechanical timing and a Prometheus endpoint are optional design ideas and are not enabled in v0.1.
 
-See [design](docs/design.md), [contract](docs/codex-contract.md), [KPI](docs/kpi.md), and [threat model](docs/threat-model.md). Prior art informed concepts only; no third-party project code was copied.
+## Roadmap & design docs
+
+- [Roadmap](docs/roadmap.md) — planned v0.3/v0.4 work. Exhaust and Deception are design drafts and stay off by default.
+- [Exhaust](docs/exhaust.md) — bounded cost imposition (delay, maze, context burn) for confirmed-malicious sessions.
+- [Deception](docs/deception.md) — making decoy data believable so an attacker’s agent may treat it as real.
+- [Design](docs/design.md), [contract](docs/codex-contract.md), [KPI](docs/kpi.md), and [threat model](docs/threat-model.md). Prior art informed concepts only; no third-party project code was copied.

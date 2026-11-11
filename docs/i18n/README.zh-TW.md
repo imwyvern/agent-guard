@@ -190,6 +190,8 @@ npm run demo:express
 PORT=3001 npm run demo:node
 AGENT_GUARD=off npm run demo:express
 npm run bench:simulate
+npm run bench:exhaust-sim
+npm run bench:deception-lint
 npm run bench:latency
 npm run bench:latency:hr
 npm run lhci
@@ -215,8 +217,15 @@ curl -s -H "Authorization: Bearer $TOKEN" http://127.0.0.1:3000/api/internal/adm
 
 量測門檻檢查失敗會使基準測試以非零結束代碼結束。`bench:latency` 在各自的子行程中執行每個示範伺服器，並用 autocannon 驅動（100 connections，30 s，3 次執行的中位數）；它還會記錄一次非門檻的固定速率執行，以及由吞吐量推導的每請求額外開銷估計。完整矩陣的 Lighthouse 大約需要 35 分鐘。若沙盒禁止本機 socket，研究工具會在記憶體中的 Duplex 資料流上使用實際的 HTTP 請求/回應物件；TCP 延遲仍為 **未驗證**。Chrome 啟動失敗會被 **略過**，而不是記為通過。確切的環境限制見 [基準測試報告](../bench-v0.1.md) 和 [實作說明](../implementation-notes.md)。本程式庫不包含此測試工具。
 
+自 v0.3b 起，`npm run bench:exhaust-sim` 在記憶體中以腳本化的貪婪 agent 對有界迷宮做成本比模擬，`npm run bench:deception-lint` 則對現有誘餌輸出與確定性人設原型做安全掃描。這兩條命令都不改變執行期行為；`mode` 仍只接受 `detect`。見 [v0.3b 離線評估](../bench-v0.3b.md)。
+
 ## 它不是什麼
 
 它不是 WAF、DDoS 防禦、驗證系統、機器人封鎖器、正式環境部署，也不保證搜尋引擎行為。沒有自動封鎖、流量節流、trap 模式、迷宮、反向提示注入、出站探測、真實廠商憑證，或第三方回呼 honeytoken。Slack/Telegram/Feishu/email 以及 Edge/Fastify/Hono 轉接器仍屬後續工作。機械計時和 Prometheus 端點是可選的設計構想，在 v0.1 中未啟用。
 
-請參閱[設計](../design.md)、[合約](../codex-contract.md)、[KPI](../kpi.md)和[威脅模型](../threat-model.md)。既有文獻僅用於啟發概念；並未複製任何第三方專案程式碼。
+## 路線圖與設計文件
+
+- [路線圖](../roadmap.md) — 規劃中的 v0.3/v0.4 工作。Exhaust 與 Deception 目前是設計草案，預設關閉。
+- [Exhaust](../exhaust.md) — 對已確認惡意工作階段的有界成本施加（延遲、迷宮、上下文消耗）。
+- [Deception](../deception.md) — 提高誘餌資料的可信度，讓攻擊者的 agent 可能把它當成真實資料。
+- [設計](../design.md)、[合約](../codex-contract.md)、[KPI](../kpi.md)和[威脅模型](../threat-model.md)。既有文獻僅用於啟發概念；並未複製任何第三方專案程式碼。

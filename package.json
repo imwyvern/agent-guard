@@ -100,6 +100,8 @@
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "bench": "node --import tsx bench/run.ts",
+    "bench:exhaust-sim": "node --import tsx bench/exhaust-sim.ts",
+    "bench:deception-lint": "node --import tsx bench/deception-lint.ts",
     "bench:simulate": "node --import tsx bench/simulate.ts",
     "bench:latency": "node --import tsx bench/latency.ts",
     "bench:latency:hr": "node --import tsx bench/latency-hr.ts",

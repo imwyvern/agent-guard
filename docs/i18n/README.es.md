@@ -190,6 +190,8 @@ npm run demo:express
 PORT=3001 npm run demo:node
 AGENT_GUARD=off npm run demo:express
 npm run bench:simulate
+npm run bench:exhaust-sim
+npm run bench:deception-lint
 npm run bench:latency
 npm run bench:latency:hr
 npm run lhci
@@ -215,8 +217,15 @@ Desde v0.2, `npm run bench:latency:hr` es la medición principal de AC-10 para E
 
 Los fallos medidos del umbral producen una salida distinta de cero de la prueba comparativa. `bench:latency` ejecuta cada servidor de demo en su propio proceso hijo y lo impulsa con autocannon (100 connections, 30 s, mediana de 3 ejecuciones); también registra una ejecución de tasa fija que no actúa como umbral y una estimación de sobrecarga por petición derivada del rendimiento. Lighthouse necesita unos 35 minutos para la matriz completa. Si un entorno aislado prohíbe los sockets locales, el arnés de investigación usa objetos reales de petición/respuesta HTTP sobre flujos Duplex en memoria; la latencia TCP permanece **sin validar**. Los fallos de arranque de Chrome se **omiten**, no se dan por superados. Véase el [informe de pruebas comparativas](../bench-v0.1.md) y las [notas de implementación](../implementation-notes.md) para las limitaciones exactas del entorno. La biblioteca no incluye este arnés.
 
+Desde v0.3b, `npm run bench:exhaust-sim` ejecuta en memoria una simulación de ratio de coste de un laberinto acotado frente a agentes codiciosos programados, y `npm run bench:deception-lint` examina por seguridad la salida actual de los señuelos y un prototipo de persona determinista. Ningún comando cambia el comportamiento en tiempo de ejecución; `mode` sigue aceptando solo `detect`. Véase la [evaluación fuera de línea de v0.3b](../bench-v0.3b.md).
+
 ## Lo que NO es
 
 Un WAF, una defensa DDoS, un sistema de autenticación, un bloqueador de bots, un despliegue en producción ni una garantía del comportamiento de los buscadores. No hay bloqueo automático, limitación de tráfico, modo trap, laberinto, inyección inversa de indicaciones, sondeo de salida, credencial real de un proveedor ni honeytoken de devolución de llamada de terceros. Slack/Telegram/Feishu/email y los adaptadores Edge/Fastify/Hono siguen siendo trabajo futuro. El temporizado mecánico y un endpoint de Prometheus son ideas de diseño opcionales y no están habilitados en v0.1.
 
-Véase el [diseño](../design.md), el [contrato](../codex-contract.md), los [KPI](../kpi.md) y el [modelo de amenazas](../threat-model.md). El trabajo previo solo informó los conceptos; no se copió código de ningún proyecto de terceros.
+## Hoja de ruta y documentos de diseño
+
+- [Hoja de ruta](../roadmap.md) — trabajo previsto para v0.3/v0.4. Exhaust y Deception son borradores de diseño y permanecen desactivados por defecto.
+- [Exhaust](../exhaust.md) — imposición de coste acotada (retraso, laberinto, consumo de contexto) sobre sesiones maliciosas confirmadas.
+- [Deception](../deception.md) — hacer que los datos señuelo resulten creíbles para que el agente del atacante pueda tratarlos como reales.
+- [Diseño](../design.md), [contrato](../codex-contract.md), [KPI](../kpi.md) y [modelo de amenazas](../threat-model.md). El trabajo previo solo informó los conceptos; no se copió código de ningún proyecto de terceros.

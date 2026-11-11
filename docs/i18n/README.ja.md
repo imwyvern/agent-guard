@@ -190,6 +190,8 @@ npm run demo:express
 PORT=3001 npm run demo:node
 AGENT_GUARD=off npm run demo:express
 npm run bench:simulate
+npm run bench:exhaust-sim
+npm run bench:deception-lint
 npm run bench:latency
 npm run bench:latency:hr
 npm run lhci
@@ -215,8 +217,15 @@ v0.2 以降、Express、Node、Hono の主要な AC-10 測定は `npm run bench:
 
 測定ゲートの失敗は、ベンチマークを非ゼロ終了にします。`bench:latency` は各デモサーバーを専用の子プロセスで起動し、autocannon で負荷をかけます（100 connections、30 s、3 回実行の中央値）。ゲート対象外の固定レート実行と、スループットから導出したリクエストあたりオーバーヘッドの見積もりも記録します。Lighthouse のフルマトリックスには約 35 分かかります。サンドボックスがローカルソケットを禁じている場合、研究用ハーネスはメモリ上の Duplex ストリーム越しに実際の HTTP リクエスト/レスポンスオブジェクトを使います。TCP レイテンシは **未検証** のままです。Chrome の起動失敗は合格ではなく **スキップ** です。正確な環境上の制約は [ベンチマークレポート](../bench-v0.1.md) と [実装ノート](../implementation-notes.md) を参照してください。このライブラリにこのハーネスは含まれません。
 
+v0.3b 以降、`npm run bench:exhaust-sim` はスクリプト化された貪欲 agent に対する有界迷路のコスト比シミュレーションをメモリ上で実行し、`npm run bench:deception-lint` は現行のデコイ出力と決定論的なペルソナ原型を安全スキャンします。いずれのコマンドもランタイムの動作は変えず、`mode` は引き続き `detect` のみを受け付けます。[v0.3b のオフライン評価](../bench-v0.3b.md) を参照してください。
+
 ## 対象外であること
 
 WAF、DDoS 防御、認証システム、ボットブロッカー、本番デプロイ、検索エンジン動作の保証ではありません。自動ブロック、トラフィック制限、trap モード、迷路、リバースプロンプトインジェクション、外向きプロービング、実在ベンダーの認証情報、第三者コールバックの honeytoken はありません。Slack/Telegram/Feishu/email および Edge/Fastify/Hono アダプターは今後の作業です。機械的タイミングと Prometheus エンドポイントは任意の設計アイデアであり、v0.1 では有効化されていません。
 
-[設計](../design.md)、[契約](../codex-contract.md)、[KPI](../kpi.md)、[脅威モデル](../threat-model.md) を参照してください。先行事例は概念の参考にすぎず、第三者プロジェクトのコードは複製していません。
+## ロードマップと設計ドキュメント
+
+- [ロードマップ](../roadmap.md) — 予定している v0.3/v0.4 の作業です。Exhaust と Deception は設計草案であり、デフォルトでは無効です。
+- [Exhaust](../exhaust.md) — 確認済みの悪意あるセッションに対する有界のコスト賦課（遅延、迷路、コンテキスト消費）。
+- [Deception](../deception.md) — デコイデータをより信じられるものにし、攻撃者の agent がそれを本物として扱う可能性を高める。
+- [設計](../design.md)、[契約](../codex-contract.md)、[KPI](../kpi.md)、[脅威モデル](../threat-model.md)。先行事例は概念の参考にすぎず、第三者プロジェクトのコードは複製していません。
