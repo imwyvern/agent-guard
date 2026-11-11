@@ -8,18 +8,36 @@ An AI-agent honeypot middleware for Node and the edge.
 
 ## 为什么需要它
 
-- AI agent 和扫描器会探测 API、读取 `.env`，并重放它们找到的凭证。
-- 隔离的诱饵路由和惰性金丝雀凭证用于检测这类探测与重放。
-- 默认仅检测并告警：中间件记录事件并发送异步告警，不会阻断、限流或反击。
-- 零运行时依赖；Express、Hono、Fastify 与 Koa 为可选 peer。当前面向 Node ≥20；边缘运行时已列入路线图。
+攻击者现在用 AI agent 探测服务器、读取配置，并重放它们找到的密钥。agent-guard 在应用的 HTTP/API 层埋入隔离的假配置、假密钥和假端点——无法解锁任何真实权限的惰性金丝雀。当攻击者的 AI 触碰到它们时，你会得到一条高置信度的早期告警，以及一段可以响应的时间窗口：轮换密钥、收紧访问，或将主机下线。
+
+这是服务器层面的最后一道行程绊线与早期预警 / 延迟层。它不能替代补丁、WAF 或最小权限。默认模式仅检测并告警。可选且默认关闭的 trap 模式可以拖慢或限流已确认的客户端；它并不声称能阻断攻击。
+
+**今天交付了什么，什么还没有。**
+
+- **今天**覆盖的是 HTTP/API 层：五条隔离的诱饵路由、MCP 与 GraphQL 诱饵，以及惰性金丝雀凭证（`AG-CANARY-…`）。零运行时依赖；在 Node ≥20 上提供 Express、Node `http`、Hono、Fastify 与 Koa 适配器。
+- **主机层 honeyfile**（磁盘上的假 `.env`、云凭证、SSH 密钥或 kubeconfig，并在被访问时告警）是**规划中**的能力，尚未交付。未来的 `agent-guard seed` 命令见[路线图](../roadmap.md)。
+- **「假成功」欺骗**——一套可能让攻击者的 AI 误以为已入侵成功的仿真环境——是**规划中**的能力（必须 opt-in，并先做安全评估），尚未交付。见 [deception.md](../deception.md)。
+- **消耗攻击者的 token** 目前**尚未得到验证**。实验性迷宫在模拟中的字节比为 1:1，低于 3:1 下限；时间比数字来自 25 ms/request 模型，不是对真实 LLM agent 的测量。在完成这项测量之前，不要指望启用迷宫就能消耗对方 token。见 [exhaust.md](../exhaust.md) 和 [trap-mode.md](../trap-mode.md)。
+- 金丝雀始终 inert。本项目从不使用真实凭证，从不做反向提示注入，也从不主动出站探测。它不会反击。
 
 **它是什么 / 不是什么。** agent-guard 用于检测、诱捕并观察针对你的 API 的敌对或探测性 AI agent 流量。它不会反击或攻击任何人。非目标、可选功能与实验性限制见[它不是什么](#它不是什么)。
 
-面向 Node ≥20 的 HTTP 中间件：五条隔离的诱饵路由和惰性金丝雀凭证，用于检测凭证重放与探测式扫描。它记录事件并发送异步告警。零运行时依赖；Express 为可选 peer。Apache-2.0，版权 2026 Wesley Wang。
+这是一个开源研究项目，尚未发布到 npm。请从源码安装，或使用 `npm pack` 生成本地 tarball。当前包名为 `@imwyvern/agent-guard`。Apache-2.0，版权 2026 Wesley Wang。
 
-这是一个开源研究项目，尚未发布到 npm。请从源码安装，或使用 `npm pack` 生成本地 tarball。当前包名为 `@imwyvern/agent-guard`。
+请参阅[安全策略](../../SECURITY.md)、[贡献指南](../../CONTRIBUTING.md)、[定位说明](../positioning.md)和[路线图](../roadmap.md)。
 
-请参阅[安全策略](../../SECURITY.md)、[贡献指南](../../CONTRIBUTING.md)和[路线图](../roadmap.md)。
+## 路线图：接下来往哪里走
+
+除另有说明外，下列事项均为规划中，尚未交付：
+
+- **主机层 honeyfile** — `agent-guard seed` 在磁盘上放置惰性的假 `.env`、云凭证、SSH 密钥和 kubeconfig，并在被访问时告警。
+- **假成功仿真环境** — 必须 opt-in，并先做安全评估：一套可能让攻击者的 AI 把假数据当成真数据的仿真服务面。见 [deception.md](../deception.md)。
+- **响应时间窗口** — 面向运营者的 incident 时间线、dwell-time 指标，以及挂钩到运营者自己的密钥轮换 / 阻断脚本。进程内 incident 关联和 `dwell_ms` 已经交付；面向运营者的时间线与挂钩尚未交付。
+- **隔离诱饵主机** — 与生产应用进程分离的独立诱饵环境。
+- **真实 agent 的 token 成本评估** — 在任何人启用实验性迷宫之前，先测量它是否真的消耗真实 AI agent 的 token。当前 1:1 的字节比只是假设。
+- **Edge 适配器（v0.4b）** — Web-standard core，以及 Cloudflare Workers、Next.js middleware、Deno 和 Bun。
+
+详细计划见 [docs/roadmap.md](../roadmap.md)。范围边界与诚实声明见 [docs/positioning.md](../positioning.md)。
 
 ## 本地安装与验证
 
@@ -261,7 +279,9 @@ curl -s -H "Authorization: Bearer $TOKEN" http://127.0.0.1:3000/api/internal/adm
 
 ## 它不是什么
 
-它不是 WAF、DDoS 防护、认证系统或通用机器人拦截器。本研究项目不提供生产部署，也不保证搜索引擎行为。
+它不是 WAF、DDoS 防护、认证系统或通用机器人拦截器。它不能替代补丁、最小权限或密钥卫生。本研究项目不提供生产部署，也不保证搜索引擎行为。
+
+主机层 honeyfile 与「假成功」欺骗是规划中的能力，尚未交付。消耗攻击者的 token 尚未得到验证。见[定位说明](../positioning.md)和上文的[路线图列表](#路线图接下来往哪里走)。
 
 反向提示注入 / counter-injection（E4）永不进入产品。不做出站探测，也不由 guard 主动向第三方回连；运营者配置的告警 adapters 是唯一的出站通知例外，既有爬虫身份 DNS 校验不变。金丝雀始终是 inert HMAC 令牌，不是真实厂商凭证。不使用第三方 honeytoken 服务（Canarytokens 等）；callback canary 仅由运营者自托管。
 
@@ -280,8 +300,9 @@ v0.4a 已实现以下**显式 opt-in、默认关闭**的集成与控制；默认
 
 ## 路线图与设计文档
 
+- [定位说明](../positioning.md) — 项目叙事、范围边界，以及诚实声明表（声明 / 状态 / 证据）。
 - [社区参与](../community.md) — 如何贡献适配器、检测特征、译本和 RFC。
-- [路线图](../roadmap.md) — v0.4a 完成项与 v0.4b Edge 计划；persona/deception 扩展仍属设计。
-- [Exhaust](../exhaust.md) — 已实现的 opt-in 延迟与实验性迷宫；上下文消耗（E3）尚未实现。
-- [Deception](../deception.md) — 提高诱饵数据的可信度，让攻击者的 agent 可能把它当成真实数据。
+- [路线图](../roadmap.md) — 前进方向、v0.4a 完成项与 v0.4b Edge 计划；persona/deception 扩展仍属设计。
+- [Exhaust](../exhaust.md) — 已实现的 opt-in 延迟与实验性迷宫；上下文消耗（E3）尚未实现；消耗 token 尚未得到验证。
+- [Deception](../deception.md) — 提高诱饵数据的可信度，让攻击者的 agent 可能把它当成真实数据；「假成功」是规划中的能力，尚未交付。
 - [设计](../design.md)、[合同](../codex-contract.md)、[KPI](../kpi.md)和[威胁模型](../threat-model.md)。先前工作仅用于启发概念；未复制任何第三方项目代码。

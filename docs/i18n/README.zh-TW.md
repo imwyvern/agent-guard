@@ -8,18 +8,36 @@ An AI-agent honeypot middleware for Node and the edge.
 
 ## 為什麼需要它
 
-- AI agent 和掃描器會探測 API、讀取 `.env`，並重放它們找到的憑證。
-- 隔離的誘餌路由和惰性金絲雀憑證用於偵測這類探測與重放。
-- 預設僅偵測並警示：中介軟體記錄事件並傳送非同步警示，不會阻擋、節流或反擊。
-- 零執行期相依；Express、Hono、Fastify 與 Koa 為可選 peer。目前面向 Node ≥20；邊緣執行環境已列入路線圖。
+攻擊者現在用 AI agent 探測伺服器、讀取設定，並重放它們找到的金鑰。agent-guard 在應用程式的 HTTP/API 層埋入隔離的假設定、假金鑰和假端點——無法解鎖任何真實權限的惰性金絲雀。當攻擊者的 AI 觸碰到它們時，你會得到一則高置信度的早期警示，以及一段可以回應的時間窗口：輪替金鑰、收緊存取，或將主機下線。
+
+這是伺服器層面的最後一道行程絆線與早期預警 / 延遲層。它不能取代修補程式、WAF 或最小權限。預設模式僅偵測並警示。可選且預設關閉的 trap 模式可以拖慢或限流已確認的用戶端；它並不聲稱能阻擋攻擊。
+
+**今天交付了什麼，什麼還沒有。**
+
+- **今天**涵蓋的是 HTTP/API 層：五條隔離的誘餌路由、MCP 與 GraphQL 誘餌，以及惰性金絲雀憑證（`AG-CANARY-…`）。執行期相依為零；在 Node ≥20 上提供 Express、Node `http`、Hono、Fastify 與 Koa 轉接器。
+- **主機層 honeyfile**（磁碟上的假 `.env`、雲端憑證、SSH 金鑰或 kubeconfig，並在被存取時警示）是**規劃中**的能力，尚未交付。未來的 `agent-guard seed` 命令見[路線圖](../roadmap.md)。
+- **「假成功」欺騙**——一套可能讓攻擊者的 AI 誤以為已入侵成功的模擬環境——是**規劃中**的能力（必須 opt-in，並先做安全評估），尚未交付。見 [deception.md](../deception.md)。
+- **消耗攻擊者的 token** 目前**尚未得到驗證**。實驗性迷宮在模擬中的位元組比為 1:1，低於 3:1 下限；時間比數字來自 25 ms/request 模型，不是對真實 LLM agent 的測量。在完成這項測量之前，不要指望啟用迷宮就能消耗對方 token。見 [exhaust.md](../exhaust.md) 和 [trap-mode.md](../trap-mode.md)。
+- 金絲雀始終 inert。本專案從不使用真實憑證，從不做反向提示注入，也從不去做出站探測。它不會反擊。
 
 **它是什麼 / 不是什麼。** agent-guard 用於偵測、誘捕並觀察針對你的 API 的敵對或探測性 AI agent 流量。它不會反擊或攻擊任何人。非目標、可選功能與實驗性限制見[它不是什麼](#它不是什麼)。
 
-面向 Node ≥20 的 HTTP 中介軟體：五條隔離的誘餌路由與惰性金絲雀憑證，用於偵測憑證重放與探索式掃描。它會記錄事件並發送非同步警示。執行期相依套件為零；Express 為可選 peer。Apache-2.0，著作權 2026 Wesley Wang。
+這是一個開源研究專案，尚未發佈到 npm。請從原始碼安裝，或使用 `npm pack` 建立本機 tarball。目前的套件名稱為 `@imwyvern/agent-guard`。Apache-2.0，著作權 2026 Wesley Wang。
 
-這是一個開源研究專案，尚未發佈到 npm。請從原始碼安裝，或使用 `npm pack` 建立本機 tarball。目前的套件名稱為 `@imwyvern/agent-guard`。
+請參閱[安全性政策](../../SECURITY.md)、[貢獻指南](../../CONTRIBUTING.md)、[定位說明](../positioning.md)和[路線圖](../roadmap.md)。
 
-請參閱[安全性政策](../../SECURITY.md)、[貢獻指南](../../CONTRIBUTING.md)和[路線圖](../roadmap.md)。
+## 路線圖：接下來往哪裡走
+
+除另有說明外，下列事項均為規劃中，尚未交付：
+
+- **主機層 honeyfile** — `agent-guard seed` 在磁碟上放置惰性的假 `.env`、雲端憑證、SSH 金鑰和 kubeconfig，並在被存取時警示。
+- **假成功模擬環境** — 必須 opt-in，並先做安全評估：一套可能讓攻擊者的 AI 把假資料當成真資料的模擬服務面。見 [deception.md](../deception.md)。
+- **回應時間窗口** — 面向營運者的 incident 時間線、dwell-time 指標，以及掛鉤到營運者自己的金鑰輪替 / 封鎖指令碼。行程內 incident 關聯和 `dwell_ms` 已經交付；面向營運者的時間線與掛鉤尚未交付。
+- **隔離誘餌主機** — 與正式環境應用程式行程分離的獨立誘餌環境。
+- **真實 agent 的 token 成本評估** — 在任何人啟用實驗性迷宮之前，先測量它是否真的消耗真實 AI agent 的 token。目前 1:1 的位元組比只是假設。
+- **Edge 轉接器（v0.4b）** — Web-standard core，以及 Cloudflare Workers、Next.js middleware、Deno 和 Bun。
+
+詳細計畫見 [docs/roadmap.md](../roadmap.md)。範圍界線與誠實聲明見 [docs/positioning.md](../positioning.md)。
 
 ## 本機安裝與驗證
 
@@ -261,7 +279,9 @@ curl -s -H "Authorization: Bearer $TOKEN" http://127.0.0.1:3000/api/internal/adm
 
 ## 它不是什麼
 
-它不是 WAF、DDoS 防護、身分驗證系統或通用機器人阻擋工具。本研究專案不提供正式環境部署，也不保證搜尋引擎行為。
+它不是 WAF、DDoS 防護、身分驗證系統或通用機器人阻擋工具。它不能取代修補程式、最小權限或金鑰衛生。本研究專案不提供正式環境部署，也不保證搜尋引擎行為。
+
+主機層 honeyfile 與「假成功」欺騙是規劃中的能力，尚未交付。消耗攻擊者的 token 尚未得到驗證。見[定位說明](../positioning.md)和上文的[路線圖列表](#路線圖接下來往哪裡走)。
 
 反向提示注入 / counter-injection（E4）永不進入產品。不做出站探測，也不由 guard 主動向第三方回連；營運者設定的警示 adapters 是唯一的出站通知例外，既有爬蟲身分 DNS 驗證不變。金絲雀始終是 inert HMAC 權杖，不是真實廠商憑證。不使用第三方 honeytoken 服務（Canarytokens 等）；callback canary 僅由營運者自行託管。
 
@@ -280,8 +300,9 @@ v0.4a 已實作以下**明確 opt-in、預設關閉**的整合與控制；預設
 
 ## 路線圖與設計文件
 
+- [定位說明](../positioning.md) — 專案敘事、範圍界線，以及誠實聲明表（聲明 / 狀態 / 證據）。
 - [社群參與](../community.md) — 如何貢獻轉接器、偵測特徵、譯本和 RFC。
-- [路線圖](../roadmap.md) — v0.4a 完成項與 v0.4b Edge 計畫；persona/deception 擴充仍屬設計。
-- [Exhaust](../exhaust.md) — 已實作的 opt-in 延遲與實驗性迷宮；上下文消耗（E3）尚未實作。
-- [Deception](../deception.md) — 提高誘餌資料的可信度，讓攻擊者的 agent 可能把它當成真實資料。
+- [路線圖](../roadmap.md) — 前進方向、v0.4a 完成項與 v0.4b Edge 計畫；persona/deception 擴充仍屬設計。
+- [Exhaust](../exhaust.md) — 已實作的 opt-in 延遲與實驗性迷宮；上下文消耗（E3）尚未實作；消耗 token 尚未得到驗證。
+- [Deception](../deception.md) — 提高誘餌資料的可信度，讓攻擊者的 agent 可能把它當成真實資料；「假成功」是規劃中的能力，尚未交付。
 - [設計](../design.md)、[合約](../codex-contract.md)、[KPI](../kpi.md)和[威脅模型](../threat-model.md)。既有文獻僅用於啟發概念；並未複製任何第三方專案程式碼。

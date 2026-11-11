@@ -8,18 +8,36 @@ An AI-agent honeypot middleware for Node and the edge.
 
 ## Por qué
 
-- Los agentes de IA y los escáneres exploran las API, leen archivos `.env` y reutilizan las credenciales que encuentran.
-- Las rutas señuelo aisladas y las credenciales canario inertes detectan esa exploración y reutilización.
-- Por defecto solo detecta y alerta: el middleware registra eventos y envía alertas de forma asíncrona; no bloquea, limita ni toma represalias.
-- Cero dependencias de tiempo de ejecución; Express, Hono, Fastify y Koa son peers opcionales. Hoy funciona en Node ≥20; los runtimes de edge están en la hoja de ruta.
+Los atacantes ahora usan agentes de IA para explorar servidores, leer la configuración y reutilizar las claves que encuentran. agent-guard planta, en la superficie HTTP/API de la aplicación, configuraciones, claves y endpoints falsos y aislados — canarios inertes que no desbloquean nada. Cuando la IA del atacante los toca, obtiene una alerta temprana de alta confianza y una ventana de tiempo para responder: rotar claves, restringir el acceso o poner el host fuera de servicio.
+
+Es una última línea de disparo (tripwire) y una capa de alerta temprana / retraso en el servidor. No sustituye al parcheo, a un WAF ni al principio de mínimo privilegio. El modo predeterminado solo detecta y alerta. Un modo trap opcional, desactivado por defecto, puede ralentizar o limitar a un cliente confirmado; no afirma bloquear ataques.
+
+**Lo que se entrega hoy y lo que no.**
+
+- **Hoy** la cobertura es la capa HTTP/API: cinco rutas señuelo aisladas, señuelos MCP y GraphQL, y credenciales canario inertes (`AG-CANARY-…`). Cero dependencias de runtime; adaptadores para Express, Node `http`, Hono, Fastify y Koa en Node ≥20.
+- Los **honeyfiles a nivel de host** (`.env` falso, credenciales de nube, claves SSH o kubeconfig en disco, con alertas de acceso) están **planificados**, no entregados. Un futuro comando `agent-guard seed` aparece en la [hoja de ruta](../roadmap.md).
+- La **decepción de «éxito falso»** — un entorno simulado que puede hacer creer a la IA del atacante que ha comprometido el servidor — está **planificada** (opt-in, con evaluación de seguridad previa), no entregada. Véase [deception.md](../deception.md).
+- **Consumir los tokens del atacante** **aún no está demostrado**. El laberinto experimental tuvo un ratio de bytes de 1:1 en simulación, por debajo del mínimo de 3:1; las cifras de ratio de tiempo corresponden a un modelo de 25 ms/petición, no a una medición con agentes LLM reales. No active el laberinto esperando un drenaje de tokens hasta que eso se mida. Véase [exhaust.md](../exhaust.md) y [trap-mode.md](../trap-mode.md).
+- Los canarios permanecen inertes. El proyecto nunca usa credenciales reales, nunca realiza inyección inversa de prompts y nunca sondea hacia fuera. No contraataca.
 
 **Qué es y qué no es.** agent-guard detecta, atrae y observa el tráfico de agentes de IA hostiles o exploratorios que llegan a tus API. No contraataca ni ataca a nadie. Los no objetivos, las funciones opt-in y sus límites experimentales se explican en [Lo que NO es](#lo-que-no-es).
 
-Middleware HTTP para Node ≥20: cinco rutas señuelo aisladas y credenciales canario inertes detectan la reutilización de credenciales y el escaneo exploratorio. Registra eventos y envía alertas asíncronas. Cero dependencias de runtime; Express es un peer opcional. Apache-2.0, copyright 2026 Wesley Wang.
+Este es un proyecto de investigación de código abierto, todavía no publicado en npm. Instálelo desde el código fuente o cree un tarball local con `npm pack`. El nombre de paquete de trabajo es `@imwyvern/agent-guard`. Apache-2.0, copyright 2026 Wesley Wang.
 
-Este es un proyecto de investigación de código abierto, todavía no publicado en npm. Instálelo desde el código fuente o cree un tarball local con `npm pack`. El nombre de paquete de trabajo es `@imwyvern/agent-guard`.
+Consulte la [política de seguridad](../../SECURITY.md), la [guía de contribución](../../CONTRIBUTING.md), el [posicionamiento](../positioning.md) y la [hoja de ruta](../roadmap.md).
 
-Consulte la [política de seguridad](../../SECURITY.md), la [guía de contribución](../../CONTRIBUTING.md) y la [hoja de ruta](../roadmap.md).
+## Hoja de ruta: hacia dónde vamos
+
+Salvo indicación en contrario, estos elementos están planificados, no entregados:
+
+- **Honeyfiles de host** — `agent-guard seed` planta en disco un `.env` falso inerte, credenciales de nube, claves SSH y kubeconfig, con alertas de acceso.
+- **Entorno de éxito falso** — opt-in, con evaluación de seguridad previa: una superficie de servicio simulada que puede llevar a la IA del atacante a tratar los datos falsos como reales. Véase [deception.md](../deception.md).
+- **Ventana de tiempo de respuesta** — una línea de tiempo de incidentes con una métrica de tiempo de permanencia (dwell-time), más ganchos para que el operador ejecute sus propios scripts de rotación de claves o bloqueo. La correlación de incidentes en proceso y `dwell_ms` ya se entregan; la línea de tiempo orientada al operador y los ganchos, no.
+- **Host señuelo aislado** — un entorno señuelo dedicado, separado del proceso de la aplicación de producción.
+- **Evaluación del coste en tokens con agentes reales** — medir si el laberinto experimental consume realmente tokens de un agente de IA real antes de que alguien lo active. El actual ratio de bytes 1:1 es solo una hipótesis.
+- **Adaptadores Edge (v0.4b)** — núcleo basado en estándares web, más Cloudflare Workers, Next.js middleware, Deno y Bun.
+
+El plan detallado está en [docs/roadmap.md](../roadmap.md). El alcance y las afirmaciones honestas están en [docs/positioning.md](../positioning.md).
 
 ## Instalación y validación en local
 
@@ -261,7 +279,9 @@ Desde v0.3b, `npm run bench:exhaust-sim` ejecuta en memoria una simulación de r
 
 ## Lo que NO es
 
-No es un WAF, una defensa DDoS, un sistema de autenticación ni un bloqueador general de bots. Este proyecto de investigación no proporciona un despliegue en producción ni garantiza el comportamiento de los buscadores.
+No es un WAF, una defensa DDoS, un sistema de autenticación ni un bloqueador general de bots. No sustituye al parcheo, al mínimo privilegio ni a la higiene de secretos. Este proyecto de investigación no proporciona un despliegue en producción ni garantiza el comportamiento de los buscadores.
+
+Los honeyfiles a nivel de host y la decepción de «éxito falso» están planificados, no entregados. El consumo de tokens del atacante no está demostrado. Véase el [posicionamiento](../positioning.md) y la [lista de la hoja de ruta](#hoja-de-ruta-hacia-dónde-vamos) más arriba.
 
 La inyección inversa de prompts / contrainyección (E4) nunca formará parte del producto. No realiza sondeos de salida ni inicia callbacks hacia terceros; los adaptadores de alertas configurados por el operador son la única excepción para notificaciones salientes. Se mantienen las verificaciones DNS de identidad de los rastreadores. Los canarios son tokens HMAC inertes, nunca credenciales reales de proveedores. No se usa ningún servicio de honeytokens de terceros (Canarytokens, etc.); el canario de callback solo se aloja en infraestructura del operador.
 
@@ -280,8 +300,9 @@ El **laberinto experimental** requiere mediciones del operador con agentes reale
 
 ## Hoja de ruta y documentos de diseño
 
+- [Posicionamiento](../positioning.md) — el propósito, los límites de alcance y una tabla de afirmaciones honestas (afirmación / estado / evidencia).
 - [Comunidad](../community.md) — cómo contribuir adaptadores, firmas de detección, traducciones y RFC.
-- [Hoja de ruta](../roadmap.md) — elementos completados en v0.4a y planes Edge para v0.4b; las extensiones persona/deception siguen en diseño.
-- [Exhaust](../exhaust.md) — retraso opt-in y laberinto experimental ya implementados; el consumo de contexto (E3) sigue sin implementarse.
-- [Deception](../deception.md) — hacer que los datos señuelo resulten creíbles para que el agente del atacante pueda tratarlos como reales.
+- [Hoja de ruta](../roadmap.md) — dirección de avance, elementos completados en v0.4a y planes Edge para v0.4b; las extensiones persona/deception siguen en diseño.
+- [Exhaust](../exhaust.md) — retraso opt-in y laberinto experimental ya implementados; el consumo de contexto (E3) sigue sin implementarse; el drenaje de tokens no está demostrado.
+- [Deception](../deception.md) — hacer que los datos señuelo resulten creíbles para que el agente del atacante pueda tratarlos como reales; el «éxito falso» está planificado, no entregado.
 - [Diseño](../design.md), [contrato](../codex-contract.md), [KPI](../kpi.md) y [modelo de amenazas](../threat-model.md). El trabajo previo solo informó los conceptos; no se copió código de ningún proyecto de terceros.

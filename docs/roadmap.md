@@ -1,7 +1,25 @@
 # agent-guard Roadmap（v0.2 → v0.4b）
 
-> 状态：v0.4a 已实现（unreleased），后续规划更新于 2026-11-11（HKT）。作者：agent-guard 维护者。
+> 状态：v0.4a 已实现（unreleased），叙事与后续方向更新于 2026-11-11（HKT）。作者：agent-guard 维护者。
 > 范围约束不变：**detect + alert only** 为默认；canary 永远 inert；decoy 永远 `noindex`；verified crawler 永远不进 decoy；任何 blocking / budget trap 只能 opt-in 且默认关闭；不做生产环境 reverse prompt injection、不做全站 tarpit、不攻击任何第三方系统；不 fork、不复制其他项目代码（尤其 GPL 的 Beelzebub，只借鉴思路）。
+> 定位与诚实声明见 [positioning.md](positioning.md)：这是服务器层面的**最后一道行程绊线与早期预警 / 延迟层**，不能替代补丁、WAF 或最小权限。
+
+## 0. 方向：接下来往哪里走
+
+叙事主轴（方向，不是已交付能力的清单）：攻击者现在用 AI agent 入侵；我们在服务端埋入假配置、假密钥和假端点（inert canaries）；对方 AI 一旦触碰，我们得到高置信度的早期告警和一段可操作的响应窗口；可选的 opt-in trap 可以拖慢或限流已确认的客户端。
+
+今日范围是 **HTTP/API 层**。下列方向是规划中的迭代，**尚未交付**（除已注明者外）：
+
+| # | 方向 | 状态 | 说明 |
+| --- | --- | --- | --- |
+| 0.1 | **主机层 honeyfile**（`agent-guard seed`） | 规划中，未交付 | 在磁盘上放置惰性的假 `.env`、云凭证、SSH 密钥、kubeconfig，并在被访问时告警。今天只在 HTTP 响应里放置 canary，不写主机文件。 |
+| 0.2 | **假成功仿真环境** | 规划中，未交付 | opt-in，先做安全评估。让攻击者的 AI 可能误以为已入侵成功，并继续在假数据上行动。见 [deception.md](deception.md)。现有 D2/D5 仍始终拒绝。 |
+| 0.3 | **响应时间窗口 / incident timeline** | 部分交付 | v0.3a 已有进程内 incident 关联和 canary 回放的 `dwell_ms`。面向运营者的时间线，以及挂钩到运营者自己的密钥轮换 / 阻断脚本，尚未交付。 |
+| 0.4 | **隔离诱饵主机** | 规划中，未交付 | 与生产应用进程分离的独立诱饵环境。相关讨论见 [distribution.md](distribution.md)。 |
+| 0.5 | **真实 agent 的 token 成本评估** | 规划中，未交付 | 用我们控制的真实 AI agent 测量实验性迷宫是否真的消耗对方 token。当前模拟字节比为 1:1，低于 3:1 下限，**不能声称已消耗攻击者 token**。见 [exhaust.md](exhaust.md)、[trap-mode.md](trap-mode.md)。 |
+| 0.6 | **Edge 适配器（v0.4b）** | 规划中，未交付 | Web-standard core，以及 Cloudflare Workers、Next.js middleware、Deno、Bun。Next.js 另见 issue #4。 |
+
+README 六个语言版本的顶部都有同一份短列表。贡献入口见 [community.md](community.md) 的 roadmap / good first issue 说明。
 
 ## 1. 现状扫描（Landscape，2026-11）
 
@@ -72,6 +90,8 @@
 | **Prompt-injection-safe canary placement**（✅ done，v0.3a / unreleased；HTML / JSON / OpenAPI） | canary 文本可能被 agent 读进上下文 → 文本必须是数据，不是指令 | 自己变成 injection 源 → placement linter：禁止 imperative、禁止隐藏字符、禁止 URL 外呼诱导；v0.4a 已提供可选精确 `allowedHosts` 以 lint 运营者的 callback 放置，默认仍严格 | `agent-guard lint <path>` + 单测/文档；所有内置 decoy/lure 与 deception bench 通过 lint |
 
 ## 5. v0.4a 已实现 / v0.4b 与后续规划
+
+> 第 0 节中的主机 honeyfile、假成功环境、响应时间窗口挂钩、隔离诱饵主机和真实 agent 评估，是 v0.4a 之后的产品方向，与本节的技术债（OTel、CEF/STIX、供应链、Web-standard core / Edge）并行。假成功必须 opt-in 且先做安全评估；迷宫在真实 agent 测量完成前不应作为默认建议启用。
 
 > **v0.4a / unreleased 已完成**：Slack / Telegram / 飞书 / SMTP 告警 adapters（opt-in、零运行时依赖）；Prometheus 文本导出（不默认挂载、无路径 label）；机械节奏观测（不升严重级别、不单独触发 block/maze）；独立 opt-in 的 delay / rateLimit / block；实验性有界 maze；自托管 callback canary（handler 显式挂载，guard 不 fetch baseUrl）；可选精确 lint 主机放行。默认 `mode: 'detect'`，trap 全部功能开关默认关闭。
 

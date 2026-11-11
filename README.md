@@ -6,18 +6,36 @@ An AI-agent honeypot middleware for Node and the edge.
 
 ## Why
 
-- AI agents and scanners probe APIs, read `.env` files, and replay credentials they find.
-- Isolated decoy routes and inert canary credentials detect that exploration and replay.
-- Detection is alert-only by default: the middleware records events and sends asynchronous alerts; it does not block, throttle, or retaliate.
-- Zero runtime dependencies, with optional Express, Hono, Fastify, and Koa peers. It ships for Node ≥20 today; edge runtimes are on the roadmap.
+Attackers now use AI agents to probe servers, read configuration, and replay whatever keys they find. agent-guard plants isolated fake configs, keys, and endpoints — inert canaries that unlock nothing — on the HTTP/API surface of your application. When an attacker's AI touches them, you get an early, high-confidence alert and a window of time to respond: rotate keys, tighten access, or take the host offline.
+
+This is a last-line tripwire and early-warning / delay layer at the server. It is not a replacement for patching, a WAF, or least privilege. Default mode is detect-and-alert only. An optional, default-off trap mode can slow or rate-limit a confirmed client; it does not claim to block attacks.
+
+**What ships today, and what does not.**
+
+- **Today** coverage is the HTTP/API layer: five isolated decoy routes, MCP and GraphQL decoys, and inert canary credentials (`AG-CANARY-…`). Zero runtime dependencies; adapters for Express, Node `http`, Hono, Fastify, and Koa on Node ≥20.
+- **Host-level honeyfiles** (fake `.env`, cloud creds, SSH keys, or kubeconfig on disk with access alerts) are **planned**, not shipped. A future `agent-guard seed` command is on the [roadmap](docs/roadmap.md).
+- **"Fake success" deception** — a simulated environment that makes the attacker's AI believe it has breached the server — is **planned** (opt-in, safety-assessed first), not shipped. See [deception.md](docs/deception.md).
+- **Burning the attacker's tokens** is **not yet demonstrated**. The experimental maze's byte ratio was 1:1 in simulation, below the 3:1 floor; the time-ratio numbers are a 25 ms/request model, not a measurement against real LLM agents. Do not enable the maze expecting token drain until that is measured. See [exhaust.md](docs/exhaust.md) and [trap-mode.md](docs/trap-mode.md).
+- Canaries stay inert. The project never uses real credentials, never performs reverse prompt injection, and never probes outbound. It does not hack back.
 
 **What it is / is not.** agent-guard detects, traps, and observes hostile or exploratory AI-agent traffic on your APIs. It does not hack back or attack anyone. See [What it is NOT](#what-it-is-not) for non-goals, opt-in features and experimental limits.
 
-HTTP middleware for Node ≥20: five isolated decoy routes and inert canary credentials detect credential replay and exploratory scanning. It records events and sends asynchronous alerts. Zero runtime dependencies; optional Express peer. Apache-2.0, copyright 2026 Wesley Wang.
+This is an open-source research project, not yet published to npm. Install from source or create a local tarball with `npm pack`. The working package name is `@imwyvern/agent-guard`. Apache-2.0, copyright 2026 Wesley Wang.
 
-This is an open-source research project, not yet published to npm. Install from source or create a local tarball with `npm pack`. The working package name is `@imwyvern/agent-guard`.
+See the [security policy](SECURITY.md), [contributing guide](CONTRIBUTING.md), [positioning](docs/positioning.md), and [roadmap](docs/roadmap.md).
 
-See the [security policy](SECURITY.md), [contributing guide](CONTRIBUTING.md), and [roadmap](docs/roadmap.md).
+## Roadmap: where this is heading
+
+These items are planned, not shipped, except where noted:
+
+- **Host honeyfiles** — `agent-guard seed` plants inert fake `.env`, cloud credentials, SSH keys, and kubeconfig on disk, with access alerts.
+- **Fake-success environment** — opt-in, safety-assessed first: a simulated service surface that may lead an attacker's AI to treat fake data as real. See [deception.md](docs/deception.md).
+- **Response time window** — an incident timeline with a dwell-time metric, plus hooks so operators can run their own key-rotation or block scripts. Process-local incident correlation and `dwell_ms` already ship; the operator-facing timeline and hooks do not.
+- **Isolated decoy host** — a dedicated decoy environment, separate from the production application process.
+- **Real-agent token-cost evaluation** — measure whether the experimental maze actually costs a real AI agent tokens before anyone should enable it. The current 1:1 byte ratio is only a hypothesis.
+- **Edge adapters (v0.4b)** — Web-standard core plus Cloudflare Workers, Next.js middleware, Deno, and Bun.
+
+The detailed plan is in [docs/roadmap.md](docs/roadmap.md). Scope and honest claims are in [docs/positioning.md](docs/positioning.md).
 
 ## Install and validate locally
 
@@ -259,7 +277,9 @@ From v0.3b, `npm run bench:exhaust-sim` runs an in-memory cost-ratio simulation 
 
 ## What it is NOT
 
-It is not a WAF, DDoS defense, authentication system or general bot blocker. This research project provides neither a production deployment nor a guarantee of search-engine behavior.
+It is not a WAF, DDoS defense, authentication system or general bot blocker. It is not a replacement for patching, least privilege, or secret hygiene. This research project provides neither a production deployment nor a guarantee of search-engine behavior.
+
+Host-level honeyfiles and "fake success" deception are planned, not shipped. Burning the attacker's tokens is not demonstrated. See [positioning](docs/positioning.md) and the short [roadmap list](#roadmap-where-this-is-heading) above.
 
 Reverse prompt injection / counter-injection (E4) is never in the product. There is no outbound probing or guard-initiated callback toward third parties; operator-configured alert adapters are the only outbound notification exception. Existing crawler-identity DNS checks remain unchanged. Canaries stay inert HMAC tokens, never real vendor credentials. No third-party honeytoken service (Canarytokens, etc.) is used; the callback canary is operator-hosted only.
 
@@ -278,8 +298,9 @@ The **experimental maze** needs the operator's own real-agent measurement before
 
 ## Roadmap & design docs
 
+- [Positioning](docs/positioning.md) — the pitch, scope boundaries, and an honest claims table (claim / status / evidence).
 - [Community](docs/community.md) — how to contribute adapters, signatures, translations, and RFCs.
-- [Roadmap](docs/roadmap.md) — v0.4a completion and v0.4b Edge plans; persona/deception extensions remain design work.
-- [Exhaust](docs/exhaust.md) — implemented opt-in delay and experimental maze; context burn (E3) remains unimplemented.
-- [Deception](docs/deception.md) — making decoy data believable so an attacker’s agent may treat it as real.
+- [Roadmap](docs/roadmap.md) — direction of travel, v0.4a completion, and v0.4b Edge plans; persona/deception extensions remain design work.
+- [Exhaust](docs/exhaust.md) — implemented opt-in delay and experimental maze; context burn (E3) remains unimplemented; token drain is not demonstrated.
+- [Deception](docs/deception.md) — making decoy data believable so an attacker’s agent may treat it as real; "fake success" is planned, not shipped.
 - [Design](docs/design.md), [contract](docs/codex-contract.md), [KPI](docs/kpi.md), and [threat model](docs/threat-model.md). Prior art informed concepts only; no third-party project code was copied.

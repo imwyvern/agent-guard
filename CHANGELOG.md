@@ -5,6 +5,7 @@
 ## [Unreleased]
 
 ### Changed
+- 2026-11-11 (HKT)：按「服务器层面最后一道行程绊线与早期预警 / 延迟层」重写 README 与五语译本的顶部叙事；补充诚实边界（今日仅为 HTTP/API 层；主机 honeyfile 与「假成功」均为规划中、尚未交付；消耗攻击者 token 尚未得到验证，迷宫模拟字节比 1:1）。新增 [docs/positioning.md](docs/positioning.md) 定位与声明表，同步 [docs/roadmap.md](docs/roadmap.md)、[docs/community.md](docs/community.md) 的后续方向与 good first issue 想法。未改运行时行为，未发 npm，未打 tag。
 - 2026-11-11 (HKT)，v0.4a（unreleased）：同步 README 与五语译本的「What it is NOT」、路线图、设计、威胁模型与社区说明；补全 trap 操作指南及 Exhaust 状态，区分已实现的 opt-in 能力、实验性迷宫和仍不做的功能。默认仍为 `mode: 'detect'`，trap 各项开关默认关闭；Edge / Web-standard core 留待 v0.4b。
 - 2026-11-10 17:10 (HKT)：范围调整为纯开源研究（不部署）。移除特定站点集成内容；验证改为本地 Express / 原生 http demo + 自动化测试 + 流量模拟 benchmark；MVP 告警仅 webhook(HMAC) + console，Slack/Telegram/飞书/email 当时改为 future（已由 v0.4a 的 opt-in adapters 取代）；Fastify/Hono adapter 当时推迟（Hono 已于 v0.2 完成；Fastify/Koa 已于 v0.3a / unreleased 完成）；仓库提案写入工作默认值（imwyvern/agent-guard、@imwyvern/agent-guard、Apache-2.0、个人账号，pending Dan confirmation）；Codex 合同同步修订。
 

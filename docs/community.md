@@ -1,6 +1,6 @@
 # Community guide
 
-agent-guard is an open-source research project: HTTP middleware that detects, deceives, and observes AI-agent and scanner traffic with isolated decoy routes and inert canary credentials. It is alert-only by default. It does not hack back, probe, or attack anyone.
+agent-guard is an open-source research project: HTTP middleware that detects, deceives, and observes AI-agent and scanner traffic with isolated decoy routes and inert canary credentials. It is a last-line tripwire and early-warning / delay layer at the server, alert-only by default. It does not hack back, probe, or attack anyone, and it does not replace patching, a WAF, or least privilege. See [positioning.md](positioning.md) for the pitch, scope boundaries, and honest claims.
 
 This page describes how to contribute. Also read [CONTRIBUTING.md](../CONTRIBUTING.md), the [roadmap](roadmap.md), its [charter and non-goals](roadmap.md#6-明确不做non-goals延续-charter), the [design](design.md), and the [security policy](../SECURITY.md). Follow the [Code of Conduct](../CODE_OF_CONDUCT.md) in all project interactions.
 
@@ -78,6 +78,18 @@ Improvements to `bench:exhaust-sim`, `bench:deception-lint`, latency runners, or
 
 README translations live in [`docs/i18n/`](i18n/). When `README.md` changes, update all five files (`zh-CN`, `zh-TW`, `ja`, `ko`, `es`). Translate prose; keep code blocks byte-identical to the English README; keep the English product tagline and add a short gloss in the target language; and re-check relative links from `docs/i18n/`.
 
+### Roadmap ideas and good first issues
+
+The direction of travel is listed in the README and in [roadmap.md §0](roadmap.md#0-方向接下来往哪里走). Useful starting points, consistent with [positioning.md](positioning.md):
+
+- **Host honeyfiles / `agent-guard seed`** — design the file formats, placement paths, and access-alert hook for inert fake `.env`, cloud credentials, SSH keys, and kubeconfig on disk. Do not invent real-looking vendor prefixes. Start with an RFC if the on-disk layout or privilege model is unclear.
+- **Fake-success environment** — design-only until a safety assessment lands. Open an RFC before any runtime change. The simulation must stay synthetic, inert, cookie-free, and opt-in. See [deception.md](deception.md).
+- **Incident timeline and dwell-time** — operator-facing timeline on top of the existing process-local incident fields and `dwell_ms`, plus documented hooks so operators can run their own key-rotation or block scripts. Do not add built-in blocking beyond opt-in trap mode.
+- **Real-agent token-cost eval harness** — a documented, local research harness that measures maze byte and token cost against agents we control. Record assumptions honestly; do not treat a 1:1 byte ratio as success.
+- **Edge adapters (v0.4b)** — Web-standard core, then Cloudflare Workers, Next.js middleware (see existing issue #4), Deno, and Bun. Follow the [runtime adapter](#runtime-adapter-50-lines) contract; document which signals degrade without Node or persistent memory.
+
+Label new work `enhancement` and, when it is a planned direction rather than a bug, `roadmap`. Use `good first issue` only when the acceptance criteria fit a first contribution. Fake-success and other safety-line changes also need the `design` label and an RFC.
+
 ## RFC process
 
 Open an issue with the [RFC template](../.github/ISSUE_TEMPLATE/rfc.md) (`design` label) **before** implementing a change to core behavior or to a safety line. Examples: altering `mode`, decoy isolation, canary inertness, crawler bypass, alert-only defaults, outbound network behavior, or adding blocking, delay, maze, or trap behavior.
@@ -91,6 +103,7 @@ Ordinary bug fixes, documentation, tests, and adapter work that preserve the exi
 - `good first issue` — self-contained, with acceptance criteria, suitable for a first contribution.
 - `help wanted` — the project would like help; the work may be larger than a first issue.
 - `design` — RFC or other design discussion; not an invitation to start coding yet.
+- `roadmap` — planned direction from [roadmap.md §0](roadmap.md#0-方向接下来往哪里走) or [positioning.md](positioning.md); not an invitation to skip the RFC process where safety lines apply.
 
 Use existing labels such as `bug`, `enhancement`, and `documentation` when they apply.
 
