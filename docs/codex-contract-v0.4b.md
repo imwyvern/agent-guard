@@ -96,4 +96,4 @@
 
 ## 9. 验收（我方独立复核）
 
-构建 / 类型 / lint / 测试全绿且总数不减；`check:neutral` 通过；差分与 golden 测试通过；Workers 冒烟通过；Node 适配器默认行为与 v0.4a 一致；两个基准如实记录；`npm audit --omit=dev` 0；`rg -i 'liandaai|练答'` 0；六份 README 代码块一致、相对链接无失效；`git status` 干净并正常推送 main。
+构建 / 类型 / lint / 测试全绿且总数不减；`check:neutral` 通过；差分与 golden 测试通过；Workers 冒烟通过；Node 适配器默认行为与 v0.4a 一致；两个基准如实记录；`npm audit --omit=dev` 0；对 liandaai 与其中文品牌名的全仓扫描结果为 0（扫描命令不要写进仓库文件，避免自匹配）；六份 README 代码块一致、相对链接无失效；`git status` 干净并正常推送 main。
