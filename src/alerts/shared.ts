@@ -1,4 +1,4 @@
-import { sanitizeEvent } from '../core/security.js';
+import { sanitizeEvent } from '../core/security-core.js';
 import type { AlertPayload } from '../types.js';
 
 export const asciiAlphanumeric = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';

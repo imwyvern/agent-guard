@@ -1,12 +1,13 @@
-import { createHmac } from 'node:crypto';
+import { nodeCrypto } from '../crypto/node.js';
+import type { CryptoProvider } from '../crypto/types.js';
+import { utf8ByteLength } from '../crypto/bytes.js';
 import type { AgentGuardConfig, AGResponse } from '../types.js';
 import { decoyHeaders } from '../decoys/headers.js';
-import { alphabet, base32 } from './ulid.js';
-import { secretEqual } from './security.js';
+import { mazeRoot, mazeMac, encodeMazeNode, verifyMazeNode } from './maze-nodes.js';
 
 type Options = NonNullable<NonNullable<AgentGuardConfig['trap']>['maze']>;
 interface Session { started: number; expires: number; pages: number; bytes: number; spent: boolean }
-const root = '0'.repeat(20), capacity = 8192;
+const capacity = 8192;
 
 export function archivePrefix(config: AgentGuardConfig): string {
     // A leading double slash must never become a URL authority in an href.
@@ -24,27 +25,18 @@ export class Maze {
     private readonly active = new Map<string, number>();
     private windowStart = Date.now();
     private windowBytes = 0;
-    constructor(config: AgentGuardConfig, private readonly secret = config.canary.secret) {
+    constructor(config: AgentGuardConfig, private readonly secret = config.canary.secret, private readonly crypto: CryptoProvider = nodeCrypto) {
         this.options = config.trap?.maze ?? {};
         this.prefix = archivePrefix(config);
-        this.entry = this.prefix + this.node(root, 0, 0);
+        this.entry = this.prefix + this.node(mazeRoot, 0, 0);
     }
     matches(path: string): boolean { return path.startsWith(this.prefix); }
     valid(path: string): boolean { return this.matches(path) && this.verify(path) !== undefined; }
-    private mac(parent: string, index: number, depth: number): string {
-        return base32(createHmac('sha256', this.secret).update(`maze:v1|${parent}|${index}|${depth}`).digest()).slice(0, 20);
-    }
     private node(parent: string, index: number, depth: number): string {
-        return alphabet[depth >> 5]! + alphabet[depth & 31]! + parent + alphabet[index]! + this.mac(parent, index, depth);
+        return encodeMazeNode(parent, index, depth, mazeMac(parent, index, depth, this.secret, this.crypto));
     }
     private verify(path: string): { depth: number; mac: string } | undefined {
-        const node = path.slice(this.prefix.length);
-        if (!/^[0-9A-HJKMNP-TV-Z]{43}$/.test(node)) return;
-        const depth = alphabet.indexOf(node[0]!) * 32 + alphabet.indexOf(node[1]!);
-        const parent = node.slice(2, 22), index = alphabet.indexOf(node[22]!), mac = node.slice(23);
-        if (depth > 65 || index >= 10 || (depth === 0 && (parent !== root || index !== 0))) return;
-        if (!secretEqual(mac, this.mac(parent, index, depth))) return;
-        return { depth, mac };
+        return verifyMazeNode(path.slice(this.prefix.length), this.secret, this.crypto);
     }
     private pruneActive(now: number): void {
         for (const [key, deadline] of this.active) if (deadline <= now) this.active.delete(key);
@@ -78,7 +70,7 @@ export class Maze {
         if (session.spent) return missing();
         const spend = () => { session.spent = true; this.active.delete(key); return missing(true); };
         if (node.depth > (this.options.maxDepth ?? 6) || session.pages >= (this.options.maxPages ?? 50) || now - session.started >= duration) return spend();
-        const body = this.render(node.depth, node.mac), bytes = head ? 0 : Buffer.byteLength(body);
+        const body = this.render(node.depth, node.mac), bytes = head ? 0 : utf8ByteLength(body);
         if (now - this.windowStart >= 60_000) { this.windowStart = now; this.windowBytes = 0; }
         if (session.bytes + bytes > (this.options.maxBytes ?? 512 * 1024) || this.windowBytes + bytes > (this.options.bytesPerMinute ?? 5 * 1024 * 1024)) return spend();
         session.pages++; session.bytes += bytes; this.windowBytes += bytes;

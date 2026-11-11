@@ -1,3 +1,4 @@
+import { utf8ByteLength } from '../crypto/bytes.js';
 import type { AGRequest, AgentGuardConfig, InspectionLimits } from '../types.js';
 
 export const DEFAULT_LIMITS: Readonly<Required<InspectionLimits>> = Object.freeze({
@@ -22,10 +23,10 @@ export function inspectionLimits(config: Pick<AgentGuardConfig, 'limits' | 'cana
 export function takeBytes(text: string, budget: number): string {
     if (budget <= 0) return '';
     const prefix = text.slice(0, budget);
-    if (Buffer.byteLength(prefix) <= budget) return prefix;
+    if (utf8ByteLength(prefix) <= budget) return prefix;
     let used = 0, end = 0;
     for (const char of prefix) {
-        const bytes = Buffer.byteLength(char);
+        const bytes = utf8ByteLength(char);
         if (used + bytes > budget) break;
         used += bytes;
         end += char.length;
@@ -41,7 +42,7 @@ export function boundedFields(input: Record<string, unknown>, count: number, byt
         if (visited++ >= count || bytes <= 0) break;
         if (!Object.hasOwn(input, key)) continue;
         const name = takeBytes(key, bytes);
-        bytes -= Buffer.byteLength(name);
+        bytes -= utf8ByteLength(name);
         if (name.length !== key.length) break;
         const raw = input[key], values: string[] = [];
         for (let i = 0; i < (Array.isArray(raw) ? raw.length : 1) && bytes > 0 && i < count; i++) {
@@ -50,7 +51,7 @@ export function boundedFields(input: Record<string, unknown>, count: number, byt
             const value: unknown = Array.isArray(raw) ? raw[i] : raw;
             if (typeof value !== 'string') continue;
             const text = takeBytes(value, Math.max(0, bytes - 1));
-            bytes -= Buffer.byteLength(text) + 1;
+            bytes -= utf8ByteLength(text) + 1;
             // Never authenticate a truncated allowlist/header credential.
             if (text.length === value.length) values.push(text);
         }

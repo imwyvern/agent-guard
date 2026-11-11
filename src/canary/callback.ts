@@ -1,34 +1,11 @@
-import { createHmac } from 'node:crypto';
 import type { RequestListener } from 'node:http';
-import type { AgentGuard, AgentGuardConfig, AGRequest, DecoyId } from '../types.js';
-import { base32 } from '../core/ulid.js';
-import { secretEqual } from '../core/security.js';
+import type { AgentGuard, AgentGuardConfig, AGRequest } from '../types.js';
+import type { CryptoProvider } from '../crypto/types.js';
+import { nodeCrypto } from '../crypto/node.js';
+import { CallbackCanaries as CoreCallbackCanaries } from './callback-core.js';
 
-/** Dedicated inert format with a 100-bit MAC and domain separation from replay
- * canaries and maze nodes. Stable IDs let separate guard instances share a handler. */
-export class CallbackCanaries {
-    private readonly placements = new Map<string, string>();
-    constructor(private readonly config: AgentGuardConfig) {
-        for (const id of ['D1', 'D2', 'D3', 'D4'] as const) this.placements.set(this.id(id), `${id}:callback`);
-    }
-    private digest(value: string): string { return base32(createHmac('sha256', this.config.canary.secret).update(value).digest()); }
-    private id(id: DecoyId): string { return this.digest(`callback:id|${this.config.env}|${id}`).slice(0, 12); }
-    private mac(id: string): string { return this.digest(`callback:v1|${this.config.env}|${id}`).slice(0, 20); }
-    url(placement: DecoyId): string | undefined {
-        const base = this.config.canary.callback?.baseUrl;
-        if (!base) return;
-        const id = this.id(placement);
-        let end = base.length;
-        while (end > 0 && base[end - 1] === '/') end--;
-        return base.slice(0, end) + `/ag/cb/AGCB-CANARY-${id}-${this.mac(id)}`;
-    }
-    verify(path: string): { id: string; placement: string } | undefined {
-        if (!this.config.canary.callback) return;
-        const match = /^\/ag\/cb\/AGCB-CANARY-([0-9A-HJKMNP-TV-Z]{12})-([0-9A-HJKMNP-TV-Z]{20})$/.exec(path);
-        if (!match || !secretEqual(match[2]!, this.mac(match[1]!))) return;
-        const id = match[1]!, placement = this.placements.get(id);
-        return placement ? { id, placement } : undefined;
-    }
+export class CallbackCanaries extends CoreCallbackCanaries {
+    constructor(config: AgentGuardConfig, crypto: CryptoProvider = nodeCrypto) { super(config, crypto); }
 }
 
 const callbackSymbol = Symbol.for('@imwyvern/agent-guard/callback');

@@ -1,44 +1,7 @@
-import { createHmac, randomBytes } from 'node:crypto';
-import { secretEqual } from '../core/security.js';
-import { base32 } from '../core/ulid.js';
-export const DEFAULT_PREFIX = 'AG-CANARY-';
-export function validatePrefix(prefix: string): void {
-    if (!/^[A-Z][A-Z0-9]{1,15}-CANARY-$/.test(prefix))
-        throw new Error('invalid canary prefix');
-}
-export function checksum(prefix: string, id: string, secret: string): string {
-    return base32(createHmac('sha256', secret).update(prefix + id).digest()).slice(0, 6);
-}
-export function generateCanary(o: {
-    prefix?: string;
-    secret: string;
-}): {
-    id: string;
-    token: string;
-} {
-    const prefix = o.prefix ?? DEFAULT_PREFIX;
-    validatePrefix(prefix);
-    if (!o.secret)
-        throw new Error('canary secret is required');
-    const id = base32(randomBytes(8)).slice(0, 12);
-    return { id, token: `${prefix}${id}-${checksum(prefix, id, o.secret)}` };
-}
-export function verifyCanary(token: string, o: {
-    prefix?: string;
-    secret: string;
-}): {
-    valid: boolean;
-    id?: string;
-} {
-    const prefix = o.prefix ?? DEFAULT_PREFIX;
-    if (typeof token !== 'string' || typeof prefix !== 'string' || typeof o.secret !== 'string') return { valid: false };
-    try { validatePrefix(prefix); } catch { return { valid: false }; }
-    if (token.length !== prefix.length + 19 || !token.startsWith(prefix))
-        return { valid: false };
-    const rest = token.slice(prefix.length);
-    if (!/^[0-9A-HJKMNP-TV-Z]{12}-[0-9A-HJKMNP-TV-Z]{6}$/.test(rest))
-        return { valid: false };
-    const id = rest.slice(0, 12);
-    const valid = secretEqual(rest.slice(13), checksum(prefix, id, o.secret));
-    return valid ? { valid, id } : { valid };
-}
+import { nodeCrypto } from '../crypto/node.js';
+import type { CryptoProvider } from '../crypto/types.js';
+import { checksum as coreChecksum, generateCanary as coreGenerate, verifyCanary as coreVerify } from './format-core.js';
+export { DEFAULT_PREFIX, validatePrefix } from './format-core.js';
+export function checksum(prefix: string, id: string, secret: string, crypto: CryptoProvider = nodeCrypto): string { return coreChecksum(prefix, id, secret, crypto); }
+export function generateCanary(o: { prefix?: string; secret: string }, crypto: CryptoProvider = nodeCrypto): { id: string; token: string } { return coreGenerate(o, crypto); }
+export function verifyCanary(token: string, o: { prefix?: string; secret: string }, crypto: CryptoProvider = nodeCrypto): { valid: boolean; id?: string } { return coreVerify(token, o, crypto); }

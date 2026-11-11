@@ -1,6 +1,6 @@
-import { sanitizeEvent } from '../core/security.js';
+import { sanitizeEvent } from '../core/security-core.js';
 import type { AgentGuardEvent, AlertPayload } from '../types.js';
-import { redactIp } from '../core/client-key.js';
+import { redactIp } from '../core/ip-parse.js';
 export function formatAlert(event: AgentGuardEvent, summary: AlertPayload['summary'], redact = true): AlertPayload {
     const copy = sanitizeEvent(event);
     if (redact && copy.req.ip)

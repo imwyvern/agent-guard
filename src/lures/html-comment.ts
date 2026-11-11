@@ -1,4 +1,5 @@
+import { utf8ByteLength } from '../crypto/bytes.js';
 export function htmlComment(path: string): string {
     const text = `<!-- TODO(ops): remove before launch, see ${path} -->`;
-    return Buffer.byteLength(text) <= 120 ? text : '<!-- TODO(ops): remove internal notes before launch -->';
+    return utf8ByteLength(text) <= 120 ? text : '<!-- TODO(ops): remove internal notes before launch -->';
 }

@@ -1,17 +1,17 @@
-import { createHmac } from 'node:crypto';
-import { secretEqual, sanitizeEvent } from '../core/security.js';
+import { nodeCrypto } from '../crypto/node.js';
+import type { CryptoProvider } from '../crypto/types.js';
+import { sanitizeEvent } from '../core/security-core.js';
+import { signWebhook as coreSign, verifyWebhookSignature as coreVerify } from './signing.js';
 import type { AlertAdapter } from '../types.js';
-export function signWebhook(body: string, timestamp: string, secret: string): string { return 'sha256=' + createHmac('sha256', secret).update(timestamp + '.' + body).digest('hex'); }
+export function signWebhook(body: string, timestamp: string, secret: string, crypto: CryptoProvider = nodeCrypto): string { return coreSign(body, timestamp, secret, crypto); }
 export function verifyWebhookSignature(o: {
     body: string;
     timestamp: string;
     signature: string;
     secret: string;
     toleranceSec?: number;
-}): boolean {
-    if (o.timestamp.length > 16 || o.signature.length !== 71 || !/^\d+$/.test(o.timestamp) || Math.abs(Date.now() / 1000 - Number(o.timestamp)) > (o.toleranceSec ?? 300) || !/^sha256=[a-f0-9]{64}$/.test(o.signature))
-        return false;
-    return secretEqual(o.signature, signWebhook(o.body, o.timestamp, o.secret));
+}, crypto: CryptoProvider = nodeCrypto): boolean {
+    return coreVerify(o, crypto);
 }
 export function webhookAdapter(o: {
     url: string;
