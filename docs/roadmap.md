@@ -80,7 +80,7 @@
 | **Opt-in 有限 maze / budget trap** | 对已确认的 decoy 命中者消耗其预算（借鉴 AI Labyrinth，但**有限深度、默认关、noindex、verified crawler 不进**） | 法律/道德与 SEO 风险 → 默认关、深度上限、只对已命中 canary 的 session | 默认配置下完全不生效；开启后 Googlebot 模拟零进入 |
 | **Community**：docs site（静态站，GitHub Pages）、贡献指南扩展、good-first-issue 标签、威胁模型公开讨论 | 长期维护 | 维护负担 | docs site 构建进 CI |
 
-> 反向消耗（迷宫 / 拖慢 / 上下文消耗）的分级设计见 [exhaust.md](exhaust.md)：先做 v0.3b 离线模拟，达标后再在 v0.4 实现 opt-in 的 E1/E2。
+> 反向消耗（迷宫 / 拖慢 / 上下文消耗）的分级设计见 [exhaust.md](exhaust.md)，提升诱饵可信度（persona、分层泄露）见 [deception.md](deception.md)；先做 v0.3b 离线模拟，达标后再在 v0.4 实现 opt-in 的 E1/E2。
 
 ## 6. 明确不做（Non-goals，延续 charter）
 
