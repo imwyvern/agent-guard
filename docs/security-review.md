@@ -135,3 +135,19 @@ Validated on Node v24.22.1, with build target Node 20 and no dependency changes 
 - Six README files each contain 10 byte-identical fenced blocks, with the same contents and order. Relative file links and Markdown heading anchors in the updated guides resolve. The repository scan for disallowed site references is clean; the contract's check is phrased without embedding those names.
 - `npm audit`: **9 high**, zero critical/moderate/low findings in the existing development-tool chain (`@lhci/cli`, `@lhci/utils`, `lighthouse`, `puppeteer-core`, `@puppeteer/browsers`, `proxy-agent`, `pac-proxy-agent`, `get-uri`, `basic-ftp`). `npm audit --omit=dev`: **0 vulnerabilities**. No dependency installation, audit fix, or lockfile edit was performed in this run.
 - `npm pack --dry-run --json`: 50 package files; no examples, tests, dependency trees, or lockfile included. No publish, commit, push, tag, workflow change, or GitHub issue action.
+
+## v0.4a maze and callback regex additions
+
+Callback and maze tokens have fixed-width base32 fields and length-bounded paths. Callback URL trailing slashes use a linear character loop, avoiding an unanchored repeated suffix scan. Existing regex regression assertions remain unchanged.
+
+| Regex | File | Review |
+| --- | --- | --- |
+| `/^\/ag\/cb\/AGCB-CANARY-([0-9A-HJKMNP-TV-Z]{12})-([0-9A-HJKMNP-TV-Z]{20})$/` | `src/canary/callback.ts` | Fixed-width validation or linear character scan; covered by the existing 100k input timing test. |
+| `/[\s<>"'\\]/` | `src/config.ts` | Fixed-width validation or linear character scan; covered by the existing 100k input timing test. |
+| `/^https?:\/\//i` | `src/config.ts` | Fixed-width validation or linear character scan; covered by the existing 100k input timing test. |
+| `/\/+/g` | `src/core/maze.ts` | Fixed-width validation or linear character scan; covered by the existing 100k input timing test. |
+| `/\/$/` | `src/core/maze.ts` | Fixed-width validation or linear character scan; covered by the existing 100k input timing test. |
+| `/^[0-9A-HJKMNP-TV-Z]{43}$/` | `src/core/maze.ts` | Fixed-width validation or linear character scan; covered by the existing 100k input timing test. |
+| `/&/g` | `src/decoys/index.ts` | Fixed-width validation or linear character scan; covered by the existing 100k input timing test. |
+| `/</g` | `src/decoys/index.ts` | Fixed-width validation or linear character scan; covered by the existing 100k input timing test. |
+| `/"/g` | `src/decoys/index.ts` | Fixed-width validation or linear character scan; covered by the existing 100k input timing test. |

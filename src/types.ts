@@ -38,7 +38,7 @@ export interface AgentGuardEvent {
     v: 1;
     ts: string;
     event_id: string;
-    event: 'decoy_hit' | 'canary_replay' | 'probe' | 'ai_discovery' | 'crawler_bypass' | 'alert_sent' | 'alert_failed' | 'trap_block' | 'trap_circuit_open';
+    event: 'decoy_hit' | 'canary_replay' | 'probe' | 'ai_discovery' | 'crawler_bypass' | 'alert_sent' | 'alert_failed' | 'trap_block' | 'trap_circuit_open' | 'exhaust_budget_spent' | 'canary_callback';
     severity: Severity;
     project: string;
     env: string;
@@ -131,7 +131,15 @@ export interface AgentGuardConfig {
         delay?: { enabled?: boolean; /** Default 1000, maximum 3000 ms. */ ms?: number; /** Default 20. */ maxConcurrent?: number };
         rateLimit?: { enabled?: boolean; /** Default 10. */ capacity?: number; /** Default 1; 0 disables refill. */ refillPerSec?: number };
         block?: { enabled?: boolean; /** Default 15 minutes, maximum 24 hours. */ ttlMs?: number; /** Default 8192, maximum 50000. */ maxKeys?: number };
-        /** Reserved for run 4; accepted but inert. */ maze?: { enabled?: boolean };
+        maze?: {
+            enabled?: boolean;
+            /** Default 6; entry depth is 0, maximum 64. */ maxDepth?: number;
+            /** Default 50. */ maxPages?: number;
+            /** Default 512 KiB, UTF-8 response bodies. */ maxBytes?: number;
+            /** Default 10 minutes, fixed from first maze page. */ maxDurationMs?: number;
+            /** Default 20, maximum 8192. */ maxConcurrent?: number;
+            /** Default 5 MiB per fixed one-minute window. */ bytesPerMinute?: number;
+        };
         gate?: { /** Detection score only; default 200. Timing scores never qualify. */ minScore?: number };
         circuit?: { /** Default 5 seconds in nanoseconds, including intentional delays. */ inspectP99Ns?: number; /** Default 1000 ms. */ eventLoopDelayMs?: number };
     };
@@ -143,6 +151,7 @@ export interface AgentGuardConfig {
         /** Default AG-CANARY-. */ prefix?: string;
         /** Required HMAC secret from the operator; no default. */ secret: string;
         /** Required registry object or JSON filename. Empty registries receive decoy placements in memory. */ registry: CanaryRegistry | string;
+        /** Opt-in, operator-hosted endpoint; HTTPS except explicit loopback hosts. */ callback?: { baseUrl: string };
     };
     decoys?: {
         /** Default D1–D5. */ enabled?: DecoyId[];

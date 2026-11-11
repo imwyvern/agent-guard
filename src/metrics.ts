@@ -5,7 +5,7 @@ export class Metrics {
     private data: AgentGuardMetrics = { requests_inspected: 0, decoy_hits: { D1: 0, D2: 0, D3: 0, D4: 0, D5: 0, MCP: 0, GQL: 0 }, canary_replays: 0, crawler_bypass: 0, alerts_sent: 0, alerts_failed: 0, inspect_ns_p50: 0, inspect_ns_p99: 0 };
     private samples: number[] = [];
     private cursor = 0;
-    private events: Record<AgentGuardEvent['event'], number> = { decoy_hit: 0, canary_replay: 0, probe: 0, ai_discovery: 0, crawler_bypass: 0, alert_sent: 0, alert_failed: 0, trap_block: 0, trap_circuit_open: 0 };
+    private events: Record<AgentGuardEvent['event'], number> = { decoy_hit: 0, canary_replay: 0, probe: 0, ai_discovery: 0, crawler_bypass: 0, alert_sent: 0, alert_failed: 0, trap_block: 0, trap_circuit_open: 0, exhaust_budget_spent: 0, canary_callback: 0 };
     request(ns: number): void { this.data.requests_inspected++; this.samples[this.cursor++ % 2048] = ns; }
     event(e: AgentGuardEvent): void {
         this.events[e.event]++;

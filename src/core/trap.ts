@@ -3,7 +3,7 @@ import { decoyHeaders } from '../decoys/headers.js';
 import { LRU } from './lru.js';
 
 const stateTtlMs = 30 * 60_000;
-export interface TrapMetrics { enabled: boolean; blocked: number; delayed: number }
+export interface TrapMetrics { enabled: boolean; blocked: number; delayed: number; mazeActive?: number }
 
 /** Per-guard global budgets; keys are exactly the existing detection client keys.
  * No per-client timers, no network activity, and no automation timing input. */
@@ -23,7 +23,7 @@ export class Trap {
     constructor(private readonly mode: AgentGuardConfig['mode'], options?: AgentGuardConfig['trap']) {
         this.options = options ?? {};
         this.blocks = new LRU(this.options.block?.maxKeys ?? 8192);
-        if (mode === 'trap' && (options?.delay?.enabled || options?.rateLimit?.enabled || options?.block?.enabled)) {
+        if (mode === 'trap' && (options?.delay?.enabled || options?.rateLimit?.enabled || options?.block?.enabled || options?.maze?.enabled)) {
             let previous = process.hrtime.bigint();
             this.probe = setInterval(() => {
                 const now = process.hrtime.bigint();

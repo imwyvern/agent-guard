@@ -7,12 +7,15 @@ import { adminResponse } from './d2-admin.js';
 import { opsBody } from './d3-ops-notes.js';
 import { openapiBody } from './d4-openapi.js';
 import { loginResponse } from './d5-login.js';
+import { CallbackCanaries } from '../canary/callback.js';
 export class Decoys {
     readonly paths: Record<DecoyId, string[]>;
     private enabled: Set<DecoyId>;
     private bodies: Partial<Record<DecoyId, string>> = {};
     private delay: number;
+    private readonly callbacks?: CallbackCanaries;
     constructor(config: AgentGuardConfig, registry: Registry) {
+        if (config.canary.callback) this.callbacks = new CallbackCanaries(config);
         const base = (config.decoys?.basePath ?? '/api/internal').replace(/\/$/, '');
         this.paths = { D1: ['/.env', '/.env.local', '/.env.production', '/.env.bak'], D2: [base + '/admin'], D3: ['/internal/ops-notes'], D4: [base + '/openapi.json'], D5: [base + '/auth/login'] };
         for (const id of Object.keys(this.paths) as DecoyId[]) {
@@ -45,13 +48,21 @@ export class Decoys {
             }
         return;
     }
-    async respond(id: DecoyId, req: AGRequest): Promise<AGResponse> {
-        if (id === 'D2')
-            return adminResponse(String(req.headers.authorization ?? ''), this.paths.D4[0]!);
+    async respond(id: DecoyId, req: AGRequest, mazeEntry?: string): Promise<AGResponse> {
         if (id === 'D5')
             return loginResponse(req.method, this.delay);
-        const body = this.bodies[id]!;
-        return { status: 200, headers: decoyHeaders(id === 'D1' ? 'text/plain' : id === 'D3' ? 'text/html' : 'application/json'), body };
+        const response = id === 'D2' ? adminResponse(String(req.headers.authorization ?? ''), this.paths.D4[0]!) :
+            { status: 200, headers: decoyHeaders(id === 'D1' ? 'text/plain' : id === 'D3' ? 'text/html' : 'application/json'), body: this.bodies[id]! };
+        const callback = this.callbacks?.url(id);
+        if (mazeEntry || callback) {
+            if (id === 'D1') response.body += (mazeEntry ? `ARCHIVE_INDEX=${mazeEntry}\n` : '') + (callback ? `CALLBACK_URL=${callback}\n` : '');
+            else if (id === 'D3') {
+                const escape = (value: string) => value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+                response.body = response.body.replace('</body>', (mazeEntry ? `<p><a rel="nofollow" href="${escape(mazeEntry)}">Archive index</a></p>` : '') + (callback ? `<p>Callback reference: ${escape(callback)}</p>` : '') + '</body>');
+            } else response.body = JSON.stringify({ ...JSON.parse(response.body) as object, ...(mazeEntry ? { 'x-archive-index': mazeEntry } : {}), ...(callback ? { 'x-callback-url': callback } : {}) });
+            if (Buffer.byteLength(response.body) > 8192) throw new Error('decoy body exceeds 8 KB');
+        }
+        return response;
     }
     disallowed(): string[] {
         const paths = [...this.enabled].flatMap(id => this.paths[id]);

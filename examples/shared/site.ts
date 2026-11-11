@@ -1,6 +1,6 @@
 import { createServer, type Server, type IncomingMessage, type ServerResponse } from 'node:http';
 import { listenLocal } from './loopback.js';
-import { createAgentGuard, consoleAdapter, webhookAdapter, type AgentGuard, type AgentGuardConfig, type AGResponse } from '../../src/index.js';
+import { createAgentGuard, callbackHandler, consoleAdapter, webhookAdapter, type AgentGuard, type AgentGuardConfig, type AGResponse } from '../../src/index.js';
 import { agentGuardNode, type ParsedRequest } from '../../src/adapters/node.js';
 export const realPaths = ['/', '/list', '/item/1', '/login', '/pricing'];
 export const browserUA = 'Mozilla/5.0 Chrome/130.0.0.0 Safari/537.36';
@@ -165,7 +165,10 @@ export async function startDemo(kind: 'express' | 'node' | 'hono' | 'fastify' | 
     }
     else {
         const middleware = guard ? agentGuardNode(guard) : undefined;
+        // This demo explicitly mounts the self-hosted endpoint only when opted in.
+        const callback = guard && config && config.canary.callback ? callbackHandler(guard) : undefined;
         server = createServer((req: ParsedRequest, res) => {
+            if (callback && req.url?.startsWith('/ag/cb/')) { callback(req, res); return; }
             void (async () => {
                 req.body = await parseBody(req);
                 if (middleware)

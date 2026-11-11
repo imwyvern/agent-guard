@@ -9,7 +9,7 @@ const schema = JSON.parse(readFileSync(new URL('../../schema/event.v1.json', imp
 it('keeps v1 required fields and event types unchanged and declares the optional metadata', () => {
     expect(schema.required).toEqual(['v', 'ts', 'event_id', 'event', 'severity', 'project', 'env', 'req']);
     expect(schema.additionalProperties).toBe(false);
-    expect(schema.properties.event.enum).toEqual(['decoy_hit', 'canary_replay', 'probe', 'ai_discovery', 'crawler_bypass', 'alert_sent', 'alert_failed', 'trap_block', 'trap_circuit_open']);
+    expect(schema.properties.event.enum).toEqual(['decoy_hit', 'canary_replay', 'probe', 'ai_discovery', 'crawler_bypass', 'alert_sent', 'alert_failed', 'trap_block', 'trap_circuit_open', 'exhaust_budget_spent', 'canary_callback']);
     expect(schema.properties.canary.properties).toMatchObject({ leaked_at: { type: 'string' }, replayed_at: { type: 'string' }, dwell_ms: { type: 'integer', minimum: 0 }, client_keys_seen: { type: 'integer', minimum: 1, maximum: 8 } });
 });
 

@@ -36,7 +36,9 @@
         "alert_sent",
         "alert_failed",
         "trap_block",
-        "trap_circuit_open"
+        "trap_circuit_open",
+        "exhaust_budget_spent",
+        "canary_callback"
       ]
     },
     "severity": {

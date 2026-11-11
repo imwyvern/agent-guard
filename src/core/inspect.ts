@@ -1,13 +1,15 @@
-import type { AGDecision, AgentGuard, AgentGuardConfig, AgentGuardEvent, Severity, UAClass } from '../types.js';
+import type { AGDecision, AGRequest, AgentGuard, AgentGuardConfig, AgentGuardEvent, Severity, UAClass } from '../types.js';
 import { validateConfig, guardConfigs } from '../config.js';
 import { mcpDecoyTools } from '../scenarios/mcp.js';
 import { graphqlDecoys, graphqlForbiddenResponse } from '../scenarios/graphql.js';
 import { decoyHeaders } from '../decoys/headers.js';
 import { Registry } from '../canary/registry.js';
 import { CanaryTracing } from '../canary/tracing.js';
+import { CallbackCanaries, installCallback } from '../canary/callback.js';
 import { Incidents } from './incidents.js';
 import { Timing } from './timing.js';
 import { Trap, trapResponse } from './trap.js';
+import { Maze, mazeNotFound } from './maze.js';
 import { matchesPath, scanRequest } from '../canary/scan.js';
 import { Decoys } from '../decoys/index.js';
 import { CrawlerVerifier } from '../crawler/verify.js';
@@ -61,8 +63,14 @@ export function createAgentGuard(config: AgentGuardConfig): AgentGuard {
     const decoys = new Decoys(config, registry), crawler = new CrawlerVerifier(config.crawler), clients = new Clients(), metrics = new Metrics();
     const incidents = new Incidents(config.incident?.windowMs), tracing = new CanaryTracing(), timing = new Timing();
     const trap = new Trap(config.mode, config.trap);
+    const maze = config.mode === 'trap' && config.trap?.maze?.enabled ? new Maze(config) : undefined;
+    const callbacks = config.canary.callback ? new CallbackCanaries(config) : undefined;
     const emit = (e: AgentGuardEvent): void => { metrics.event(e); logEvent(e, config); };
     const alerts = new Dispatcher(config.alerts, emit);
+    const allowed = (req: AGRequest): boolean => {
+        const ua = String(req.headers['user-agent'] ?? '').slice(0, 512), allow = config.allowlist, token = allow?.headerToken;
+        return !!(allow?.ips?.includes(req.ip) || allow?.cidrs?.some(c => inCidr(req.ip, c)) || uaPatterns.some(p => { p.lastIndex = 0; return p.test(ua); }) || (token && typeof req.headers[token.name.toLowerCase()] === 'string' && secretEqual(req.headers[token.name.toLowerCase()] as string, token.value)));
+    };
     // A single-entry memo avoids repeated IP parsing/hash/UA classification on keep-alive
     // traffic, without retaining another per-client cache alongside Clients.
     let lastIp: string | undefined, lastUa: string | undefined, lastKey = '', lastClass: UAClass = 'unknown';
@@ -79,9 +87,8 @@ export function createAgentGuard(config: AgentGuardConfig): AgentGuard {
                 if (queryAt >= 0) req.path = req.path.slice(0, queryAt);
                 req.ip = (config.clientIp?.(input) ?? req.ip).slice(0, 128);
                 let headers = req.headers;
-                const ua = String(headers['user-agent'] ?? '').slice(0, 512), allow = config.allowlist;
-                const token = allow?.headerToken;
-                if (allow?.ips?.includes(req.ip) || allow?.cidrs?.some(c => inCidr(req.ip, c)) || uaPatterns.some(p => { p.lastIndex = 0; return p.test(ua); }) || (token && typeof headers[token.name.toLowerCase()] === 'string' && secretEqual(headers[token.name.toLowerCase()] as string, token.value)))
+                const ua = String(headers['user-agent'] ?? '').slice(0, 512);
+                if (allowed(req))
                     return { action: 'pass', events: [] };
                 if (req.ip !== lastIp || ua !== lastUa) {
                     lastKey = clientKey(req.ip, ua);
@@ -95,13 +102,14 @@ export function createAgentGuard(config: AgentGuardConfig): AgentGuard {
                 if (uaClass === 'automation')
                     signals.push('ua_automation');
                 const id = context?.mcp ? 'MCP' : context?.graphql ? 'GQL' : pathTruncated ? undefined : decoys.match(req.path, req.method), probe = pathSignal(req.path);
+                const mazePath = !context?.mcp && !context?.graphql && !pathTruncated && !!maze?.matches(req.path);
                 const decoyHit = id && (id === 'MCP' ? mcpDecoyTools.some(tool => tool.name === context?.mcp?.toolName) : id === 'GQL' ? graphqlDecoys().some(decoy => decoy.field.name === context?.graphql?.fieldName) : true);
                 const scanBody = id === 'MCP' || id === 'GQL' || id === 'D5' || (config.canaryScan?.bodyPaths ?? ['/login', '/api/auth/*']).some(p => matchesPath(req.path, p));
                 const hits = scanRequest(req, registry, config, scanBody);
                 if (hits.length)
                     signals.push('canary_replay');
                 let verified: Awaited<ReturnType<CrawlerVerifier['verify']>> | undefined;
-                if (id || (trap.enabled && (hits.length > 0 || trap.blocked(key)))) {
+                if (id || mazePath || (trap.enabled && (hits.length > 0 || trap.blocked(key)))) {
                     const claimed = claimedCrawler(ua);
                     if (claimed) {
                         // Preserve the header snapshot across the only inspection await
@@ -127,7 +135,7 @@ export function createAgentGuard(config: AgentGuardConfig): AgentGuard {
                 clients.set(key, state.score, req.path === '/robots.txt', state.robots);
                 // Internal observation only: robots requests keep their existing event behavior.
                 if (req.path === '/robots.txt') incidents.observe(key, 'robots');
-                if (!id && signals.length === 0 && !trap.enabled)
+                if (!id && !mazePath && signals.length === 0 && !trap.enabled)
                     return { action: 'pass', events };
                 const make = (event: AgentGuardEvent['event'], severity: Severity): AgentGuardEvent => ({ v: 1, ts: new Date().toISOString(), event_id: ulid(), event, severity, project: config.project, env: config.env, req: { method: req.method, path: req.path, query_keys: Object.keys(req.query), ip: req.ip, client_key: key, ua, ua_class: uaClass, has_session: headers.cookie !== undefined }, score: state.score, signals: [...signals] });
                 const push = (event: AgentGuardEvent): void => {
@@ -141,9 +149,23 @@ export function createAgentGuard(config: AgentGuardConfig): AgentGuard {
                     push(make('trap_circuit_open', 'high'));
                 for (const hit of hits)
                     push({ ...make('canary_replay', 'critical'), canary: { id: hit.entry.id, placement: hit.entry.placement, env: hit.entry.env, found_in: hit.found_in, field: hit.field, ...tracing.replay(hit.entry, req.path, key) } });
-                if (id && verified?.verified) {
+                if ((id || mazePath) && verified?.verified) {
                     push({ ...make('crawler_bypass', 'debug'), crawler: verified });
                     return { action: 'respond', response: { status: 404, headers: { 'Content-Type': 'text/plain; charset=utf-8' }, body: 'Not Found\n' }, events };
+                }
+                if (mazePath) {
+                    const gated = trap.enabled && trap.gated(key, state.score, previousScore);
+                    // Preserve native routing for unconfirmed malformed archive paths.
+                    if (!gated && !maze!.valid(req.path)) return { action: 'pass', events };
+                    if (!gated || (req.method !== 'GET' && req.method !== 'HEAD'))
+                        return { action: 'respond', response: mazeNotFound(req.method === 'HEAD'), events };
+                    if (trap.blocked(key) && maze!.valid(req.path)) {
+                        push(make('trap_block', 'high'));
+                        return { action: 'respond', response: trapResponse(403, req.method === 'HEAD'), events };
+                    }
+                    const result = maze!.respond(req.path, key, req.method === 'HEAD');
+                    if (result.spent) push(make('exhaust_budget_spent', 'high'));
+                    return { action: 'respond', response: result.response, events };
                 }
                 if (trap.blocked(key) && !verified?.verified) {
                     push(make('trap_block', 'high'));
@@ -161,7 +183,7 @@ export function createAgentGuard(config: AgentGuardConfig): AgentGuard {
                     const gated = id !== 'MCP' && id !== 'GQL' && trap.enabled && trap.gated(key, state.score, previousScore);
                     if (gated && trap.limited(key))
                         return { action: 'respond', response: trapResponse(429, req.method === 'HEAD'), events };
-                    const response = id === 'MCP' ? { status: 200, headers: decoyHeaders('application/json'), body: JSON.stringify({ error: 'permission denied' }) } : id === 'GQL' ? graphqlForbiddenResponse() : await decoys.respond(id, req);
+                    const response = id === 'MCP' ? { status: 200, headers: decoyHeaders('application/json'), body: JSON.stringify({ error: 'permission denied' }) } : id === 'GQL' ? graphqlForbiddenResponse() : await decoys.respond(id, req, gated ? maze?.entry : undefined);
                     if (gated) await trap.delay();
                     if (req.method === 'HEAD')
                         response.body = '';
@@ -180,13 +202,30 @@ export function createAgentGuard(config: AgentGuardConfig): AgentGuard {
                 metrics.request(Number(process.hrtime.bigint() - start));
             }
         },
-        robotsLines: () => robotsLines(decoys.disallowed()),
+        robotsLines: () => robotsLines([...decoys.disallowed(), ...(trap.enabled && maze ? [maze.prefix] : [])]),
         htmlCommentFor: path => config.lures?.htmlComment && config.lures.htmlComment.paths.includes(path) ? htmlComment(decoys.paths.D3[0]!) : null,
         metrics: () => metrics.snapshot(),
-        prometheusText: () => metrics.prometheusText(clients.size, timing.size, trap.snapshot()),
+        prometheusText: () => metrics.prometheusText(clients.size, timing.size, { ...trap.snapshot(), mazeActive: trap.enabled ? maze?.size ?? 0 : 0 }),
         setTrapEnabled: enabled => trap.setEnabled(enabled),
         async close() { closed = true; trap.close(); await alerts.close(); },
     };
+    if (callbacks) installCallback(guard, async input => {
+        if (closed) return false;
+        const hit = callbacks.verify(input.path);
+        if (!hit) return false;
+        const req = boundRequest(input, limits);
+        req.ip = (config.clientIp?.(input) ?? req.ip).slice(0, 128);
+        if (allowed(req)) return true;
+        const ua = String(req.headers['user-agent'] ?? '').slice(0, 512), claimed = claimedCrawler(ua);
+        if (claimed && (await crawler.verify(req.ip, claimed)).verified) return true;
+        if (closed) return false;
+        // Never log the callback token, URL/query, or arbitrary incoming headers.
+        const event = sanitizeEvent({ v: 1, ts: new Date().toISOString(), event_id: ulid(), event: 'canary_callback', severity: 'high', project: config.project, env: config.env,
+            req: { method: req.method, path: '/ag/cb/' + hit.id, ip: req.ip, client_key: clientKey(req.ip, ua) },
+            canary: { ...hit, env: config.env, found_in: 'path', field: 'callback' } });
+        emit(event); alerts.enqueue(event);
+        return true;
+    });
     guardConfigs.set(guard, config);
     return guard;
 }

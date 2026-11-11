@@ -46,7 +46,7 @@ export function lintBuiltins(): LintViolation[] { return builtinPlacementSamples
 /** Lint a placement file or directory without following symlinks. Dependency,
  * build, VCS and coverage directories are skipped, like canary scan. File sizes
  * are not decoy response sizes, so the response cap applies only to built-ins. */
-export function lintFiles(root: string): LintViolation[] {
+export function lintFiles(root: string, allowedHosts?: string[]): LintViolation[] {
     const findings: LintViolation[] = [];
     const walk = (file: string): void => {
         const stat = lstatSync(file);
@@ -55,11 +55,11 @@ export function lintFiles(root: string): LintViolation[] {
             for (const name of readdirSync(file).sort()) {
                 if (!['node_modules', '.git', 'dist', 'coverage'].includes(name)) walk(resolve(file, name));
             }
-        } else if (stat.isFile()) findings.push(...lintSample({ name: file, body: readFileSync(file, 'utf8'), capBytes: Infinity }));
+        } else if (stat.isFile()) findings.push(...lintSample({ name: file, body: readFileSync(file, 'utf8'), capBytes: Infinity, allowedHosts }));
     };
     walk(resolve(root));
     return findings;
 }
 
 /** Both built-ins and operator placements must pass the same unchanged rules. */
-export function lintPlacement(root: string): LintViolation[] { return [...lintBuiltins(), ...lintFiles(root)]; }
+export function lintPlacement(root: string, allowedHosts?: string[]): LintViolation[] { return [...lintBuiltins(), ...lintFiles(root, allowedHosts)]; }

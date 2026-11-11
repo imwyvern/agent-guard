@@ -23,7 +23,7 @@ export class Dispatcher {
     enqueue(event: AgentGuardEvent): void {
         if (this.closed || severityRank[event.severity] < severityRank[this.config?.minSeverity ?? 'info'])
             return;
-        if (!['decoy_hit', 'canary_replay', 'trap_block', 'trap_circuit_open'].includes(event.event) && this.config?.minSeverity === undefined)
+        if (!['decoy_hit', 'canary_replay', 'trap_block', 'trap_circuit_open', 'exhaust_budget_spent', 'canary_callback'].includes(event.event) && this.config?.minSeverity === undefined)
             return;
         const key = [event.event, event.decoy?.id ?? event.canary?.id, event.req.client_key].join('|');
         if (this.seen.get(key)) {

@@ -11,6 +11,17 @@ export function validateConfig(c: AgentGuardConfig): void {
             throw new AgentGuardConfigError(`${key} is required`);
     if (!c.canary?.secret)
         throw new AgentGuardConfigError('canary.secret is required');
+    if (c.canary.callback !== undefined) {
+        try {
+            const value = c.canary.callback?.baseUrl;
+            if (typeof value !== 'string' || value.length > 2048 || /[\s<>"'\\]/.test(value)) throw new Error();
+            const url = new URL(value);
+            const loopback = ['127.0.0.1', 'localhost', '[::1]'].includes(url.hostname);
+            const authority = value.slice(value.indexOf('://') + 3).split('/')[0]!;
+            if (!/^https?:\/\//i.test(value) || authority.includes('@') || url.username || url.password || value.includes('?') || value.includes('#') ||
+                (url.protocol !== 'https:' && !(url.protocol === 'http:' && loopback))) throw new Error();
+        } catch { throw new AgentGuardConfigError('canary.callback.baseUrl must be an HTTPS URL without credentials, query or fragment (HTTP loopback allowed)'); }
+    }
     if (!/^[A-Z][A-Z0-9]{1,15}-CANARY-$/.test(c.canary.prefix ?? 'AG-CANARY-'))
         throw new AgentGuardConfigError('invalid canary prefix');
     if (c.decoys?.siteName && !/^[a-z0-9.-]+\.invalid$/i.test(c.decoys.siteName))
@@ -49,6 +60,12 @@ function validateTrap(trap: AgentGuardConfig['trap']): void {
     integer('rateLimit.refillPerSec', trap.rateLimit?.refillPerSec, 0);
     integer('block.ttlMs', trap.block?.ttlMs, 1, 86400000);
     integer('block.maxKeys', trap.block?.maxKeys, 1, 50000);
+    integer('maze.maxDepth', trap.maze?.maxDepth, 0, 64);
+    integer('maze.maxPages', trap.maze?.maxPages, 1);
+    integer('maze.maxBytes', trap.maze?.maxBytes, 1);
+    integer('maze.maxDurationMs', trap.maze?.maxDurationMs, 1, 86400000);
+    integer('maze.maxConcurrent', trap.maze?.maxConcurrent, 1, 8192);
+    integer('maze.bytesPerMinute', trap.maze?.bytesPerMinute, 1);
     integer('gate.minScore', trap.gate?.minScore, 0);
     integer('circuit.inspectP99Ns', trap.circuit?.inspectP99Ns, 0);
     integer('circuit.eventLoopDelayMs', trap.circuit?.eventLoopDelayMs, 0);

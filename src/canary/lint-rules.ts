@@ -1,6 +1,6 @@
 import { isIP } from 'node:net';
 
-export interface LintSample { name: string; body: string; capBytes: number }
+export interface LintSample { name: string; body: string; capBytes: number; /** Exact operator-configured callback hostnames only. */ allowedHosts?: string[] }
 export interface LintViolation { sample: string; rule: string; detail: string }
 export const DECOY_CAP_BYTES = 8 * 1024;
 
@@ -68,6 +68,8 @@ export function lintSample(sample: LintSample): LintViolation[] {
     }
     for (const match of body.matchAll(/\b(?:\d{1,3}\.){3}\d{1,3}\b/g)) hosts.add(match[0]);
     for (const match of body.matchAll(/\[[0-9a-f:]+\]|\b(?:[0-9a-f]{0,4}:){2,}[0-9a-f:]+/gi)) hosts.add(match[0]);
-    for (const host of hosts) if (!reservedHost(host)) add('host', `non-reserved hostname: ${host}`);
+    const normalize = (host: string) => host.toLowerCase().replace(/^\[|\]$/g, '');
+    const allowed = new Set((sample.allowedHosts ?? []).map(normalize));
+    for (const host of hosts) if (!reservedHost(host) && !allowed.has(normalize(host))) add('host', `non-reserved hostname: ${host}`);
     return errors;
 }
