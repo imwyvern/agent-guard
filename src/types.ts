@@ -34,11 +34,20 @@ export interface CanaryRegistry {
     prefix: string;
     canaries: CanaryEntry[];
 }
+export type HookTrigger = 'incident_high' | 'canary_replay' | 'honeyfile_read';
+export interface ResponseHook {
+    on: HookTrigger;
+    /** Fixed literal argv; executable must be an absolute slash-separated path. No shell or inherited environment. */
+    run: [string, ...string[]];
+    /** Default 5000; safe integer 1–60000 ms. SIGTERM, then SIGKILL after 1000 ms. */ timeoutMs?: number;
+    /** Default 10; safe integer 1–100. Fixed one-hour window per entry, from its first admitted attempt. */ maxPerHour?: number;
+    /** Default 2; safe integer 1–8. Pending starts count toward concurrency. */ maxConcurrent?: number;
+}
 export interface AgentGuardEvent {
     v: 1;
     ts: string;
     event_id: string;
-    event: 'decoy_hit' | 'canary_replay' | 'probe' | 'ai_discovery' | 'crawler_bypass' | 'alert_sent' | 'alert_failed' | 'trap_block' | 'trap_circuit_open' | 'exhaust_budget_spent' | 'canary_callback' | 'honeyfile_read' | 'incident_ack' | 'incident_escalated' | 'incident_reminder';
+    event: 'decoy_hit' | 'canary_replay' | 'probe' | 'ai_discovery' | 'crawler_bypass' | 'alert_sent' | 'alert_failed' | 'trap_block' | 'trap_circuit_open' | 'exhaust_budget_spent' | 'canary_callback' | 'honeyfile_read' | 'incident_ack' | 'incident_escalated' | 'incident_reminder' | 'hook_result';
     severity: Severity;
     project: string;
     env: string;
@@ -64,6 +73,11 @@ export interface AgentGuardEvent {
         source: 'auditd' | 'inotify';
         uid?: string;
         comm?: string;
+    };
+    hook?: {
+        on: HookTrigger;
+        status: 'success' | 'failure' | 'timeout' | 'refused' | 'cancelled';
+        reason?: 'spawn_error' | 'exit_nonzero' | 'signal' | 'rate_limit' | 'concurrency_limit' | 'global_concurrency_limit' | 'closed';
     };
     canary?: {
         id: string;
@@ -163,6 +177,10 @@ export interface AgentGuardConfig {
         /** Default 300000 ms; measured from first successful alert, then each reminder. */ remindAfterMs?: number;
         /** Default 2; maximum 100. */ maxReminders?: number;
     };
+    /** Node only; unset/empty disables hooks. Maximum 32 entries and 16 pending/running children
+     * across all runners in this module. Environment contains only AG_* metadata; client keys
+     * use lowercase hex SHA-256. incident_high deduplication uses a 50000-entry LRU, matching correlation. */
+    hooks?: ResponseHook[];
     canary: {
         /** Default AG-CANARY-. */ prefix?: string;
         /** Required HMAC secret from the operator; no default. */ secret: string;

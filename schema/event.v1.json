@@ -42,7 +42,8 @@
         "honeyfile_read",
         "incident_ack",
         "incident_escalated",
-        "incident_reminder"
+        "incident_reminder",
+        "hook_result"
       ]
     },
     "severity": {
@@ -187,6 +188,16 @@
         "source": { "enum": ["auditd", "inotify"] },
         "uid": { "type": "string" },
         "comm": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "hook": {
+      "type": "object",
+      "required": ["on", "status"],
+      "properties": {
+        "on": { "enum": ["incident_high", "canary_replay", "honeyfile_read"] },
+        "status": { "enum": ["success", "failure", "timeout", "refused", "cancelled"] },
+        "reason": { "enum": ["spawn_error", "exit_nonzero", "signal", "rate_limit", "concurrency_limit", "global_concurrency_limit", "closed"] }
       },
       "additionalProperties": false
     },

@@ -1,5 +1,6 @@
 import { webhookAdapter } from '../alerts/webhook.js';
-import type { AlertAdapter } from '../types.js';
+import type { AgentGuardConfig, AlertAdapter } from '../types.js';
+import type { HookDependencies } from '../hooks/runner.js';
 import { loadHoneyfiles } from '../watch/files.js';
 import { createWatcher, type WatchSession } from '../watch/monitor.js';
 import { boundedInteger } from '../watch/parser.js';
@@ -9,6 +10,8 @@ export const WATCH_USAGE = 'agent-guard watch (--auditd <logfile> | --inotify-lo
 
 export interface WatchDependencies {
     adapters?: AlertAdapter[];
+    hooks?: AgentGuardConfig['hooks'];
+    hookDependencies?: HookDependencies;
     start?: (session: WatchSession) => void;
 }
 
@@ -42,6 +45,7 @@ export function createWatchFromArgs(args: string[], out: (line: string) => void,
         logPath: options.get(source === 'auditd' ? 'auditd' : 'inotify-log')!, fromStart: options.has('from-start'),
         intervalMs: numeric('interval-ms', 60000), maxLineBytes: numeric('max-line-bytes', 1024 * 1024),
         maxEventsPerMinute: numeric('max-events-per-minute', 100000),
+        hooks: dependencies.hooks, hookDependencies: dependencies.hookDependencies,
         alerts: { adapters, minSeverity: 'medium' }, sink: event => out(JSON.stringify(event)),
     });
 }

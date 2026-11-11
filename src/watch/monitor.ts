@@ -1,6 +1,7 @@
 import { Dispatcher } from '../alerts/dispatcher.js';
 import { sanitizeEvent } from '../core/security-core.js';
 import type { AgentGuardConfig, AgentGuardEvent } from '../types.js';
+import { HookRunner, type HookDependencies } from '../hooks/runner.js';
 import { createLogFollower } from './follower.js';
 import { boundedInteger, createLogParser, type ParserOptions } from './parser.js';
 
@@ -9,6 +10,8 @@ export interface WatchOptions extends ParserOptions {
     fromStart?: boolean;
     intervalMs?: number;
     alerts?: AgentGuardConfig['alerts'];
+    hooks?: AgentGuardConfig['hooks'];
+    hookDependencies?: HookDependencies;
     sink: (event: AgentGuardEvent) => void;
 }
 export interface WatchSession {
@@ -25,6 +28,7 @@ export function createWatcher(options: WatchOptions): WatchSession {
     // Delivery status is kept out of the hit JSONL stream. All notification
     // delivery, redaction, retries and deduplication belong to the dispatcher.
     const dispatcher = new Dispatcher({ ...options.alerts, adapters: options.alerts?.adapters ?? [], minSeverity: options.alerts?.minSeverity ?? 'medium' }, () => {});
+    const hooks = options.hooks === undefined ? undefined : new HookRunner(options.hooks, event => options.sink(sanitizeEvent(event)), options.hookDependencies);
     let timer: ReturnType<typeof setInterval> | undefined, closed = false;
     const session: WatchSession = {
         tick() {
@@ -36,6 +40,7 @@ export function createWatcher(options: WatchOptions): WatchSession {
                     events.push(clean);
                     options.sink(clean);
                     dispatcher.enqueue(clean);
+                    hooks?.dispatch(clean);
                 }
             });
             return events;
@@ -49,7 +54,7 @@ export function createWatcher(options: WatchOptions): WatchSession {
         async close() {
             closed = true;
             clearInterval(timer);
-            await dispatcher.close();
+            await Promise.all([hooks?.close(), dispatcher.close()]);
         },
     };
     return session;

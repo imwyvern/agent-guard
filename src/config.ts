@@ -6,6 +6,7 @@ export function validateConfig(c: AgentGuardConfig): void {
     if (c.mode !== 'detect' && c.mode !== 'trap')
         throw new AgentGuardConfigError('mode must be "detect" or "trap"');
     validateTrap(c.trap);
+    validateHooks(c.hooks);
     if (c.log?.file !== undefined && (typeof c.log.file !== 'string' || !c.log.file.trim() || c.log.file.includes('\0')))
         throw new AgentGuardConfigError('log.file must be a nonempty path');
     for (const [name, value, minimum, maximum] of [
@@ -54,6 +55,30 @@ export function validateConfig(c: AgentGuardConfig): void {
     for (const n of [c.crawler?.timeoutMs, c.canaryScan?.maxBodyBytes, c.alerts?.dedupeWindowSec, c.alerts?.ratePerMinute])
         if (n !== undefined && (!Number.isFinite(n) || n < 0))
             throw new AgentGuardConfigError('limits must be finite and nonnegative');
+}
+export const hookLimits = {
+    entries: 32, globalConcurrent: 16, killGraceMs: 1000,
+    timeoutMs: { default: 5000, min: 1, max: 60000 },
+    maxPerHour: { default: 10, min: 1, max: 100 },
+    maxConcurrent: { default: 2, min: 1, max: 8 },
+} as const;
+
+export function validateHooks(hooks: AgentGuardConfig['hooks']): void {
+    if (hooks === undefined) return;
+    if (!Array.isArray(hooks) || hooks.length > hookLimits.entries)
+        throw new AgentGuardConfigError('hooks must be an array of at most 32 entries');
+    for (const hook of hooks) {
+        if (!hook || typeof hook !== 'object' || !['incident_high', 'canary_replay', 'honeyfile_read'].includes(hook.on))
+            throw new AgentGuardConfigError('hooks.on must be incident_high, canary_replay or honeyfile_read');
+        if (!Array.isArray(hook.run) || !hook.run.length || Array.from(hook.run).some(arg => typeof arg !== 'string' || arg.includes('\0')) ||
+            !hook.run[0]!.startsWith('/') || hook.run[0]!.slice(1).split('/').some(segment => !segment))
+            throw new AgentGuardConfigError('hooks.run must be literal argv with an absolute executable path without empty segments or NUL');
+        for (const key of ['timeoutMs', 'maxPerHour', 'maxConcurrent'] as const) {
+            const value = hook[key], bounds = hookLimits[key];
+            if (value !== undefined && (!Number.isSafeInteger(value) || value < bounds.min || value > bounds.max))
+                throw new AgentGuardConfigError(`hooks.${key} must be a safe integer between ${bounds.min} and ${bounds.max}`);
+        }
+    }
 }
 function validateTrap(trap: AgentGuardConfig['trap']): void {
     if (trap === undefined) return;

@@ -21,6 +21,7 @@ import { Metrics } from '../metrics.js';
 import { Dispatcher } from '../alerts/dispatcher.js';
 import { logEvent } from '../log/sink.js';
 import { Escalation } from '../incident/escalation.js';
+import { HookRunner } from '../hooks/runner.js';
 import { robotsLines } from '../lures/robots.js';
 import { htmlComment } from '../lures/html-comment.js';
 import { boundedUAPattern } from './ua-pattern.js';
@@ -79,6 +80,7 @@ export function createAgentGuard(config: AgentGuardConfig): AgentGuard {
         metrics.event(e); logEvent(e, config);
     };
     const alerts = new Dispatcher(config.alerts, emit);
+    const hooks = config.hooks?.length ? new HookRunner(config.hooks, emit) : undefined;
     const escalation = config.escalation?.enabled ? new Escalation(config, (event, key) => alerts.enqueue(event, key), emit) : undefined;
     escalation?.start();
     const enqueue = (event: AgentGuardEvent): void => {
@@ -179,7 +181,7 @@ export function createAgentGuard(config: AgentGuardConfig): AgentGuard {
                         const related = incidents.current(key);
                         if (related) safe.incident = related;
                     }
-                    events.push(safe); emit(safe); enqueue(safe);
+                    events.push(safe); emit(safe); enqueue(safe); hooks?.dispatch(safe);
                 };
                 if (trap.checkCircuit(() => metrics.snapshot().inspect_ns_p99))
                     push(make('trap_circuit_open', 'high'));
@@ -243,7 +245,7 @@ export function createAgentGuard(config: AgentGuardConfig): AgentGuard {
         metrics: () => metrics.snapshot(),
         prometheusText: () => metrics.prometheusText(clients.size, timing.size, { ...trap.snapshot(), mazeActive: trap.enabled ? maze?.size ?? 0 : 0 }),
         setTrapEnabled: enabled => trap.setEnabled(enabled),
-        async close() { closed = true; escalation?.close(); trap.close(); await alerts.close(); },
+        async close() { closed = true; escalation?.close(); trap.close(); await Promise.all([hooks?.close(), alerts.close()]); },
     };
     if (callbacks) installCallback(guard, async input => {
         if (closed) return false;

@@ -2,6 +2,8 @@ export { createAgentGuard } from './core/inspect.js';
 export { prometheusHandler } from './metrics/prometheus.js';
 export { callbackHandler } from './canary/callback.js';
 export { AgentGuardConfigError } from './config.js';
+export { HookRunner } from './hooks/runner.js';
+export type { HookChild, HookSpawn, HookDependencies } from './hooks/runner.js';
 export { generateCanary, verifyCanary } from './canary/format.js';
 export { webhookAdapter, verifyWebhookSignature } from './alerts/webhook.js';
 export { consoleAdapter } from './alerts/console.js';

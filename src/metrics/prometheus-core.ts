@@ -32,7 +32,7 @@ export function prometheusText(data: AgentGuardMetrics, events: Readonly<Record<
     };
     metric('agent_guard_requests_inspected_total', 'Total requests inspected.', 'counter', `agent_guard_requests_inspected_total ${data.requests_inspected}`);
     // Preserve detect-mode series; new trap event series appear on their first event.
-    metric('agent_guard_events_total', 'Total emitted events by type.', 'counter', Object.entries(events).filter(([type, count]) => !['trap_block', 'trap_circuit_open', 'exhaust_budget_spent', 'canary_callback', 'honeyfile_read', 'incident_ack', 'incident_escalated', 'incident_reminder'].includes(type) || count > 0).map(([type, count]) => `agent_guard_events_total{type="${type}"} ${count}`).join('\n'));
+    metric('agent_guard_events_total', 'Total emitted events by type.', 'counter', Object.entries(events).filter(([type, count]) => !['trap_block', 'trap_circuit_open', 'exhaust_budget_spent', 'canary_callback', 'honeyfile_read', 'incident_ack', 'incident_escalated', 'incident_reminder', 'hook_result'].includes(type) || count > 0).map(([type, count]) => `agent_guard_events_total{type="${type}"} ${count}`).join('\n'));
     metric('agent_guard_alerts_sent_total', 'Total successful alert deliveries.', 'counter', `agent_guard_alerts_sent_total ${data.alerts_sent}`);
     metric('agent_guard_alerts_failed_total', 'Total failed alert deliveries.', 'counter', `agent_guard_alerts_failed_total ${data.alerts_failed}`);
     metric('agent_guard_inspect_latency_seconds', 'Inspect latency quantiles in seconds over the latest 2048 requests.', 'gauge', `agent_guard_inspect_latency_seconds{quantile="0.5"} ${data.inspect_ns_p50 / 1e9}\nagent_guard_inspect_latency_seconds{quantile="0.99"} ${data.inspect_ns_p99 / 1e9}`);
