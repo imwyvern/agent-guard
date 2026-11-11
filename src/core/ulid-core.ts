@@ -14,7 +14,7 @@ export function base32(bytes: Uint8Array): string {
         out += alphabet[(value << (5 - bits)) & 31];
     return out;
 }
-export function ulid(crypto: CryptoProvider): string {
+export function ulid(crypto: Pick<CryptoProvider, 'randomBytes'>): string {
     let time = Date.now(), out = '';
     for (let i = 0; i < 10; i++) {
         out = alphabet[time % 32] + out;

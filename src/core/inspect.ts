@@ -57,6 +57,7 @@ export class Clients {
 }
 export function createAgentGuard(config: AgentGuardConfig): AgentGuard {
     validateConfig(config);
+    const uaBypass = config.crawler?.verify === 'ua-bypass', customCrawler = config.crawler?.verify === 'custom';
     const limits = inspectionLimits(config);
     const uaPatterns = (config.allowlist?.uaPatterns ?? []).filter(boundedUAPattern);
     const registry = new Registry(config.canary.registry, config.canary.secret, config.canary.prefix ?? 'AG-CANARY-');
@@ -109,18 +110,25 @@ export function createAgentGuard(config: AgentGuardConfig): AgentGuard {
                 if (hits.length)
                     signals.push('canary_replay');
                 let verified: Awaited<ReturnType<CrawlerVerifier['verify']>> | undefined;
-                if (id || mazePath || (trap.enabled && (hits.length > 0 || trap.blocked(key)))) {
+                if (customCrawler || id || mazePath || (trap.enabled && (hits.length > 0 || trap.blocked(key)))) {
                     const claimed = claimedCrawler(ua);
                     if (claimed) {
                         // Preserve the header snapshot across the only inspection await
                         // that precedes use of request headers in a decoy response.
                         headers = { ...headers };
                         req.headers = headers;
-                        verified = await crawler.verify(req.ip, claimed);
-                        uaClass = verified.verified ? 'verified_crawler' : 'spoofed_crawler';
-                        if (!verified.verified)
+                        verified = await crawler.verify(req.ip, claimed, ua);
+                        uaClass = verified.verified ? 'verified_crawler' : config.crawler?.verify === 'ua-bypass' ? uaClass : 'spoofed_crawler';
+                        if (!verified.verified && config.crawler?.verify !== 'ua-bypass')
                             signals.push('ua_spoof_crawler');
                     }
+                }
+                if ((uaBypass || (customCrawler && verified?.verified)) && claimedCrawler(ua)) {
+                    const event = sanitizeEvent({ v: 1, ts: new Date().toISOString(), event_id: ulid(), event: 'crawler_bypass', severity: 'debug', project: config.project, env: config.env,
+                        req: { method: req.method, path: req.path, query_keys: Object.keys(req.query), ip: req.ip, client_key: key, ua, ua_class: uaClass, has_session: headers.cookie !== undefined },
+                        score: previousScore, signals: [], crawler: verified ?? { claimed: claimedCrawler(ua)!, verified: false, cache: false } });
+                    emit(event);
+                    return id || mazePath ? { action: 'respond', response: { status: 404, headers: { 'Content-Type': 'text/plain; charset=utf-8' }, body: 'Not Found\n' }, events: [event] } : { action: 'pass', events: [event] };
                 }
                 if (id) {
                     if (decoyHit && !verified?.verified) {
@@ -217,7 +225,7 @@ export function createAgentGuard(config: AgentGuardConfig): AgentGuard {
         req.ip = (config.clientIp?.(input) ?? req.ip).slice(0, 128);
         if (allowed(req)) return true;
         const ua = String(req.headers['user-agent'] ?? '').slice(0, 512), claimed = claimedCrawler(ua);
-        if (claimed && (await crawler.verify(req.ip, claimed)).verified) return true;
+        if (claimed && (config.crawler?.verify === 'ua-bypass' || (await crawler.verify(req.ip, claimed, ua)).verified)) return true;
         if (closed) return false;
         // Never log the callback token, URL/query, or arbitrary incoming headers.
         const event = sanitizeEvent({ v: 1, ts: new Date().toISOString(), event_id: ulid(), event: 'canary_callback', severity: 'high', project: config.project, env: config.env,

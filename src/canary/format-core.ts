@@ -1,4 +1,4 @@
-import type { CryptoProvider } from '../crypto/types.js';
+import type { CryptoProvider, AsyncCryptoProvider } from '../crypto/types.js';
 import { base32 } from '../core/ulid-core.js';
 import { patterns } from '../core/signals.js';
 export const DEFAULT_PREFIX = 'AG-CANARY-';
@@ -32,5 +32,22 @@ export function verifyCanary(token: string, o: { prefix?: string; secret: string
     const parsed = parseCanary(token, prefix);
     if (!parsed) return { valid: false };
     const valid = crypto.secretEqual(parsed.checksum, checksum(prefix, parsed.id, o.secret, crypto));
+    return valid ? { valid, id: parsed.id } : { valid };
+}
+
+export async function checksumAsync(prefix: string, id: string, secret: string, crypto: AsyncCryptoProvider): Promise<string> {
+    return base32(await crypto.hmacSha256(secret, prefix + id)).slice(0, 6);
+}
+export async function generateCanaryAsync(o: { prefix?: string; secret: string }, crypto: AsyncCryptoProvider): Promise<{ id: string; token: string }> {
+    const prefix = o.prefix ?? DEFAULT_PREFIX;
+    validatePrefix(prefix);
+    if (!o.secret) throw new Error('canary secret is required');
+    const id = base32(crypto.randomBytes(8)).slice(0, 12);
+    return { id, token: formatCanary(prefix, id, await checksumAsync(prefix, id, o.secret, crypto)) };
+}
+export async function verifyCanaryAsync(token: string, o: { prefix?: string; secret: string }, crypto: AsyncCryptoProvider): Promise<{ valid: boolean; id?: string }> {
+    const prefix = o.prefix ?? DEFAULT_PREFIX, parsed = parseCanary(token, prefix);
+    if (!parsed) return { valid: false };
+    const valid = crypto.secretEqual(parsed.checksum, await checksumAsync(prefix, parsed.id, o.secret, crypto));
     return valid ? { valid, id: parsed.id } : { valid };
 }

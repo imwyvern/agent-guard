@@ -1,4 +1,4 @@
-import type { CryptoProvider } from '../crypto/types.js';
+import type { CryptoProvider, AsyncCryptoProvider } from '../crypto/types.js';
 import { alphabet, base32 } from './ulid-core.js';
 import { patterns } from './signals.js';
 
@@ -20,5 +20,14 @@ export function parseMazeNode(encoded: string): { parent: string; index: number;
 export function verifyMazeNode(encoded: string, secret: string, crypto: CryptoProvider): { depth: number; mac: string } | undefined {
     const parsed = parseMazeNode(encoded);
     if (!parsed || !crypto.secretEqual(parsed.mac, mazeMac(parsed.parent, parsed.index, parsed.depth, secret, crypto))) return;
+    return { depth: parsed.depth, mac: parsed.mac };
+}
+
+export async function mazeMacAsync(parent: string, index: number, depth: number, secret: string, crypto: AsyncCryptoProvider): Promise<string> {
+    return base32(await crypto.hmacSha256(secret, mazeMacInput(parent, index, depth))).slice(0, 20);
+}
+export async function verifyMazeNodeAsync(encoded: string, secret: string, crypto: AsyncCryptoProvider): Promise<{ depth: number; mac: string } | undefined> {
+    const parsed = parseMazeNode(encoded);
+    if (!parsed || !crypto.secretEqual(parsed.mac, await mazeMacAsync(parsed.parent, parsed.index, parsed.depth, secret, crypto))) return;
     return { depth: parsed.depth, mac: parsed.mac };
 }

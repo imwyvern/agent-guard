@@ -1,5 +1,5 @@
 import type { AgentGuardMetrics, AgentGuardEvent } from './types.js';
-import { prometheusText } from './metrics/prometheus.js';
+import { prometheusText } from './metrics/prometheus-core.js';
 import type { TrapMetrics } from './core/trap.js';
 export class Metrics {
     private data: AgentGuardMetrics = { requests_inspected: 0, decoy_hits: { D1: 0, D2: 0, D3: 0, D4: 0, D5: 0, MCP: 0, GQL: 0 }, canary_replays: 0, crawler_bypass: 0, alerts_sent: 0, alerts_failed: 0, inspect_ns_p50: 0, inspect_ns_p99: 0 };

@@ -173,7 +173,8 @@ export interface AgentGuardConfig {
         /** Default 16384; bounds body traversal and UTF-8 bytes; limits.maxBodyBytes takes precedence. */ maxBodyBytes?: number;
     };
     crawler?: {
-        /** Default true. */ verify?: boolean;
+        /** Node defaults to DNS; Web defaults to ua-bypass. */ verify?: boolean | 'dns' | 'ua-bypass' | 'custom';
+        customVerify?: (ip: string, ua: string) => Promise<boolean>;
         /** Default 300 ms. */ timeoutMs?: number;
         /** Default true on DNS errors/timeouts. */ failOpen?: boolean;
         /** Default empty; suffixes keyed by crawler family. */ extraSuffixes?: Record<string, string[]>;

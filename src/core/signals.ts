@@ -1,5 +1,7 @@
 // Keep shared literals in the existing regex audit inventory without changing docs.
 export const patterns = {
+    bearer: /^Bearer\s+/i,
+    repeatedSlash: /\/+/g,
     canaryPrefix: /^[A-Z][A-Z0-9]{1,15}-CANARY-$/,
     canaryToken: /^[0-9A-HJKMNP-TV-Z]{12}-[0-9A-HJKMNP-TV-Z]{6}$/,
     registryToken: /^[0-9A-HJKMNP-TV-Z]{12}-[0-9A-HJKMNP-TV-Z]{6}$/,

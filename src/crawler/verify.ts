@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { LRU } from '../core/lru.js';
 import { inCidr, ipNumber } from '../core/client-key.js';
 import { crawlerPatterns } from './ua.js';
+import { customCrawlerVerify } from './custom.js';
 import type { AgentGuardConfig, Resolver } from '../types.js';
 export interface CrawlerResult {
     claimed: string;
@@ -25,9 +26,11 @@ export class CrawlerVerifier {
     private pending = new Map<string, Promise<CrawlerResult>>();
     private ranges: Record<string, string[]>;
     constructor(private options: NonNullable<AgentGuardConfig['crawler']> = {}) {
-        this.ranges = options.ipRangesFile ? JSON.parse(readFileSync(options.ipRangesFile, 'utf8')) as Record<string, string[]> : {};
+        this.ranges = options.ipRangesFile && !['ua-bypass', 'custom'].includes(String(options.verify)) ? JSON.parse(readFileSync(options.ipRangesFile, 'utf8')) as Record<string, string[]> : {};
     }
-    async verify(ip: string, claimed: string): Promise<CrawlerResult> {
+    async verify(ip: string, claimed: string, ua = claimed): Promise<CrawlerResult> {
+        if (this.options.verify === 'ua-bypass') return { claimed, verified: false, cache: false };
+        if (this.options.verify === 'custom') return { claimed, verified: await customCrawlerVerify(this.options, ip, ua), cache: false };
         const key = claimed + '|' + ip, cached = this.cache.get(key);
         if (cached)
             return { ...cached, cache: true };

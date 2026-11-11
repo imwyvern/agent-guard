@@ -6,6 +6,10 @@ export function validateConfig(c: AgentGuardConfig): void {
     if (c.mode !== 'detect' && c.mode !== 'trap')
         throw new AgentGuardConfigError('mode must be "detect" or "trap"');
     validateTrap(c.trap);
+    if (c.crawler?.verify !== undefined && ![true, false, 'dns', 'ua-bypass', 'custom'].includes(c.crawler.verify))
+        throw new AgentGuardConfigError('crawler.verify must be boolean, dns, ua-bypass or custom');
+    if (c.crawler?.verify === 'custom' && typeof c.crawler.customVerify !== 'function')
+        throw new AgentGuardConfigError('crawler.customVerify is required for custom verification');
     for (const key of ['project', 'env', 'projectSeed'] as const)
         if (!c[key])
             throw new AgentGuardConfigError(`${key} is required`);

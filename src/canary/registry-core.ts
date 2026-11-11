@@ -16,20 +16,17 @@ export function validateRegistry(r: CanaryRegistry): CanaryRegistry {
     }
     return r;
 }
-export class Registry {
-    readonly data: CanaryRegistry;
-    private tokens = new Map<string, CanaryEntry>();
+export class CandidateIndex {
+    constructor(private readonly prefix: string) {}
     private nodes: Array<{ next: Map<string, number>; fail: number; output?: string; suffix: number }> = [
         { next: new Map(), fail: 0, suffix: 0 },
     ];
-    private fingerprint(token: string): string { return hex(this.crypto.sha256(token)); }
-    private index(entry: CanaryEntry): void {
-        this.tokens.set(this.fingerprint(entry.token), entry);
+    add(token: string): void {
         // Modern candidates are parsed by fixed prefix/length, including rotated tokens.
-        const rest = entry.token.slice(this.data.prefix.length);
-        if (entry.token.startsWith(this.data.prefix) && rest.length === 19 && patterns.registryToken.test(rest)) return;
+        const rest = token.slice(this.prefix.length);
+        if (token.startsWith(this.prefix) && rest.length === 19 && patterns.registryToken.test(rest)) return;
         let node = 0;
-        for (const char of entry.token) {
+        for (const char of token) {
             let child = this.nodes[node]!.next.get(char);
             if (child === undefined) {
                 child = this.nodes.length;
@@ -38,9 +35,10 @@ export class Registry {
             }
             node = child;
         }
-        this.nodes[node]!.output = entry.token;
+        this.nodes[node]!.output = token;
     }
-    private link(): void {
+    hasCandidate(text: string): boolean { return !this.candidates(text, 1).next().done; }
+    link(): void {
         const queue = [...this.nodes[0]!.next.values()];
         for (let i = 0; i < queue.length; i++) {
             const node = queue[i]!;
@@ -58,11 +56,11 @@ export class Registry {
     *candidates(text: string, budget: number): Generator<string> {
         let offset = 0;
         while (budget > 0) {
-            const at = text.indexOf(this.data.prefix, offset);
+            const at = text.indexOf(this.prefix, offset);
             if (at < 0) break;
-            yield text.slice(at, at + this.data.prefix.length + 19);
+            yield text.slice(at, at + this.prefix.length + 19);
             budget--;
-            offset = at + this.data.prefix.length;
+            offset = at + this.prefix.length;
         }
         if (this.nodes.length === 1 || budget <= 0) return;
         let node = 0;
@@ -77,7 +75,14 @@ export class Registry {
             }
         }
     }
+}
+export class Registry extends CandidateIndex {
+    readonly data: CanaryRegistry;
+    private tokens = new Map<string, CanaryEntry>();
+    private fingerprint(token: string): string { return hex(this.crypto.sha256(token)); }
+    private index(entry: CanaryEntry): void { this.tokens.set(this.fingerprint(entry.token), entry); this.add(entry.token); }
     constructor(data: CanaryRegistry, private secret: string, prefix: string, private readonly crypto: CryptoProvider) {
+        super(prefix);
         this.data = data;
         if (this.data.prefix !== prefix)
             throw new Error('registry prefix does not match config');
@@ -85,7 +90,6 @@ export class Registry {
             this.index(entry);
         this.link();
     }
-    hasCandidate(text: string): boolean { return !this.candidates(text, 1).next().done; }
     find(token: string): CanaryEntry | undefined {
         const entry = this.tokens.get(this.fingerprint(token));
         return entry && this.crypto.secretEqual(token, entry.token) ? entry : undefined;

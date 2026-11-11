@@ -2,7 +2,8 @@ import type { AgentGuardEvent } from '../types.js';
 import { ulid } from './ulid-core.js';
 import type { CryptoProvider } from '../crypto/types.js';
 
-const steps = ['robots', 'D1', 'D2', 'D3', 'D4', 'D5', 'MCP', 'GQL', 'probe', 'ai_discovery', 'canary_replay'] as const;
+export const incidentSteps = ['robots', 'D1', 'D2', 'D3', 'D4', 'D5', 'MCP', 'GQL', 'probe', 'ai_discovery', 'canary_replay'] as const;
+const steps = incidentSteps;
 type Step = typeof steps[number];
 const sequenceLimit = 32;
 
@@ -76,15 +77,12 @@ export class Incidents {
         const features = this.features[slot]! | (1 << code);
         this.features[slot] = features;
         if (length < 2 && step !== 'canary_replay') return;
-        const decoys = features & 0xfe;
-        const multipleDecoys = (decoys & (decoys - 1)) !== 0;
-        const discoveryThenDecoy = decoys !== 0 && (features & ((1 << 0) | (1 << 8) | (1 << 9))) !== 0;
         return {
             id: `${this.prefix}-${this.serial[slot]!.toString(36)}`,
             sequence: Array.from({ length }, (_, i) => steps[(this.sequences[offset + (i >> 1)]! >>> (i % 2 * 4)) & 15]!),
             first_seen: new Date(this.first[slot]!).toISOString(),
             last_seen: new Date(this.last[slot]!).toISOString(),
-            confidence: features & (1 << 10) ? 'high' : multipleDecoys || discoveryThenDecoy ? 'medium' : 'low',
+            confidence: incidentConfidence(features),
         };
     }
     event(event: AgentGuardEvent): AgentGuardEvent['incident'] {
@@ -92,4 +90,11 @@ export class Incidents {
             : event.event === 'probe' || event.event === 'ai_discovery' || event.event === 'canary_replay' ? event.event : undefined;
         return step === undefined ? undefined : this.observe(event.req.client_key, step);
     }
+}
+
+export function incidentConfidence(features: number): NonNullable<AgentGuardEvent['incident']>['confidence'] {
+    const decoys = features & 0xfe;
+    const multipleDecoys = (decoys & (decoys - 1)) !== 0;
+    const discoveryThenDecoy = decoys !== 0 && (features & ((1 << 0) | (1 << 8) | (1 << 9))) !== 0;
+    return features & (1 << 10) ? 'high' : multipleDecoys || discoveryThenDecoy ? 'medium' : 'low';
 }
