@@ -1,8 +1,11 @@
 import type { AGDecision, AgentGuard, AgentGuardConfig, AgentGuardEvent, Severity, UAClass } from '../types.js';
 import { validateConfig, guardConfigs } from '../config.js';
 import { mcpDecoyTools } from '../scenarios/mcp.js';
+import { graphqlDecoys, graphqlForbiddenResponse } from '../scenarios/graphql.js';
 import { decoyHeaders } from '../decoys/headers.js';
 import { Registry } from '../canary/registry.js';
+import { CanaryTracing } from '../canary/tracing.js';
+import { Incidents } from './incidents.js';
 import { matchesPath, scanRequest } from '../canary/scan.js';
 import { Decoys } from '../decoys/index.js';
 import { CrawlerVerifier } from '../crawler/verify.js';
@@ -53,6 +56,7 @@ export function createAgentGuard(config: AgentGuardConfig): AgentGuard {
     const uaPatterns = (config.allowlist?.uaPatterns ?? []).filter(boundedUAPattern);
     const registry = new Registry(config.canary.registry, config.canary.secret, config.canary.prefix ?? 'AG-CANARY-');
     const decoys = new Decoys(config, registry), crawler = new CrawlerVerifier(config.crawler), clients = new Clients(), metrics = new Metrics();
+    const incidents = new Incidents(config.incident?.windowMs), tracing = new CanaryTracing();
     const emit = (e: AgentGuardEvent): void => { metrics.event(e); logEvent(e, config); };
     const alerts = new Dispatcher(config.alerts, emit);
     // A single-entry memo avoids repeated IP parsing/hash/UA classification on keep-alive
@@ -85,9 +89,9 @@ export function createAgentGuard(config: AgentGuardConfig): AgentGuard {
                 let uaClass = lastClass;
                 if (uaClass === 'automation')
                     signals.push('ua_automation');
-                const id = context?.mcp ? 'MCP' : pathTruncated ? undefined : decoys.match(req.path, req.method), probe = pathSignal(req.path);
-                const decoyHit = id && (id !== 'MCP' || mcpDecoyTools.some(tool => tool.name === context?.mcp.toolName));
-                const scanBody = id === 'MCP' || id === 'D5' || (config.canaryScan?.bodyPaths ?? ['/login', '/api/auth/*']).some(p => matchesPath(req.path, p));
+                const id = context?.mcp ? 'MCP' : context?.graphql ? 'GQL' : pathTruncated ? undefined : decoys.match(req.path, req.method), probe = pathSignal(req.path);
+                const decoyHit = id && (id === 'MCP' ? mcpDecoyTools.some(tool => tool.name === context?.mcp?.toolName) : id === 'GQL' ? graphqlDecoys().some(decoy => decoy.field.name === context?.graphql?.fieldName) : true);
+                const scanBody = id === 'MCP' || id === 'GQL' || id === 'D5' || (config.canaryScan?.bodyPaths ?? ['/login', '/api/auth/*']).some(p => matchesPath(req.path, p));
                 const hits = scanRequest(req, registry, config, scanBody);
                 if (hits.length)
                     signals.push('canary_replay');
@@ -114,12 +118,18 @@ export function createAgentGuard(config: AgentGuardConfig): AgentGuard {
                     signals.push(probe === 'probe' ? 'probe_path' : 'ai_discovery_path');
                 state.score = Math.min(1023, state.score + signals.reduce((n, s) => n + (weights[s] ?? 0), 0));
                 clients.set(key, state.score, req.path === '/robots.txt', state.robots);
+                // Internal observation only: robots requests keep their existing event behavior.
+                if (req.path === '/robots.txt') incidents.observe(key, 'robots');
                 if (!id && signals.length === 0)
                     return { action: 'pass', events };
                 const make = (event: AgentGuardEvent['event'], severity: Severity): AgentGuardEvent => ({ v: 1, ts: new Date().toISOString(), event_id: ulid(), event, severity, project: config.project, env: config.env, req: { method: req.method, path: req.path, query_keys: Object.keys(req.query), ip: req.ip, client_key: key, ua, ua_class: uaClass, has_session: headers.cookie !== undefined }, score: state.score, signals: [...signals] });
-                const push = (event: AgentGuardEvent): void => { const safe = sanitizeEvent(event); events.push(safe); emit(safe); alerts.enqueue(safe); };
+                const push = (event: AgentGuardEvent): void => {
+                    const incident = incidents.event(event);
+                    const safe = sanitizeEvent(incident ? { ...event, incident } : event);
+                    events.push(safe); emit(safe); alerts.enqueue(safe);
+                };
                 for (const hit of hits)
-                    push({ ...make('canary_replay', 'critical'), canary: { id: hit.entry.id, placement: hit.entry.placement, env: hit.entry.env, found_in: hit.found_in, field: hit.field } });
+                    push({ ...make('canary_replay', 'critical'), canary: { id: hit.entry.id, placement: hit.entry.placement, env: hit.entry.env, found_in: hit.found_in, field: hit.field, ...tracing.replay(hit.entry, req.path, key) } });
                 if (id && verified?.verified) {
                     push({ ...make('crawler_bypass', 'debug'), crawler: verified });
                     return { action: 'respond', response: { status: 404, headers: { 'Content-Type': 'text/plain; charset=utf-8' }, body: 'Not Found\n' }, events };
@@ -127,10 +137,11 @@ export function createAgentGuard(config: AgentGuardConfig): AgentGuard {
                 if (decoyHit) {
                     // Log and enqueue before the fixed D5 login delay, so delivery latency stays low.
                     const status = id === 'D2' ? (/^Bearer\s+/i.test(String(headers.authorization ?? '')) ? 403 : 401) : id === 'D5' ? (req.method === 'POST' ? 401 : 405) : 200;
-                    push({ ...make('decoy_hit', uaClass === 'declared_ai_crawler' ? 'info' : id === 'D1' || id === 'D3' ? 'high' : 'medium'), decoy: { id, status }, ...(verified ? { crawler: verified } : {}) });
-                    const response = id === 'MCP' ? { status: 200, headers: decoyHeaders('application/json'), body: JSON.stringify({ error: 'permission denied' }) } : await decoys.respond(id, req);
+                    push({ ...make('decoy_hit', uaClass === 'declared_ai_crawler' && id !== 'GQL' ? 'info' : id === 'D1' || id === 'D3' ? 'high' : 'medium'), decoy: { id, status }, ...(verified ? { crawler: verified } : {}) });
+                    const response = id === 'MCP' ? { status: 200, headers: decoyHeaders('application/json'), body: JSON.stringify({ error: 'permission denied' }) } : id === 'GQL' ? graphqlForbiddenResponse() : await decoys.respond(id, req);
                     if (req.method === 'HEAD')
                         response.body = '';
+                    if (response.body) tracing.delivered(response.body, registry);
                     return { action: 'respond', response, events };
                 }
                 if (probe)

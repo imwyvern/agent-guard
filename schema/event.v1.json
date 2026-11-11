@@ -117,7 +117,8 @@
             "D3",
             "D4",
             "D5",
-            "MCP"
+            "MCP",
+            "GQL"
           ]
         },
         "status": {
@@ -147,6 +148,25 @@
         },
         "field": {
           "type": "string"
+        },
+        "leaked_at": {
+          "type": "string",
+          "description": "Registry placement of the replayed canary"
+        },
+        "replayed_at": {
+          "type": "string",
+          "description": "Replay pathname, without query"
+        },
+        "dwell_ms": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Milliseconds since first decoy delivery; omitted when process-local issuance is unknown"
+        },
+        "client_keys_seen": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 8,
+          "description": "Distinct replaying client keys retained in memory, saturated at 8"
         }
       }
     },
@@ -192,6 +212,58 @@
           "type": "boolean"
         }
       }
+    },
+    "incident": {
+      "type": "object",
+      "required": [
+        "id",
+        "sequence",
+        "first_seen",
+        "last_seen",
+        "confidence"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "sequence": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 32,
+          "items": {
+            "enum": [
+              "robots",
+              "D1",
+              "D2",
+              "D3",
+              "D4",
+              "D5",
+              "MCP",
+              "GQL",
+              "probe",
+              "ai_discovery",
+              "canary_replay"
+            ]
+          }
+        },
+        "first_seen": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "last_seen": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "confidence": {
+          "enum": [
+            "low",
+            "medium",
+            "high"
+          ]
+        }
+      },
+      "additionalProperties": false,
+      "description": "Optional process-local correlation; never changes inspection decisions or severity"
     }
   },
   "additionalProperties": false

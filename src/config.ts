@@ -22,6 +22,8 @@ export function validateConfig(c: AgentGuardConfig): void {
     for (const n of Object.values(c.limits ?? {}))
         if (n !== undefined && (!Number.isSafeInteger(n) || n < 0))
             throw new AgentGuardConfigError('inspection limits must be nonnegative safe integers');
+    if (c.incident?.windowMs !== undefined && (!Number.isSafeInteger(c.incident.windowMs) || c.incident.windowMs < 0))
+        throw new AgentGuardConfigError('incident.windowMs must be a nonnegative safe integer');
     for (const n of [c.crawler?.timeoutMs, c.canaryScan?.maxBodyBytes, c.alerts?.dedupeWindowSec, c.alerts?.ratePerMinute])
         if (n !== undefined && (!Number.isFinite(n) || n < 0))
             throw new AgentGuardConfigError('limits must be finite and nonnegative');

@@ -5,3 +5,6 @@ export { webhookAdapter, verifyWebhookSignature } from './alerts/webhook.js';
 export { consoleAdapter } from './alerts/console.js';
 export type * from './types.js';
 export { mcpDecoyTools, inspectMcpRequest, lintMcpDecoyDescription } from './scenarios/mcp.js';
+export { graphqlDecoys, inspectGraphqlRequest } from './scenarios/graphql.js';
+export { lintSample, reservedHost, builtinPlacementSamples, lintBuiltins, lintFiles, lintPlacement } from './canary/lint.js';
+export type { LintSample, LintViolation } from './canary/lint.js';

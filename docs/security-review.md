@@ -76,6 +76,8 @@ sanitizeHeader strips C0/C1 controls, CR/LF, DEL and Unicode line/paragraph sepa
 | State | Bound | Verification |
 | --- | ---: | --- |
 | Client score/robots history | 50000 entries, 30-minute lazy expiry | Fill/eviction test plus existing TTL tests |
+| Incident correlation | 50000 client keys, fixed 15-minute window by default, last 32 observations | Compact slots/nibble sequences, LRU/expiry/response-equality tests, 50k memory gate |
+| Canary propagation | 50000 records, 24-hour TTL, at most 8 distinct replaying client keys each | Delivery/replay, restart/HEAD/crawler omissions, LRU/expiry and saturation tests |
 | Crawler result LRU | 10000 entries; 24-hour positive/1-hour negative TTL | Fill test and existing cache/TTL tests |
 | Pending crawler checks | 128 | Concurrent unresolved resolver test |
 | Actual DNS jobs | 128, including jobs surviving a timeout | A second wave after timeout starts no additional jobs |
@@ -91,3 +93,45 @@ Crawler saturation follows the existing failOpen setting (default true) without 
 ## Property and regression coverage
 
 A tiny seeded Mulberry32 generator in test/helpers/prng.ts supplies reproducible cases without new dependencies: 1000 canary round-trips/tamper cases, 500 arbitrary request cases with a per-inspection <50ms bound, and 2000 sanitizer cases checking control removal, caps and idempotence. Additional deterministic cases cover 100k/1M inputs, cycles, deep/wide bodies, getter/toJSON isolation, UTF-8 budgets, duplicate query parameters, prototype keys, global candidate exhaustion, legacy overlap matching, truncation authentication mistakes, reflection, state saturation and DNS timeouts. Timing assertions are regression checks on this test environment, not a hardware-independent latency guarantee. The existing D5 intentional login delay and configured DNS/alert I/O are separate from CPU inspection timing.
+
+## v0.3a GraphQL and placement lint regex audit
+
+The shared lint rules also run in the offline bench. URL discovery retains scheme-aware URL parsing while removing the optional unanchored scheme scan. GraphQL tokenization runs only for explicitly inspected GraphQL requests and has independent length, token and depth limits. These literals remain covered by the existing 100k adversarial-input tests.
+
+| Regex | File | Review |
+| --- | --- | --- |
+| `/^\[\|\]$/g` | `src/canary/lint-rules.ts` | Offline placement lint; existing violation classes retained. URL discovery scans // before recovering a scheme to avoid quadratic suffix retries. |
+| `/\.$/` | `src/canary/lint-rules.ts` | Offline placement lint; existing violation classes retained. URL discovery scans // before recovering a scheme to avoid quadratic suffix retries. |
+| `/(?:AKIA\|ASIA\|ghp_\|github_pat_\|sk-\|xox[bpas]-\|AIza\|eyJ\|-----BEGIN (?:[A-Z0-9]+ )*PRIVATE KEY-----)/` | `src/canary/lint-rules.ts` | Offline placement lint; existing violation classes retained. URL discovery scans // before recovering a scheme to avoid quadratic suffix retries. |
+| `/[\u200B-\u200F\u202A-\u202E\u2060\uFEFF]/u` | `src/canary/lint-rules.ts` | Offline placement lint; existing violation classes retained. URL discovery scans // before recovering a scheme to avoid quadratic suffix retries. |
+| `/\b(?:ignore\|disregard\|override)\b(?:\s+\w+){0,3}\s+(?:previous\|prior\|above\|instructions?\|prompts?\|rules?\|polic(?:y\|ies)\|system\|developer\|safety)\b/i` | `src/canary/lint-rules.ts` | Offline placement lint; existing violation classes retained. URL discovery scans // before recovering a scheme to avoid quadratic suffix retries. |
+| `/\b(?:you\s+must\|you\s+should\|please\s+(?:run\|execute\|ignore\|disregard\|send\|reveal\|visit\|follow)\|(?:run\|execute\|invoke)\s+(?:this\|the\|a\|an\|following\|command\|tool\|code\|script\|shell\|curl\|wget\|bash\|powershell\|rm\|python\|node)\b)/i` | `src/canary/lint-rules.ts` | Offline placement lint; existing violation classes retained. URL discovery scans // before recovering a scheme to avoid quadratic suffix retries. |
+| `/(?:^\|[\n.!?:>])\s*["']?(?:run\|execute\|ignore\|disregard)\b/i` | `src/canary/lint-rules.ts` | Offline placement lint; existing violation classes retained. URL discovery scans // before recovering a scheme to avoid quadratic suffix retries. |
+| `/\b(?:agent\|assistant\|model)\s*[,，:]?\s*(?:run\|execute\|obey\|follow\|send\|reveal\|visit\|read\|use)\b/i` | `src/canary/lint-rules.ts` | Offline placement lint; existing violation classes retained. URL discovery scans // before recovering a scheme to avoid quadratic suffix retries. |
+| `/\b(?:follow\|obey)\s+(?:(?:these\|the\|my\|new)\s+)?(?:instructions?\|commands?\|rules?)\b/i` | `src/canary/lint-rules.ts` | Offline placement lint; existing violation classes retained. URL discovery scans // before recovering a scheme to avoid quadratic suffix retries. |
+| `/(?:忽略\|无视\|無視\|忘记\|忘記\|覆盖\|覆蓋).{0,12}(?:指令\|提示\|规则\|規則\|系统\|系統\|之前\|先前)\|(?:你\|您)(?:必须\|必須\|应当\|應當)\|(?:请\|請)(?:执行\|執行\|运行\|運行\|调用\|調用\|访问\|訪問\|发送\|發送\|遵循\|忽略)\|(?:执行\|執行\|运行\|運行\|调用\|調用)(?:以下\|此\|这个\|這個\|命令\|代码\|代碼\|脚本\|腳本\|工具)/u` | `src/canary/lint-rules.ts` | Offline placement lint; existing violation classes retained. URL discovery scans // before recovering a scheme to avoid quadratic suffix retries. |
+| `/<[^>]*>/g` | `src/canary/lint-rules.ts` | Offline placement lint; existing violation classes retained. URL discovery scans // before recovering a scheme to avoid quadratic suffix retries. |
+| `/\/\/[^\s<>"'\\]+/g` | `src/canary/lint-rules.ts` | Offline placement lint; existing violation classes retained. URL discovery scans // before recovering a scheme to avoid quadratic suffix retries. |
+| `/[a-z0-9+.-]/i` | `src/canary/lint-rules.ts` | Offline placement lint; existing violation classes retained. URL discovery scans // before recovering a scheme to avoid quadratic suffix retries. |
+| `/[a-z]/i` | `src/canary/lint-rules.ts` | Offline placement lint; existing violation classes retained. URL discovery scans // before recovering a scheme to avoid quadratic suffix retries. |
+| `/\b(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}\b/gi` | `src/canary/lint-rules.ts` | Offline placement lint; existing violation classes retained. URL discovery scans // before recovering a scheme to avoid quadratic suffix retries. |
+| `/\b(?:\d{1,3}\.){3}\d{1,3}\b/g` | `src/canary/lint-rules.ts` | Offline placement lint; existing violation classes retained. URL discovery scans // before recovering a scheme to avoid quadratic suffix retries. |
+| `/\[[0-9a-f:]+\]\|\b(?:[0-9a-f]{0,4}:){2,}[0-9a-f:]+/gi` | `src/canary/lint-rules.ts` | Offline placement lint; existing violation classes retained. URL discovery scans // before recovering a scheme to avoid quadratic suffix retries. |
+| `/^[A-Za-z_][A-Za-z_0-9]*$/` | `src/scenarios/graphql.ts` | Sticky or anchored token scans, fixed character classes; query length, token count and nesting are capped before parsing. |
+| `/[A-Za-z_][A-Za-z_0-9]*/y` | `src/scenarios/graphql.ts` | Sticky or anchored token scans, fixed character classes; query length, token count and nesting are capped before parsing. |
+| `/-?(?:0\|[1-9][0-9]*)(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?/y` | `src/scenarios/graphql.ts` | Sticky or anchored token scans, fixed character classes; query length, token count and nesting are capped before parsing. |
+| `/[\t\n\r ,\uFEFF]/u` | `src/scenarios/graphql.ts` | Sticky or anchored token scans, fixed character classes; query length, token count and nesting are capped before parsing. |
+| `/[A-Za-z_]/` | `src/scenarios/graphql.ts` | Sticky or anchored token scans, fixed character classes; query length, token count and nesting are capped before parsing. |
+| `/[0-9]/` | `src/scenarios/graphql.ts` | Sticky or anchored token scans, fixed character classes; query length, token count and nesting are capped before parsing. |
+| `/[.A-Za-z_0-9]/` | `src/scenarios/graphql.ts` | Sticky or anchored token scans, fixed character classes; query length, token count and nesting are capped before parsing. |
+
+## v0.3a local validation (split run c)
+
+Validated on Node v24.22.1, with build target Node 20 and no dependency changes in this run. The uncommitted Fastify/Koa, GraphQL and placement-linter work from runs a/b is retained.
+
+- `npm run build && npm run typecheck && npm run lint && npm test`: passed; 382 tests across 23 files, including all 371 prior tests. Focused additions cover incident windows/LRU/confidence, unchanged responses/scores/severity/event types, canary issuance/replay/restart/HEAD/crawler boundaries, and actual event-schema validation.
+- 50k incident-state clients, measured in an isolated process with forced GC: heap delta **7,547,264 bytes** plus **2,150,000 bytes** of typed-array backing storage, **9,697,264 bytes total**. The unit gate counts both and keeps the 10,000,000-byte threshold; it also checks eviction beyond 50k. The existing `bench/memory.ts` gate measured **8,299,032 heap bytes** for 50k clients.
+- `npm run bench:deception-lint`: passed, 140 samples, zero violations.
+- Six README files each contain 10 byte-identical fenced blocks, with the same contents and order. Relative file links and Markdown heading anchors in the updated guides resolve. The repository scan for disallowed site references is clean; the contract's check is phrased without embedding those names.
+- `npm audit`: **9 high**, zero critical/moderate/low findings in the existing development-tool chain (`@lhci/cli`, `@lhci/utils`, `lighthouse`, `puppeteer-core`, `@puppeteer/browsers`, `proxy-agent`, `pac-proxy-agent`, `get-uri`, `basic-ftp`). `npm audit --omit=dev`: **0 vulnerabilities**. No dependency installation, audit fix, or lockfile edit was performed in this run.
+- `npm pack --dry-run --json`: 50 package files; no examples, tests, dependency trees, or lockfile included. No publish, commit, push, tag, workflow change, or GitHub issue action.

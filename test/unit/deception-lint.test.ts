@@ -1,6 +1,7 @@
 import { it, expect } from 'vitest';
 import { deceptionLint, existingDecoySamples, lintSample, reservedHost } from '../../bench/deception-lint.js';
 import { persona, personaSample, PERSONA_CAP_BYTES } from '../../bench/lib/persona.js';
+import { builtinPlacementSamples, lintBuiltins } from '../../src/canary/lint.js';
 
 const lint = (body: string, capBytes = 8192) => lintSample({ name: 'fixture', body, capBytes });
 it('flags AKIA and every required vendor prefix and private-key format', () => {
@@ -47,6 +48,24 @@ it('enforces body size in UTF-8 bytes at the configured cap', () => {
 it('accepts descriptive copy, relative filenames and canonical AG-CANARY tokens', () => {
     expect(lint('Ops notes (internal, do not share); read-only maintenance account. Last run metadata. /api/openapi.json')).toEqual([]);
     expect(lint('AG-CANARY-0123456789AB-ABCDEF')).toEqual([]);
+});
+
+it('accepts leading-dot filenames in a single path segment', () => {
+    for (const path of ['/.env.local', '/.env.production', '/.env.bak', '/dir/.env.local', '/dir/.env.production', '/dir/.env.bak'])
+        expect(lint(`Disallow: ${path}`), path).toEqual([]);
+});
+
+it('rejects URL authorities and bare hosts that resemble path aliases', () => {
+    for (const body of ['https://env.local', 'http://env.production', '//env.bak', 'https://.env.local', '//.env.bak',
+        'env.local', 'env.production', 'env.bak', '.env.local', 'docs.env.production.example.com'])
+        expect(lint(body).some(error => error.rule === 'host'), body).toBe(true);
+});
+
+it('passes every built-in placement sample, including robots path aliases', () => {
+    const samples = builtinPlacementSamples();
+    expect(samples.length).toBeGreaterThan(0);
+    for (const sample of samples) expect(lintSample(sample), sample.name).toEqual([]);
+    expect(lintBuiltins()).toEqual([]);
 });
 
 it('passes existing D1–D4 outputs and MCP tools without modifying runtime copy', () => {

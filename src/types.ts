@@ -55,7 +55,7 @@ export interface AgentGuardEvent {
         country?: string;
     };
     decoy?: {
-        id: DecoyId | 'MCP';
+        id: DecoyId | 'MCP' | 'GQL';
         status: number;
     };
     canary?: {
@@ -64,6 +64,17 @@ export interface AgentGuardEvent {
         env: string;
         found_in: 'header' | 'query' | 'body' | 'path';
         field: string;
+        /** Registry placement where this inert token originated. */ leaked_at?: string;
+        /** Replay pathname (without query). */ replayed_at?: string;
+        /** Milliseconds since first decoy delivery; absent after eviction/restart. */ dwell_ms?: number;
+        /** Distinct replaying client keys in bounded process-local state, saturated at 8. */ client_keys_seen?: number;
+    };
+    incident?: {
+        id: string;
+        /** Most recent 32 ordered observations; decoy hits use their IDs. */ sequence: string[];
+        first_seen: string;
+        last_seen: string;
+        confidence: 'low' | 'medium' | 'high';
     };
     score?: number;
     signals?: string[];
@@ -115,6 +126,9 @@ export interface AgentGuardConfig {
     /** Required environment label; no default. */ env: string;
     /** Required; v0.1 only accepts detect. */ mode: 'detect';
     /** Required seed for deterministic fake data; no default. */ projectSeed: string;
+    incident?: {
+        /** Fixed window from first_seen; default 900000 ms (15 minutes). 0 disables correlation. */ windowMs?: number;
+    };
     canary: {
         /** Default AG-CANARY-. */ prefix?: string;
         /** Required HMAC secret from the operator; no default. */ secret: string;
@@ -173,7 +187,7 @@ export interface AgentGuardConfig {
 }
 export interface AgentGuardMetrics {
     requests_inspected: number;
-    decoy_hits: Record<DecoyId | 'MCP', number>;
+    decoy_hits: Record<DecoyId | 'MCP' | 'GQL', number>;
     canary_replays: number;
     crawler_bypass: number;
     alerts_sent: number;
@@ -183,8 +197,8 @@ export interface AgentGuardMetrics {
 }
 export interface AgentGuard {
     /** Trusted application metadata; never populate context directly from HTTP input.
-     * MCP context verifies crawler identity even for discovery/real tool requests. */
-    inspect(req: AGRequest, context?: { mcp: { toolName?: string } }): Promise<AGDecision>;
+     * Scenario contexts verify crawler identity even for discovery/real requests. */
+    inspect(req: AGRequest, context?: { mcp?: { toolName?: string }; graphql?: { fieldName?: string } }): Promise<AGDecision>;
     robotsLines(): string[];
     htmlCommentFor(path: string): string | null;
     metrics(): AgentGuardMetrics;
