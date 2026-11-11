@@ -3,6 +3,7 @@ import { resolve, relative, basename } from 'node:path';
 import { generateCanary } from '../canary/format.js';
 import { loadRegistry } from '../canary/registry.js';
 import { lintPlacement } from '../canary/lint.js';
+import { runSeed, SEED_USAGE } from './seed.js';
 import type { AgentGuardEvent, CanaryRegistry } from '../types.js';
 export function scanFiles(root: string, registry?: CanaryRegistry): string[] {
     const findings: string[] = [];
@@ -33,6 +34,7 @@ export function runCLI(args: string[], out: (s: string) => void = console.log): 
         const option = (name: string): string | undefined => { const i = args.indexOf('--' + name); return i < 0 ? undefined : args[i + 1]; };
         const registryPath = option('registry') ?? 'agent-guard.canaries.json';
         const [command, sub] = args;
+        if (command === 'seed') return runSeed(args.slice(1), out);
         if (command === 'lint') {
             if (!sub || sub.startsWith('--') || args.length !== 2)
                 throw new Error('usage: agent-guard lint <path>');
@@ -82,7 +84,7 @@ export function runCLI(args: string[], out: (s: string) => void = console.log): 
             out(`\nSessions observed: ${new Set(events.map(e => e.req.client_key)).size}; delivery p95: ${latencies[Math.floor(latencies.length * .95)] ?? 0} ms. FP/detection rates require labeled simulation traffic.`);
             return 0;
         }
-        throw new Error('usage: agent-guard lint <path>, canary new|list|scan, report --since 7d <log.jsonl>');
+        throw new Error('usage: agent-guard lint <path>, canary new|list|scan, report --since 7d <log.jsonl>\n' + SEED_USAGE);
     }
     catch (error) {
         out(error instanceof Error ? error.message : String(error));
