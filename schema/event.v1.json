@@ -39,7 +39,10 @@
         "trap_circuit_open",
         "exhaust_budget_spent",
         "canary_callback",
-        "honeyfile_read"
+        "honeyfile_read",
+        "incident_ack",
+        "incident_escalated",
+        "incident_reminder"
       ]
     },
     "severity": {
@@ -265,7 +268,8 @@
               "GQL",
               "probe",
               "ai_discovery",
-              "canary_replay"
+              "canary_replay",
+              "incident_ack"
             ]
           }
         },
@@ -283,6 +287,18 @@
             "medium",
             "high"
           ]
+        },
+        "first_touch_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "alerted_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "dwell_ms": {
+          "type": "integer",
+          "minimum": 0
         }
       },
       "additionalProperties": false,

@@ -21,18 +21,21 @@ export class Dispatcher {
     constructor(private config: AgentGuardConfig['alerts'], private emit: (event: AgentGuardEvent) => void, private readonly crypto: Pick<CryptoProvider, 'randomBytes'>) {
         this.channels = (config?.adapters ?? []).map(adapter => ({ adapter, count: 0, start: Date.now(), deduped: 0, limited: 0 }));
     }
-    enqueue(event: AgentGuardEvent): void {
+    accepts(event: AgentGuardEvent): boolean {
         if (this.closed || severityRank[event.severity] < severityRank[this.config?.minSeverity ?? 'info'])
-            return;
-        if (!['decoy_hit', 'canary_replay', 'trap_block', 'trap_circuit_open', 'exhaust_budget_spent', 'canary_callback'].includes(event.event) && this.config?.minSeverity === undefined)
-            return;
-        const key = [event.event, event.decoy?.id ?? event.canary?.id, event.req.client_key].join('|');
+            return false;
+        return this.config?.minSeverity !== undefined || ['decoy_hit', 'canary_replay', 'trap_block', 'trap_circuit_open', 'exhaust_budget_spent', 'canary_callback', 'incident_escalated', 'incident_reminder'].includes(event.event);
+    }
+    enqueue(event: AgentGuardEvent, dedupeKey?: string): boolean {
+        if (!this.accepts(event)) return false;
+        const key = dedupeKey ?? [event.event, event.decoy?.id ?? event.canary?.id, event.req.client_key].join('|');
         if (this.seen.get(key)) {
             for (const channel of this.channels)
                 channel.deduped++;
-            return;
+            return false;
         }
         this.seen.set(key, true, (this.config?.dedupeWindowSec ?? 600) * 1000);
+        let queued = false;
         for (const channel of this.channels) {
             if (Date.now() - channel.start >= 60000) {
                 channel.start = Date.now();
@@ -47,12 +50,14 @@ export class Dispatcher {
             channel.deduped = 0;
             channel.limited = 0;
             this.queue.push(() => this.deliver(channel.adapter, payload));
+            queued = true;
         }
         // Delivery starts in a microtask, after inspect has constructed its decision.
         if (this.queue.length && !this.scheduled) {
             this.scheduled = true;
             queueMicrotask(() => { this.scheduled = false; this.pump(); });
         }
+        return queued;
     }
     private pump(): void {
         while (this.active.size < 8 && this.queue.length) {

@@ -38,7 +38,7 @@ export interface AgentGuardEvent {
     v: 1;
     ts: string;
     event_id: string;
-    event: 'decoy_hit' | 'canary_replay' | 'probe' | 'ai_discovery' | 'crawler_bypass' | 'alert_sent' | 'alert_failed' | 'trap_block' | 'trap_circuit_open' | 'exhaust_budget_spent' | 'canary_callback' | 'honeyfile_read';
+    event: 'decoy_hit' | 'canary_replay' | 'probe' | 'ai_discovery' | 'crawler_bypass' | 'alert_sent' | 'alert_failed' | 'trap_block' | 'trap_circuit_open' | 'exhaust_budget_spent' | 'canary_callback' | 'honeyfile_read' | 'incident_ack' | 'incident_escalated' | 'incident_reminder';
     severity: Severity;
     project: string;
     env: string;
@@ -82,6 +82,9 @@ export interface AgentGuardEvent {
         first_seen: string;
         last_seen: string;
         confidence: 'low' | 'medium' | 'high';
+        first_touch_at?: string;
+        alerted_at?: string;
+        /** Milliseconds from first touch to this event, clamped on clock rollback. */ dwell_ms?: number;
     };
     score?: number;
     /** Request timing regularity in [0, 1]; independent of detection score and severity. */
@@ -154,6 +157,12 @@ export interface AgentGuardConfig {
     incident?: {
         /** Fixed window from first_seen; default 900000 ms (15 minutes). 0 disables correlation. */ windowMs?: number;
     };
+    /** Node inspect path only; disabled unless enabled is true. */
+    escalation?: {
+        enabled?: boolean;
+        /** Default 300000 ms; measured from first successful alert, then each reminder. */ remindAfterMs?: number;
+        /** Default 2; maximum 100. */ maxReminders?: number;
+    };
     canary: {
         /** Default AG-CANARY-. */ prefix?: string;
         /** Required HMAC secret from the operator; no default. */ secret: string;
@@ -206,6 +215,8 @@ export interface AgentGuardConfig {
     };
     log?: {
         /** Default JSONL to stdout. */ sink?: (event: AgentGuardEvent) => void;
+        /** Node only. Append sanitized JSONL to an existing directory; refuses symlinks. Replaces stdout, may accompany sink. */ file?: string;
+        /** Default 10 MiB. Truncate before an append that would exceed this bound; oversized individual lines are dropped. */ maxBytes?: number;
         /** Default info. */ level?: Severity;
         /** Default true for local logs. */ keepIp?: boolean;
     };

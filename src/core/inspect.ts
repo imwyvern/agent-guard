@@ -20,6 +20,7 @@ import { ulid } from './ulid.js';
 import { Metrics } from '../metrics.js';
 import { Dispatcher } from '../alerts/dispatcher.js';
 import { logEvent } from '../log/sink.js';
+import { Escalation } from '../incident/escalation.js';
 import { robotsLines } from '../lures/robots.js';
 import { htmlComment } from '../lures/html-comment.js';
 import { boundedUAPattern } from './ua-pattern.js';
@@ -66,8 +67,29 @@ export function createAgentGuard(config: AgentGuardConfig): AgentGuard {
     const trap = new Trap(config.mode, config.trap);
     const maze = config.mode === 'trap' && config.trap?.maze?.enabled ? new Maze(config) : undefined;
     const callbacks = config.canary.callback ? new CallbackCanaries(config) : undefined;
-    const emit = (e: AgentGuardEvent): void => { metrics.event(e); logEvent(e, config); };
+    const emit = (e: AgentGuardEvent): void => {
+        if (e.incident && (e.event === 'alert_sent' || e.event === 'alert_failed')) {
+            e.incident.dwell_ms = Math.max(0, Date.parse(e.ts) - Date.parse(e.incident.first_touch_at ?? e.incident.first_seen));
+            if (e.event === 'alert_sent') {
+                const elapsed = incidents.alert(e);
+                if (elapsed !== undefined) metrics.timeToAlert(elapsed);
+                escalation?.delivered(e);
+            }
+        }
+        metrics.event(e); logEvent(e, config);
+    };
     const alerts = new Dispatcher(config.alerts, emit);
+    const escalation = config.escalation?.enabled ? new Escalation(config, (event, key) => alerts.enqueue(event, key), emit) : undefined;
+    escalation?.start();
+    const enqueue = (event: AgentGuardEvent): void => {
+        if (!alerts.accepts(event)) return;
+        // A single observation keeps its historical public event shape. Carry its
+        // internal incident on delivery so an early successful alert is not lost.
+        const incident = event.incident ?? incidents.current(event.req.client_key, true);
+        const correlated = incident ? { ...event, incident } : event;
+        if (escalation && incident) escalation.observe(correlated);
+        else alerts.enqueue(correlated);
+    };
     const allowed = (req: AGRequest): boolean => {
         const ua = String(req.headers['user-agent'] ?? '').slice(0, 512), allow = config.allowlist, token = allow?.headerToken;
         return !!(allow?.ips?.includes(req.ip) || allow?.cidrs?.some(c => inCidr(req.ip, c)) || uaPatterns.some(p => { p.lastIndex = 0; return p.test(ua); }) || (token && typeof req.headers[token.name.toLowerCase()] === 'string' && secretEqual(req.headers[token.name.toLowerCase()] as string, token.value)));
@@ -148,10 +170,16 @@ export function createAgentGuard(config: AgentGuardConfig): AgentGuard {
                 const make = (event: AgentGuardEvent['event'], severity: Severity): AgentGuardEvent => ({ v: 1, ts: new Date().toISOString(), event_id: ulid(), event, severity, project: config.project, env: config.env, req: { method: req.method, path: req.path, query_keys: Object.keys(req.query), ip: req.ip, client_key: key, ua, ua_class: uaClass, has_session: headers.cookie !== undefined }, score: state.score, signals: [...signals] });
                 const push = (event: AgentGuardEvent): void => {
                     if (automation !== undefined) event.automation_score = automation;
-                    const incident = incidents.event(event);
+                    const incident = incidents.event(event, true);
                     const safe = sanitizeEvent(incident ? { ...event, incident } : event);
                     if (!verified?.verified) trap.observe(safe);
-                    events.push(safe); emit(safe); alerts.enqueue(safe);
+                    // Associate block/circuit events for the timeline only after
+                    // the existing trap observation; metadata cannot renew a gate.
+                    if (!safe.incident && (event.event === 'trap_block' || event.event === 'trap_circuit_open')) {
+                        const related = incidents.current(key);
+                        if (related) safe.incident = related;
+                    }
+                    events.push(safe); emit(safe); enqueue(safe);
                 };
                 if (trap.checkCircuit(() => metrics.snapshot().inspect_ns_p99))
                     push(make('trap_circuit_open', 'high'));
@@ -215,7 +243,7 @@ export function createAgentGuard(config: AgentGuardConfig): AgentGuard {
         metrics: () => metrics.snapshot(),
         prometheusText: () => metrics.prometheusText(clients.size, timing.size, { ...trap.snapshot(), mazeActive: trap.enabled ? maze?.size ?? 0 : 0 }),
         setTrapEnabled: enabled => trap.setEnabled(enabled),
-        async close() { closed = true; trap.close(); await alerts.close(); },
+        async close() { closed = true; escalation?.close(); trap.close(); await alerts.close(); },
     };
     if (callbacks) installCallback(guard, async input => {
         if (closed) return false;

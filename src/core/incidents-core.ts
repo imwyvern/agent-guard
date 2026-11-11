@@ -15,6 +15,7 @@ export class Incidents {
     private readonly first: Float64Array;
     private readonly last: Float64Array;
     private readonly serial: Float64Array;
+    private alerted?: Float64Array;
     private readonly features: Uint16Array;
     private readonly lengths: Uint8Array;
     private readonly sequences: Uint8Array;
@@ -34,7 +35,7 @@ export class Incidents {
         this.sequences = new Uint8Array(slots * sequenceLimit / 2);
     }
     get size(): number { return this.entries.size; }
-    observe(key: string, step: Step): AgentGuardEvent['incident'] {
+    observe(key: string, step: Step, timeline = false): AgentGuardEvent['incident'] {
         if (this.windowMs === 0) return;
         const now = this.now();
         let slot = this.entries.get(key);
@@ -60,6 +61,7 @@ export class Incidents {
             this.serial[slot] = ++this.counter;
             this.features[slot] = 0;
             this.lengths[slot] = 0;
+            if (this.alerted) this.alerted[slot] = NaN;
         }
         this.last[slot] = Math.max(this.first[slot]!, now);
         const code = steps.indexOf(step), offset = slot * sequenceLimit / 2;
@@ -77,18 +79,49 @@ export class Incidents {
         const features = this.features[slot]! | (1 << code);
         this.features[slot] = features;
         if (length < 2 && step !== 'canary_replay') return;
+        return this.snapshot(slot, now, timeline);
+    }
+    private snapshot(slot: number, now: number, timeline = true): NonNullable<AgentGuardEvent['incident']> {
+        const length = this.lengths[slot]!, offset = slot * sequenceLimit / 2;
         return {
             id: `${this.prefix}-${this.serial[slot]!.toString(36)}`,
             sequence: Array.from({ length }, (_, i) => steps[(this.sequences[offset + (i >> 1)]! >>> (i % 2 * 4)) & 15]!),
             first_seen: new Date(this.first[slot]!).toISOString(),
             last_seen: new Date(this.last[slot]!).toISOString(),
-            confidence: incidentConfidence(features),
+            confidence: incidentConfidence(this.features[slot]!),
+            ...(timeline ? {
+                first_touch_at: new Date(this.first[slot]!).toISOString(),
+                dwell_ms: Math.max(0, Math.floor(now - this.first[slot]!)),
+                ...(!this.alerted || Number.isNaN(this.alerted[slot]!) ? {} : { alerted_at: new Date(this.alerted[slot]!).toISOString() }),
+            } : {}),
         };
     }
-    event(event: AgentGuardEvent): AgentGuardEvent['incident'] {
+    /** Does not extend the fixed window or add a sequence observation. */
+    current(key: string, includeSingle = false): AgentGuardEvent['incident'] {
+        const slot = this.entries.get(key), now = this.now();
+        if (slot === undefined || now - this.first[slot]! >= this.windowMs ||
+            (!includeSingle && this.lengths[slot]! < 2 && !(this.features[slot]! & (1 << 10)))) return;
+        return this.snapshot(slot, now);
+    }
+    /** Returns time-to-alert once; stale in-flight deliveries cannot mark a reused slot. */
+    alert(event: AgentGuardEvent): number | undefined {
+        const slot = this.entries.get(event.req.client_key), incident = event.incident;
+        if (slot === undefined || !incident || incident.id !== `${this.prefix}-${this.serial[slot]!.toString(36)}`) return;
+        const now = Date.parse(event.ts);
+        // Log-only guards retain the existing compact memory footprint.
+        if (!this.alerted) { this.alerted = new Float64Array(this.first.length); this.alerted.fill(NaN); }
+        if (!Number.isNaN(this.alerted[slot]!)) {
+            incident.alerted_at = new Date(this.alerted[slot]!).toISOString();
+            return;
+        }
+        this.alerted[slot] = now;
+        incident.alerted_at = event.ts;
+        return Math.max(0, now - this.first[slot]!);
+    }
+    event(event: AgentGuardEvent, timeline = false): AgentGuardEvent['incident'] {
         const step: Step | undefined = event.event === 'decoy_hit' ? event.decoy?.id
             : event.event === 'probe' || event.event === 'ai_discovery' || event.event === 'canary_replay' ? event.event : undefined;
-        return step === undefined ? undefined : this.observe(event.req.client_key, step);
+        return step === undefined ? undefined : this.observe(event.req.client_key, step, timeline);
     }
 }
 

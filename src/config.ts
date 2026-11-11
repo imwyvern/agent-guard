@@ -6,6 +6,17 @@ export function validateConfig(c: AgentGuardConfig): void {
     if (c.mode !== 'detect' && c.mode !== 'trap')
         throw new AgentGuardConfigError('mode must be "detect" or "trap"');
     validateTrap(c.trap);
+    if (c.log?.file !== undefined && (typeof c.log.file !== 'string' || !c.log.file.trim() || c.log.file.includes('\0')))
+        throw new AgentGuardConfigError('log.file must be a nonempty path');
+    for (const [name, value, minimum, maximum] of [
+        ['log.maxBytes', c.log?.maxBytes, 1, Number.MAX_SAFE_INTEGER],
+        ['escalation.remindAfterMs', c.escalation?.remindAfterMs, 1, 2147483647],
+        ['escalation.maxReminders', c.escalation?.maxReminders, 0, 100],
+    ] as const)
+        if (value !== undefined && (!Number.isSafeInteger(value) || value < minimum || value > maximum))
+            throw new AgentGuardConfigError(`${name} must be a safe integer within its limits`);
+    if (c.escalation?.enabled !== undefined && typeof c.escalation.enabled !== 'boolean')
+        throw new AgentGuardConfigError('escalation.enabled must be boolean');
     if (c.crawler?.verify !== undefined && ![true, false, 'dns', 'ua-bypass', 'custom'].includes(c.crawler.verify))
         throw new AgentGuardConfigError('crawler.verify must be boolean, dns, ua-bypass or custom');
     if (c.crawler?.verify === 'custom' && typeof c.crawler.customVerify !== 'function')
