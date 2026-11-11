@@ -173,6 +173,12 @@
     "score": {
       "type": "integer"
     },
+    "automation_score": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "description": "Timing regularity, independent of detection score and severity"
+    },
     "signals": {
       "type": "array",
       "items": {

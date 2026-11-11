@@ -77,6 +77,8 @@ export interface AgentGuardEvent {
         confidence: 'low' | 'medium' | 'high';
     };
     score?: number;
+    /** Request timing regularity in [0, 1]; independent of detection score and severity. */
+    automation_score?: number;
     signals?: string[];
     crawler?: {
         claimed: string;
@@ -202,5 +204,7 @@ export interface AgentGuard {
     robotsLines(): string[];
     htmlCommentFor(path: string): string | null;
     metrics(): AgentGuardMetrics;
+    /** Prometheus 0.0.4 text; the host must explicitly mount prometheusHandler. */
+    prometheusText(): string;
     close(): Promise<void>;
 }

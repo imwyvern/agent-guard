@@ -13,6 +13,26 @@ it('keeps v1 required fields and event types unchanged and declares the optional
     expect(schema.properties.canary.properties).toMatchObject({ leaked_at: { type: 'string' }, replayed_at: { type: 'string' }, dwell_ms: { type: 'integer', minimum: 0 }, client_keys_seen: { type: 'integer', minimum: 1, maximum: 8 } });
 });
 
+it('validates optional automation scores across the full range', async () => {
+    const { $schema: _draft, ...body } = schema;
+    const app = Fastify({ ajv: { customOptions: { removeAdditional: false, coerceTypes: false } } });
+    app.post('/', { schema: { body } }, async () => ({ ok: true }));
+    try {
+        for (const automation_score of [0, .5, 1])
+            expect((await app.inject({ method: 'POST', url: '/', payload: event({ automation_score }) })).statusCode).toBe(200);
+    } finally { await app.close(); }
+});
+
+it('rejects out-of-range and wrong-type automation scores', async () => {
+    const { $schema: _draft, ...body } = schema;
+    const app = Fastify({ ajv: { customOptions: { removeAdditional: false, coerceTypes: false } } });
+    app.post('/', { schema: { body } }, async () => ({ ok: true }));
+    try {
+        for (const automation_score of [-.01, 1.01, '0.5', null, true, [], {}])
+            expect((await app.inject({ method: 'POST', url: '/', payload: { ...event(), automation_score } })).statusCode).toBe(400);
+    } finally { await app.close(); }
+});
+
 it('validates legacy and emitted incident/replay events and rejects invalid optional metadata', async () => {
     // Reuse the installed Fastify dev dependency's validator; no new dependency.
     // These schema keywords are shared by draft 7 and 2020-12.

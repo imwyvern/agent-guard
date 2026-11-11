@@ -6,6 +6,7 @@ import { decoyHeaders } from '../decoys/headers.js';
 import { Registry } from '../canary/registry.js';
 import { CanaryTracing } from '../canary/tracing.js';
 import { Incidents } from './incidents.js';
+import { Timing } from './timing.js';
 import { matchesPath, scanRequest } from '../canary/scan.js';
 import { Decoys } from '../decoys/index.js';
 import { CrawlerVerifier } from '../crawler/verify.js';
@@ -25,6 +26,7 @@ import { sanitizeEvent, secretEqual } from './security.js';
 // 50k clients remain bounded without per-client timers or object allocations.
 export class Clients {
     private entries = new Map<string, number>();
+    get size(): number { return this.entries.size; }
     get(key: string): {
         score: number;
         robots: boolean;
@@ -56,7 +58,7 @@ export function createAgentGuard(config: AgentGuardConfig): AgentGuard {
     const uaPatterns = (config.allowlist?.uaPatterns ?? []).filter(boundedUAPattern);
     const registry = new Registry(config.canary.registry, config.canary.secret, config.canary.prefix ?? 'AG-CANARY-');
     const decoys = new Decoys(config, registry), crawler = new CrawlerVerifier(config.crawler), clients = new Clients(), metrics = new Metrics();
-    const incidents = new Incidents(config.incident?.windowMs), tracing = new CanaryTracing();
+    const incidents = new Incidents(config.incident?.windowMs), tracing = new CanaryTracing(), timing = new Timing();
     const emit = (e: AgentGuardEvent): void => { metrics.event(e); logEvent(e, config); };
     const alerts = new Dispatcher(config.alerts, emit);
     // A single-entry memo avoids repeated IP parsing/hash/UA classification on keep-alive
@@ -86,6 +88,7 @@ export function createAgentGuard(config: AgentGuardConfig): AgentGuard {
                     lastUa = ua;
                 }
                 const key = lastKey, state = clients.get(key), signals: string[] = [], events: AgentGuardEvent[] = [];
+                const automation = timing.record(key);
                 let uaClass = lastClass;
                 if (uaClass === 'automation')
                     signals.push('ua_automation');
@@ -124,6 +127,7 @@ export function createAgentGuard(config: AgentGuardConfig): AgentGuard {
                     return { action: 'pass', events };
                 const make = (event: AgentGuardEvent['event'], severity: Severity): AgentGuardEvent => ({ v: 1, ts: new Date().toISOString(), event_id: ulid(), event, severity, project: config.project, env: config.env, req: { method: req.method, path: req.path, query_keys: Object.keys(req.query), ip: req.ip, client_key: key, ua, ua_class: uaClass, has_session: headers.cookie !== undefined }, score: state.score, signals: [...signals] });
                 const push = (event: AgentGuardEvent): void => {
+                    if (automation !== undefined) event.automation_score = automation;
                     const incident = incidents.event(event);
                     const safe = sanitizeEvent(incident ? { ...event, incident } : event);
                     events.push(safe); emit(safe); alerts.enqueue(safe);
@@ -159,6 +163,7 @@ export function createAgentGuard(config: AgentGuardConfig): AgentGuard {
         robotsLines: () => robotsLines(decoys.disallowed()),
         htmlCommentFor: path => config.lures?.htmlComment && config.lures.htmlComment.paths.includes(path) ? htmlComment(decoys.paths.D3[0]!) : null,
         metrics: () => metrics.snapshot(),
+        prometheusText: () => metrics.prometheusText(clients.size, timing.size),
         async close() { closed = true; await alerts.close(); },
     };
     guardConfigs.set(guard, config);
