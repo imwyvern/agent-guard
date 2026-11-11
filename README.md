@@ -12,7 +12,7 @@ This is a last-line tripwire and early-warning / delay layer at the server. It i
 
 **What ships today, and what does not.**
 
-- **Today** coverage is the HTTP/API layer: five isolated decoy routes, MCP and GraphQL decoys, and inert canary credentials (`AG-CANARY-…`). Zero runtime dependencies; adapters for Express, Node `http`, Hono, Fastify, and Koa on Node ≥20.
+- **Today** coverage is the HTTP/API layer: five isolated decoy routes, MCP and GraphQL decoys, and inert canary credentials (`AG-CANARY-…`). Zero runtime dependencies; adapters for Express, Node `http`, Hono, Fastify, and Koa on Node ≥20, plus Web / Edge adapters in v0.4b (unreleased).
 - **Host-level honeyfiles** (fake `.env`, cloud creds, SSH keys, or kubeconfig on disk with access alerts) are **planned**, not shipped. A future `agent-guard seed` command is on the [roadmap](docs/roadmap.md).
 - **"Fake success" deception** — a simulated environment that makes the attacker's AI believe it has breached the server — is **planned** (opt-in, safety-assessed first), not shipped. See [deception.md](docs/deception.md).
 - **Burning the attacker's tokens** is **not yet demonstrated**. The experimental maze's byte ratio was 1:1 in simulation, below the 3:1 floor; the time-ratio numbers are a 25 ms/request model, not a measurement against real LLM agents. Do not enable the maze expecting token drain until that is measured. See [exhaust.md](docs/exhaust.md) and [trap-mode.md](docs/trap-mode.md).
@@ -33,7 +33,7 @@ These items are planned, not shipped, except where noted:
 - **Response time window** — an incident timeline with a dwell-time metric, plus hooks so operators can run their own key-rotation or block scripts. Process-local incident correlation and `dwell_ms` already ship; the operator-facing timeline and hooks do not.
 - **Isolated decoy host** — a dedicated decoy environment, separate from the production application process.
 - **Real-agent token-cost evaluation** — measure whether the experimental maze actually costs a real AI agent tokens before anyone should enable it. The current 1:1 byte ratio is only a hypothesis.
-- **Edge adapters (v0.4b)** — Web-standard core plus Cloudflare Workers, Next.js middleware, Deno, and Bun.
+- **Edge adapters (v0.4b)** — **shipped (unreleased)**: Web-standard core, Cloudflare Workers, Next.js middleware / Vercel Edge, Deno, Bun, and Hono-web.
 
 The detailed plan is in [docs/roadmap.md](docs/roadmap.md). Scope and honest claims are in [docs/positioning.md](docs/positioning.md).
 
@@ -108,7 +108,7 @@ Opt-in robots/HTML/llms transformations buffer at most 1 MiB on selected paths; 
 
 ## Hono (Node runtime)
 
-The v0.2 Hono adapter is available as `@imwyvern/agent-guard/hono`, with an optional `hono` peer. It requires Node ≥20: the shared core still uses `node:crypto` and Node DNS. Edge runtimes and a WebCrypto core remain v0.4b work.
+The v0.2 Hono adapter is available as `@imwyvern/agent-guard/hono`, with an optional `hono` peer. It requires Node ≥20: its Node core uses `node:crypto` and Node DNS. For Workers/Bun/Deno, use `@imwyvern/agent-guard/hono-web` with `createWebGuard` from `@imwyvern/agent-guard/web` (v0.4b, unreleased).
 
 ```ts
 import { Hono } from 'hono';
@@ -130,7 +130,121 @@ In default `mode: 'detect'`, detection remains alert-only: canary replay continu
 
 ## Fastify and Koa (Node runtime)
 
-v0.3a (unreleased) adds `agentGuard` at `@imwyvern/agent-guard/fastify` and `@imwyvern/agent-guard/koa`, accepting the same guard or config. Register the Fastify plugin with `await app.register(agentGuard(guard))` before routes; inspection runs in `preHandler` after body parsing. Use `app.use(agentGuard(guard))` in Koa after your bounded body parser. Neither adapter consumes the request stream. Both preserve native crawler 404s, alert-only replay in detect mode, and opt-in lure transforms; frameworks are optional peers and the core adds no runtime dependencies. See the [Fastify demo](examples/fastify-demo/server.ts), [Koa demo](examples/koa-demo/server.ts), and [adapter guide](docs/community.md). Edge runtimes remain roadmap work.
+v0.3a (unreleased) adds `agentGuard` at `@imwyvern/agent-guard/fastify` and `@imwyvern/agent-guard/koa`, accepting the same guard or config. Register the Fastify plugin with `await app.register(agentGuard(guard))` before routes; inspection runs in `preHandler` after body parsing. Use `app.use(agentGuard(guard))` in Koa after your bounded body parser. Neither adapter consumes the request stream. Both preserve native crawler 404s, alert-only replay in detect mode, and opt-in lure transforms; frameworks are optional peers and the core adds no runtime dependencies. See the [Fastify demo](examples/fastify-demo/server.ts), [Koa demo](examples/koa-demo/server.ts), and [adapter guide](docs/community.md).
+
+## Edge / Web runtimes
+
+v0.4b is implemented in this **unreleased tree**, with zero runtime dependencies. Install from git/source or a local `npm pack` tarball; this package is not published to npm. Web entries use WebCrypto and structural host types; the adapters do not import `next` or `hono`.
+
+`createWebGuard(config)` returns a Web guard; `await guard.handle(request, ctx?)` yields `Response` when intercepted or `null` to continue to the host.
+
+| Runtime | Import suffix after `@imwyvern/agent-guard` | Client IP |
+| --- | --- | --- |
+| Web-standard host | `/web` (`createWebGuard`) | Host `ctx.clientIp`, or explicit `ipHeader`; otherwise `unknown` |
+| Cloudflare Workers | `/workers` (`fromEnv`, `withAgentGuard`) | `fromEnv` defaults to `CF-Connecting-IP` |
+| Next.js middleware / Vercel Edge | `/next` (`agentGuardMiddleware`) | Operator must set `ipHeader` |
+| Deno | `/deno` (`denoHandler`) | `remoteAddr.hostname` |
+| Bun | `/bun` (`bunHandler`) | `server.requestIP(request)` |
+| Hono on edge | `/hono-web` (`honoWeb`) + `/web` | Explicit `ipHeader` on the Web guard |
+| Hono on Node ≥20 | `/hono` (`agentGuard`) + root Node core | Socket IP; trusted `clientIp` override |
+
+The following applies to `/web` and all five Web adapters above, including Hono on Bun/Deno. `/hono` retains the Node core (`node:crypto` / Node DNS).
+
+| Feature | Web core / Workers / Next / Deno / Bun / Hono-web | Hono on Node (`/hono`) |
+| --- | --- | --- |
+| Stateless features | Decoy routes, canary generation/replay detection, HMAC-stateless maze **nodes**, fetch alerts, Prometheus (single isolate view) | Available; metrics are per process |
+| Incident correlation, rateLimit, block, timing scores, maze session admission | Need `StateStore`; no store → automatically off, one console warning per guard. `memoryStore()` is per isolate, never global | Bounded process-local state |
+| Crawler policy | Default `ua-bypass`: claimed Googlebot/Bingbot and other recognized search crawlers never enter trap/maze/block; `crawler.verified: false`. `custom` verifier allowed. No DNS / no DoH | Node DNS verification, or configured policy |
+| `trap.delay` | Default-off; discouraged on edge because of wall-time billing; capped at 3000 ms when explicitly enabled | Default-off, opt-in |
+| Forwarded headers | Unconfigured headers are untrusted; explicitly configured `x-forwarded-for` uses the rightmost nonempty hop, requiring a trusted proxy | Explicit trusted `clientIp` callback |
+| SMTP | Unavailable; use webhook / Slack / Telegram / Feishu via fetch | Node-only SMTP available |
+
+Trap remains default-off everywhere. Signed maze nodes do not grant session admission without a store; the maze remains experimental (simulation byte ratio 1:1). Durable/persistent stores are operator-provided. See [the Edge operator guide](docs/edge.md) for StateStore examples, the full degradation table, and troubleshooting. The configuration and alert examples later in this README describe the Node API.
+
+**Workers** — supply `AG_CANARY_SECRET` and `AG_PROJECT_SEED` through environment bindings; `fromEnv(env)` rejects missing/empty values and has no default secret. This minimal example has no StateStore.
+
+```ts
+import { fromEnv, withAgentGuard } from '@imwyvern/agent-guard/workers';
+import type { WebContext, WebGuard } from '@imwyvern/agent-guard/web';
+
+let guard: WebGuard | undefined;
+export default {
+  fetch(request: Request, env: Record<string, unknown>, ctx: WebContext) {
+    // Bind AG_CANARY_SECRET and AG_PROJECT_SEED in the host environment.
+    guard ??= fromEnv(env);
+    return withAgentGuard(guard, {
+      fetch: () => new Response('Hello'),
+    }).fetch(request, env, ctx);
+  },
+};
+```
+
+**Next.js / Vercel Edge** — `middleware.ts`; configure a header your trusted ingress overwrites. The adapter returns `Response` on interception and `undefined` to continue, without importing `next`.
+
+```ts
+import { createWebGuard } from '@imwyvern/agent-guard/web';
+import { agentGuardMiddleware } from '@imwyvern/agent-guard/next';
+
+const secret = process.env.AG_CANARY_SECRET;
+const projectSeed = process.env.AG_PROJECT_SEED;
+if (!secret || !projectSeed) throw new Error('Set AG_CANARY_SECRET and AG_PROJECT_SEED');
+const guard = createWebGuard({
+  project: 'catalog', env: 'production', mode: 'detect', projectSeed,
+  ipHeader: 'x-real-ip', // Only trust a header overwritten by your ingress.
+  canary: { secret, registry: { version: 1, prefix: 'AG-CANARY-', canaries: [] } },
+});
+export const middleware = agentGuardMiddleware(guard);
+export const config = {
+  matcher: ['/((?!_next/static|_next/image|favicon\\.ico|robots\\.txt|sitemap\\.xml|assets/).*)'],
+};
+```
+
+**Deno** — use a local consumer installation of the tarball with Deno 2's `nodeModulesDir: "manual"`; allow environment access for these two bindings and network access for the server.
+
+```ts
+import { createWebGuard } from '@imwyvern/agent-guard/web';
+import { denoHandler } from '@imwyvern/agent-guard/deno';
+
+const secret = Deno.env.get('AG_CANARY_SECRET');
+const projectSeed = Deno.env.get('AG_PROJECT_SEED');
+if (!secret || !projectSeed) throw new Error('Set AG_CANARY_SECRET and AG_PROJECT_SEED');
+const guard = createWebGuard({
+  project: 'catalog', env: 'production', mode: 'detect', projectSeed,
+  canary: { secret, registry: { version: 1, prefix: 'AG-CANARY-', canaries: [] } },
+});
+Deno.serve(denoHandler(guard, () => new Response('Hello')));
+```
+
+**Bun** — the adapter takes the connection IP from the server.
+
+```ts
+import { createWebGuard } from '@imwyvern/agent-guard/web';
+import { bunHandler } from '@imwyvern/agent-guard/bun';
+
+const secret = Bun.env.AG_CANARY_SECRET;
+const projectSeed = Bun.env.AG_PROJECT_SEED;
+if (!secret || !projectSeed) throw new Error('Set AG_CANARY_SECRET and AG_PROJECT_SEED');
+const guard = createWebGuard({
+  project: 'catalog', env: 'production', mode: 'detect', projectSeed,
+  canary: { secret, registry: { version: 1, prefix: 'AG-CANARY-', canaries: [] } },
+});
+Bun.serve({ fetch: bunHandler(guard, () => new Response('Hello')) });
+```
+
+**Hono on edge** — this Workers example uses the same required bindings. For Bun/Deno, create the Web guard with `createWebGuard` and configure a trusted `ipHeader` for that host. Install Hono in the consuming application.
+
+```ts
+import { Hono } from 'hono';
+import { fromEnv } from '@imwyvern/agent-guard/workers';
+import { honoWeb } from '@imwyvern/agent-guard/hono-web';
+import type { WebGuard } from '@imwyvern/agent-guard/web';
+
+let guard: WebGuard | undefined;
+const app = new Hono<{ Bindings: Record<string, unknown> }>();
+app.use('*', (c, next) => honoWeb(guard ??= fromEnv(c.env))(c, next));
+app.get('/', c => c.text('Hello'));
+export default app;
+```
 
 ## MCP / LLM tool endpoint decoy
 
@@ -283,7 +397,7 @@ Host-level honeyfiles and "fake success" deception are planned, not shipped. Bur
 
 Reverse prompt injection / counter-injection (E4) is never in the product. There is no outbound probing or guard-initiated callback toward third parties; operator-configured alert adapters are the only outbound notification exception. Existing crawler-identity DNS checks remain unchanged. Canaries stay inert HMAC tokens, never real vendor credentials. No third-party honeytoken service (Canarytokens, etc.) is used; the callback canary is operator-hosted only.
 
-Edge adapters (Cloudflare Workers, Next.js middleware, Deno, Bun and Vercel Edge) are **not in this release**; they and the Web-standard core are the next batch, **v0.4b**. Hono already ships for **Node ≥20**.
+Edge / Web runtimes are **supported in this unreleased v0.4b tree**. There is no durable state unless the operator provides a store: without `StateStore`, incident correlation, rateLimit, block, timing scores and maze session admission are off with one warning; `memoryStore()` is per isolate only. The default crawler policy is unverified `ua-bypass` (no DNS / no DoH); SMTP is Node-only; `trap.delay` is default-off, discouraged on edge, and capped at 3000 ms if explicitly enabled. See [Edge / Web runtimes](#edge--web-runtimes) and [the operator guide](docs/edge.md).
 
 v0.4a ships these **opt-in, default-off** integrations and controls. Default mode remains `mode: 'detect'`:
 
@@ -300,7 +414,8 @@ The **experimental maze** needs the operator's own real-agent measurement before
 
 - [Positioning](docs/positioning.md) — the pitch, scope boundaries, and an honest claims table (claim / status / evidence).
 - [Community](docs/community.md) — how to contribute adapters, signatures, translations, and RFCs.
-- [Roadmap](docs/roadmap.md) — direction of travel, v0.4a completion, and v0.4b Edge plans; persona/deception extensions remain design work.
+- [Roadmap](docs/roadmap.md) — direction of travel, v0.4a/v0.4b completion (unreleased), and the v0.5+ plan; persona/deception extensions remain design work.
+- [Edge operator guide](docs/edge.md) — runtime setup, StateStore examples, degradation, and troubleshooting.
 - [Exhaust](docs/exhaust.md) — implemented opt-in delay and experimental maze; context burn (E3) remains unimplemented; token drain is not demonstrated.
 - [Deception](docs/deception.md) — making decoy data believable so an attacker’s agent may treat it as real; "fake success" is planned, not shipped.
 - [Design](docs/design.md), [contract](docs/codex-contract.md), [KPI](docs/kpi.md), and [threat model](docs/threat-model.md). Prior art informed concepts only; no third-party project code was copied.

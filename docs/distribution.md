@@ -11,7 +11,7 @@
 | **E-2 Docker 镜像** | 运维者 | `docker run -p 8080:8080 -e UPSTREAM=http://host:3000 ghcr.io/imwyvern/agent-guard`；附 Compose、nginx、Caddy、Traefik 配置片段 | 镜像供应链 → 固定基础镜像摘要、无 root、只读文件系统、SBOM |
 | **E-3 init 向导** | 开发者 | `npx @imwyvern/agent-guard init`：检测 Express/Fastify/Koa/Hono，生成接入片段、配置、`canary scan` 的 pre-commit 钩子 | 改用户文件 → 默认只打印补丁，`--write` 才落盘，且先备份 |
 | **E-4 日志模式** | 不想碰流量的生产运维 | `agent-guard watch --log /var/log/nginx/access.log --format combined`：只读日志，命中诱饵路径或回放假密钥则告警 | 日志不含请求头/请求体 → 只能做路径和 Bearer 以外的检测，文档写明能力边界 |
-| **E-5 Workers / Helm** | edge、K8s 用户 | Cloudflare Workers 模板；Helm chart（边车） | 依赖 Web 标准核心（v0.3b） |
+| **E-5 Workers / Helm** | edge、K8s 用户 | Cloudflare Workers 模板；Helm chart（边车），**均未实现** | Web 标准核心已于 v0.4b 实现（unreleased）；仅核心/适配器与 [接入文档](edge.md)，不代表 E-5 完成 |
 
 ## 2. 代理模式的行为约束
 
@@ -53,5 +53,5 @@
 
 1. 先做 E-1（代理）+ E-3（init），Node 内置 `http` 实现，零依赖。
 2. 再做 E-2 镜像与配置片段，E-4 日志模式。
-3. E-5 等 Web 标准核心。
+3. E-5 的 Web 标准核心前置已于 v0.4b 实现（unreleased）；Workers 模板和 Helm chart 仍未实现。后续交付计划见 [plan-v0.5-v0.7.md](plan-v0.5-v0.7.md)，已有程序接入见 [edge.md](edge.md)。
 4. E-1 / E-2 的"一行命令"体验依赖 npm 发布，见 [release-checklist.md](release-checklist.md)。

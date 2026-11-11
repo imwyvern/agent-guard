@@ -1,8 +1,8 @@
-# agent-guard 威胁模型（MVP 背景与 v0.4a 边界）
+# agent-guard 威胁模型（MVP 背景与 v0.4b 边界）
 
-- 日期：初稿 2026-11-10；v0.4a 更新 2026-11-11（HKT, UTC+8）
+- 日期：初稿 2026-11-10；v0.4b 更新 2026-11-11（HKT, UTC+8）
 - 来源：`/workspace/security/bla-server-anti-ai-assessment-2026-11-10.md`（权威起点）
-- 范围：HTTP/API 运行时（Node 中间件优先，Edge 后续）。**不是** WAF、不是 DDoS 防护、不是客户端反逆向（那是 BLA 的本职）。
+- 范围：HTTP/API 运行时（Node 中间件与已实现、unreleased 的 v0.4b Web / Edge 核心）。**不是** WAF、不是 DDoS 防护、不是客户端反逆向（那是 BLA 的本职）。
 - 性质：纯开源研究项目，本仓库不部署到任何服务器；验证全部在本地 demo app 上进行。
 
 ## 1. 资产（Assets）
@@ -50,13 +50,13 @@
 - 客户端 bundle 反逆向（BLA 的领域，独立评估）。
 - 默认仍为 MVP 的 detect + alert only。v0.4a 已实现独立 opt-in 的 trap delay / rateLimit / block 与实验性有界 maze；全站 tarpit、无限迷宫和通用 bot 阻断仍不做。
 - E4 reverse prompt injection / counter-injection 永不进入产品（对第三方 Agent 下指令、诱其外泄 system prompt）。
-- 对任何第三方系统的反击、出站探测、主动回连或 "hack back"。运营者配置的告警 adapters 是唯一出站通知例外，原有爬虫 DNS 身份验证不变。
+- 对任何第三方系统的反击、出站探测、主动回连或 "hack back"。运营者配置的告警 adapters 是唯一出站通知例外，Node 的爬虫 DNS 身份验证不变；Web 无 DNS / DoH，使用 `ua-bypass` 或 `custom`。
 - 真实厂商凭证与第三方 honeytoken 服务（Canarytokens 等）。自托管 callback 只接收入站：`canary.callback.baseUrl` 要求 HTTPS（显式 loopback 可 HTTP），`callbackHandler` 不默认挂载，guard 永不 fetch baseUrl，token 仍为 inert HMAC。
 - 假 MCP server / 假 LLM API 独立蜜罐机（Phase 2 再议）。
 
 trap 的准入与自保：verified crawler / allowlist 永不被 trap；单次 `/.env` 命中不够。canary replay 或 high incident 可确认；已有前次检测信号且检测分 ≥ 阈值可进入 delay/rateLimit/maze，但不能单凭检测分 block。机械 `automation_score` 只观测、不提升严重级别、不单独触发 block/maze。block 使用固定 TTL（默认 15 min，上限 24 h）和有界 LRU（默认 8192、上限 50k），每次 403 记录日志，不扩大到 CIDR。client key 本身是网络前缀 + UA，可能合并多人，不能当作身份凭据。
 
-`AGENT_GUARD_TRAP=off` 与 `guard.setTrapEnabled(false)` 可运行时关闭；inspect p99 / 事件循环延迟超阈值时断路器发 `trap_circuit_open` 并回到检测。迷宫每会话/全局预算有界，耗尽返回普通 404；HTML 页面带 noindex/nofollow/no-store、无 cookie/外部 URL。v0.3b 在 25 ms/request 模型下时间比数百比一，字节比却为 1:1，低于 3:1 下限；运营者未做自己的真实 agent 测量前不应启用实验性迷宫。配置和风险见 [trap-mode.md](trap-mode.md) 与 [exhaust.md](exhaust.md)。
+Node 的 `AGENT_GUARD_TRAP=off` 与 `guard.setTrapEnabled(false)` 可运行时关闭；inspect p99 / 事件循环延迟超阈值时断路器发 `trap_circuit_open` 并回到检测。迷宫每会话/全局预算有界，耗尽返回普通 404；HTML 页面带 noindex/nofollow/no-store、无 cookie/外部 URL。v0.3b 在 25 ms/request 模型下时间比数百比一，字节比却为 1:1，低于 3:1 下限；运营者未做自己的真实 agent 测量前不应启用实验性迷宫。配置和风险见 [trap-mode.md](trap-mode.md) 与 [exhaust.md](exhaust.md)。
 
 ## 6. 主要风险（防御方自伤）
 
@@ -67,4 +67,16 @@ trap 的准入与自保：verified crawler / allowlist 永不被 trap；单次 `
 | 误把 canary 当真密钥用 | 固定前缀 + checksum；CI 扫描禁止 canary 前缀进入 secret store |
 | 告警风暴 | 同一 (canary_id, src_ip) 去重窗口 + 速率上限 |
 | 自我资源耗尽 | delay 并发上限、maze 字节/页数/时长预算、断路器与运行时关闭；成本收益须自测 |
+| Edge 状态降级 / 伪全局保证 | 无 StateStore 时 incident、rateLimit、block、timing、maze 会话准入自动关闭并警告一次；`memoryStore()` 仅单 isolate，不能当全局限流/封禁。持久 store 也需跨 isolate 更新协调 |
+| IP 头伪造 | 未配置的转发头不受信任；配置 `ipHeader` 后必须由可信入口覆盖/清洗。否则攻击者可伪造客户端 key、绕过状态或使无关客户端合并 |
+| UA 绕过导致漏报 | Web 默认 `ua-bypass` 接受自称已知搜索爬虫者，`crawler.verified: false`；可能放过伪装 Googlebot，优先避免 SEO 自伤；可用可信 `custom` 验证替代 |
 | 品牌尴尬 | 假数据不含可识别真人 PII，风格为"内部样例" |
+
+## 7. v0.4b Web / Edge 信任边界
+
+- **状态作用域**：无 StateStore 时仍有 decoy、canary 生成/回放、HMAC 无状态 maze 节点、fetch 告警和单 isolate Prometheus，但不接纳 maze 会话。`memoryStore()` 在扩缩容/重启/淘汰后丢失或分割状态。接口无原子 read-modify-write；即使用持久或强一致 KV，多个 guard 的并发更新仍可能丢失。运营者不得把缺 store 或每 isolate 的内存当成全局 rateLimit / block；全局预算需要协调整个 inspection（例如单个 Durable Object 内的 guard），不只是单次 get/set。
+- **IP 信任**：Workers `fromEnv` 默认 `CF-Connecting-IP`；Next/Vercel 必须显式指定可信 `ipHeader`，如 `x-real-ip` 或 `x-forwarded-for`。后者取最右侧非空一跳，不自动证明该跳可信；必须确保入口覆盖/清洗且源站不可被带伪造头的请求绕过。配置的头缺失时为 `unknown`，会合并客户端观测。Deno/Bun 的直接连接地址也只代表该连接，代理后的真实用户需另行可信配置。
+- **爬虫策略**：默认 `ua-bypass` 下，Googlebot/Bingbot 等已识别搜索爬虫声明者永不进入 trap / maze / block，事件未验证、不升级严重度。伪装 UA 因而可能漏报；这是宁可放过也避免 SEO 自伤的明确取舍，不能作为爬虫身份验证。`custom` 验证必须依赖运营者可信数据，不可相信用户自己发来的 bot 头；Web guard 不做 DNS / DoH。
+- **执行与投递**：trap 默认关闭；edge `trap.delay` 占用 wall time，不建议启用，显式开启上限 3000 ms。Web 不读取 Node 环境关闭开关，应使用 `setTrapEnabled(false)`。告警仅 fetch webhook / Slack / Telegram / 飞书，无 SMTP；无宿主 `waitUntil` 时异步投递可能随请求生命周期终止。持久 store 不使告警去重或指标成为全局视图。
+
+接入、仅文档的存储示例和故障排查见 [edge.md](edge.md)。这些限制不改变 WAF / 补丁 / 最小权限的职责，也不证明实验性 maze 的 token 成本收益。

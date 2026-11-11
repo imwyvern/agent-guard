@@ -14,9 +14,9 @@ The core interface is `AgentGuard.inspect(req): Promise<AGDecision>` in [`src/ty
 - Node `http` ([`node.ts`](../src/adapters/node.ts)) maps the request to `AGRequest`, calls `inspect`, writes a decoy response or calls `next()`, and optionally installs lure transforms.
 - Fastify ([`fastify.ts`](../src/adapters/fastify.ts), v0.3a / unreleased) uses `preHandler` after body parsing and `onSend` for opted-in lure transforms.
 - Koa ([`koa.ts`](../src/adapters/koa.ts), v0.3a / unreleased) inspects after the host body parser and applies opted-in transforms after downstream handlers.
-- Hono ([`hono.ts`](../src/adapters/hono.ts)) does the same on Hono's Web-standard `Request`/`Response`, still on Node ≥20. The shared core uses `node:crypto` and Node DNS; the Web-standard core and Edge adapters remain v0.4b work.
+- Hono ([`hono.ts`](../src/adapters/hono.ts)) does the same on Hono's Web-standard `Request`/`Response`, still on Node ≥20. `./hono` retains `node:crypto` and Node DNS. The separate `./hono-web` uses the implemented v0.4b Web core (unreleased).
 
-A new adapter should follow that contract, not invent a second inspection API:
+A new Node adapter should follow that contract:
 
 1. Accept an existing `AgentGuard` or `AgentGuardConfig` (create the guard with `createAgentGuard` when given config).
 2. Map the host request into `AGRequest`: `method`, `path` (pathname), bounded `query`, `headers`, socket IP, and `body` only when the host has already parsed it. Do not consume the request stream. Do not trust forwarded headers unless the operator supplies a `clientIp` callback. Leave over-long URLs intact so the core cannot match a truncated decoy path; see `toRequest` in the Node adapter.
@@ -50,7 +50,19 @@ app.use(async ctx => { ctx.body = { status: 'ok' }; });
 
 Both accept a config or an existing guard, preserve alert-only canary replay in default detect mode and verified-crawler native 404s, and add no runtime dependencies. They also forward opt-in trap decisions from the shared core. Run `npm run demo:fastify` or `npm run demo:koa`; full integrations are in [fastify-demo](../examples/fastify-demo/server.ts) and [koa-demo](../examples/koa-demo/server.ts). Close the guard on shutdown to flush alerts.
 
-A Next.js middleware or edge adapter should say clearly which signals require Node (`node:crypto`, Node DNS, in-memory client state) and which degrade in a stateless edge runtime; a complete Edge port waits for the Web-standard core on the [roadmap](roadmap.md).
+### Edge / Web adapters (v0.4b, unreleased)
+
+The Web-standard core and `./workers`, `./next`, `./deno`, `./bun`, `./hono-web` are implemented. Use `createWebGuard` from `./web`; `await guard.handle(request, ctx?)` returns `Response | null`. Keep `./hono` for the Node core and `./hono-web` for Web hosts. Integration, storage scope and degradation are documented in [edge.md](edge.md).
+
+- Use minimal structural host types. Library Web variants must not import `next` or `hono`; consuming applications supply their framework. Keep wrappers thin, preserve the request body for the host, and pass inspection failures through. Next maps pass-through to `undefined`; other wrappers call the host handler on `null`.
+- Keep the entire Web dependency graph free of `node:*`, `Buffer`, `process` and `require`. Import Web transports from `./web`, never Node SMTP or the root Node entry. Do not add runtime environment detection or dependencies to make a Node import appear portable.
+- Build neutral ESM entries, then run `npm run check:neutral`. It checks the Web entry bundles, not just source files. Run typecheck, lint and the existing acceptance tests as well.
+- Preserve golden-vector byte identity for canaries, maze MACs and webhook signatures across Node/Web, including mutual verification and tamper rejection. Extend the fixed differential corpus (currently 63 requests) for changed shared logic; do not weaken Node or Web acceptance assertions. Ordinary requests without candidates/decoys must not acquire HMAC work.
+- Cover both no-store degradation (one warning; incident/rateLimit/block/timing/maze session admission off) and `memoryStore()` admission (per isolate only). Persistent examples belong in docs, with TTL and cross-isolate coordination limits; no bundled store SDKs.
+- Preserve default unverified `ua-bypass`, crawler/allowlist immunity, no DNS/DoH, default-off trap, edge delay cap of 3000 ms and the no-SMTP boundary. Trust IP headers only through explicit operator configuration; Workers `fromEnv` requires secret/seed bindings and no default secret.
+- Run the local `smoke:workers` (miniflare/workerd), `smoke:bun` and `smoke:deno` scripts when those runtimes are available; report missing runtimes as skipped. Next return semantics use structural types, without installing Next. `bench:latency:web` measures the Web hot path; do not loosen budgets to hide regressions.
+
+Web fetch alerts use `redirect: 'manual'` and reject 3xx without following them because workerd does not support `redirect: 'error'`. Preserve this behavior and host `waitUntil` support. Queues, dedupe and Prometheus remain local even with a persistent store.
 
 ### Alerts, metrics and opt-in trap controls
 
@@ -86,7 +98,7 @@ The direction of travel is listed in the README and in [roadmap.md §0](roadmap.
 - **Fake-success environment** — design-only until a safety assessment lands. Open an RFC before any runtime change. The simulation must stay synthetic, inert, cookie-free, and opt-in. See [deception.md](deception.md).
 - **Incident timeline and dwell-time** — operator-facing timeline on top of the existing process-local incident fields and `dwell_ms`, plus documented hooks so operators can run their own key-rotation or block scripts. Do not add built-in blocking beyond opt-in trap mode.
 - **Real-agent token-cost eval harness** — a documented, local research harness that measures maze byte and token cost against agents we control. Record assumptions honestly; do not treat a 1:1 byte ratio as success.
-- **Edge adapters (v0.4b)** — Web-standard core, then Cloudflare Workers, Next.js middleware (see existing issue #4), Deno, and Bun. Follow the [runtime adapter](#runtime-adapter-50-lines) contract; document which signals degrade without Node or persistent memory.
+- **Edge adapter improvements** — v0.4b is implemented (unreleased). Follow the [Web adapter contract](#edge--web-adapters-v04b-unreleased) and [operator guide](edge.md); preserve neutral bundles, differential parity, explicit IP trust and state degradation. Future product work starts at [v0.5+](plan-v0.5-v0.7.md).
 
 Label new work `enhancement` and, when it is a planned direction rather than a bug, `roadmap`. Use `good first issue` only when the acceptance criteria fit a first contribution. Fake-success and other safety-line changes also need the `design` label and an RFC.
 
@@ -129,7 +141,7 @@ Security vulnerabilities are reported privately through [GitHub Security Advisor
 Before requesting review:
 
 - [ ] `npm run build`, `npm run typecheck`, `npm run lint`, and `npm test` pass locally.
-- [ ] New behavior has focused tests. Shared acceptance coverage is updated for adapter work.
+- [ ] New behavior has focused tests. Shared acceptance coverage is updated for adapter work; Web changes preserve golden/differential parity and pass `check:neutral` after build.
 - [ ] [README.md](../README.md) and all five translations in `docs/i18n/` are updated when the English README or public behavior changes.
 - [ ] [CHANGELOG.md](../CHANGELOG.md) records the change.
 - [ ] The safety lines above still hold. No real secrets or personal data appear in the diff, fixtures, or issue text.

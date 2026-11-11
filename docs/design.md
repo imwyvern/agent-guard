@@ -1,9 +1,9 @@
 # agent-guard 设计文档（MVP = detect + canary）
 
-- 日期：2026-11-10（HKT）
-- 状态：保留 MVP 设计背景，已按 v0.4a（unreleased，2026-11-11 HKT）更新实现边界；完整 API 以 [src/types.ts](../src/types.ts) 为准。
+- 日期：2026-11-11（HKT）
+- 状态：保留 MVP 设计背景，已按 v0.4b（unreleased，2026-11-11 HKT）更新实现边界；Node API 以 [src/types.ts](../src/types.ts) 为准，Web API 见 [src/web/index.ts](../src/web/index.ts) 与 [edge.md](edge.md)。
 - 上游：`/workspace/security/bla-server-anti-ai-assessment-2026-11-10.md`、`docs/threat-model.md`、`docs/kpi.md`
-- 定位：Node ≥20 HTTP 中间件（Web-standard core / Edge 留待 v0.4b）；纯开源研究项目，本仓库不部署到任何服务器，验证在本地 demo app 上完成。
+- 定位：Node ≥20 HTTP 中间件与 Web-standard core / Edge 适配器（v0.4b，unreleased）；纯开源研究项目，本仓库不部署到任何服务器，验证在本地 demo app 上完成。
 
 ## 0. 一句话
 
@@ -16,13 +16,34 @@
 3. **SEO 零回归**：诱饵 = noindex + X-Robots-Tag + robots Disallow + 不进 sitemap + verified-crawler bypass。
 4. **Inert canary**：canary 永不进入真实 IdP / secret store / DB；它不能登录任何东西。
 5. **隔离**：decoy handler 不调用任何业务代码 / DB / 外部服务。
-6. **零/极少依赖**：核心零运行时依赖；只用 Node 内置 `crypto`、`dns`（WebCrypto / Edge 核心尚未实现，v0.4b 再议）。
+6. **零运行时依赖**：核心零运行时依赖。Node 使用内置 `node:crypto` / DNS；v0.4b Web 核心使用 WebCrypto 与 Web 标准 API，依赖闭包无 `node:*` / `Buffer` / `process`，不做 DNS / DoH。
 7. **借概念不借代码**：概念来自 BLA（Poison / Exhaust / Canary）、Snare（inert 凭据位）、Drosera（Lure/Detect/Trap/Canary 分层）、Beelzebub/Sundew/Oubliette（Agent 行为指纹）。**不复制任何代码**（Beelzebub 为 GPL-3.0，尤其不得复制）。
 
 ## 2. 架构
 
+v0.4b 的核心分层已实现，Node 适配器的既有行为保持不变：
+
+```text
+Node adapters ──► Node core ──► shared pure logic ◄── Web core ◄── Web adapters
+                      │                                  │
+             CryptoProvider                    AsyncCryptoProvider
+             sync node:crypto                  async WebCrypto HMAC/hash
+                      │                                  │
+             bounded process state             optional StateStore
+                                               ├─ memoryStore (one isolate)
+                                               └─ operator persistent store
 ```
-request ──► [agent-guard core，以下为 detect 默认流程]
+
+`src/crypto/types.ts` 的 `CryptoProvider` 保留 Node 同步 HMAC / SHA-256 路径；`AsyncCryptoProvider` 以 WebCrypto 异步完成相同计算，随机数与比较仍为同步。共享纯逻辑包含路径/UA、decoy、canary 格式、incident 与 maze 节点。普通 Web 请求既无 canary 候选又无 decoy 时不做 HMAC；Node 热路径不因 Web 移植改为异步密码操作。
+
+Web `createWebGuard` 提供 `handle(Request, ctx?) → Promise<Response | null>` 与 `inspect → decision`；StateStore 为可同步/异步的 `get / set(key, value, ttlMs) / delete`。无 store 时 incident 关联、rateLimit、block、timing 评分和 maze 会话准入自动关闭，每个 guard 一次控制台警告。`memoryStore()` 是有界 LRU（默认 50k），只在单 isolate 内有效。HMAC maze 节点仍可无状态构造/校验，但没有 store 不接纳会话。store 无原子更新接口，guard 只在自身串行化；跨 isolate 的强一致预算需运营者协调整个检查流程，持久 KV 不是全局限流保证。
+
+Web 告警为 fetch webhook / Slack / Telegram / 飞书，SMTP 保持 Node-only。Workers / Next 的 `waitUntil` 延续投递生命周期；无 ctx 时 fire-and-forget 并隔离错误。Web/shared fetch 使用 `redirect: 'manual'` 并拒绝 3xx（workerd 不支持 `error`），不跟随重定向。Prometheus 仍是单 isolate 视角。Trap 默认关闭，edge `trap.delay` 不建议启用（wall-time 计费），显式启用上限 3000 ms。接入、存储示例与完整降级表见 [edge.md](edge.md)。
+
+以下保留 Node 默认检测流程：
+
+```
+request ──► [Node agent-guard core，以下为 detect 默认流程]
               ├─ 1. allowlist?（监控探针/自家 Bot）──► pass（仅 debug 日志）
               ├─ 2. canary scan（header / query / 小 body）──► 命中 → event=canary_replay → alert；请求继续交给 app（不改变行为）
               ├─ 3. path match decoy?
@@ -38,7 +59,7 @@ request ──► [agent-guard core，以下为 detect 默认流程]
 
 v0.4a 的 trap 闸门：verified crawler / allowlist 永不进入；canary replay 或 `incident.confidence === 'high'` 可确认会话；delay/rateLimit/maze 也接受「已有前次请求检测信号 + 检测分 ≥ `trap.gate.minScore`（默认 200）」。首次单次 `/.env` 不够；机械 `automation_score` 不计入闸门，检测分单独不能 block。block 默认 TTL 15 min、上限 24 h，8192 项 LRU（可配至 50k），每次 403 记录 `trap_block`，普通访问不续期。key 已含网络前缀 + UA，可能合并无关用户。
 
-运行时可用 `AGENT_GUARD_TRAP=off` 或 `guard.setTrapEnabled(false)` 关闭所有 trap；inspect p99 / 事件循环延迟超阈值则打开断路器、发 `trap_circuit_open` 并回到检测。`setTrapEnabled(true)` 重置断路器，但不能覆盖环境关闭或改变 mode/功能开关。迷宫有深度、页数、字节、时长与全局并发/字节预算；v0.3b 字节比 1:1，成本门槛未通过，详见 [Exhaust](exhaust.md)。
+Node 运行时可用 `AGENT_GUARD_TRAP=off` 或 `guard.setTrapEnabled(false)` 关闭所有 trap；inspect p99 / 事件循环延迟超阈值则打开断路器、发 `trap_circuit_open` 并回到检测。`setTrapEnabled(true)` 重置断路器，但不能覆盖环境关闭或改变 mode/功能开关。迷宫有深度、页数、字节、时长与全局并发/字节预算；v0.3b 字节比 1:1，成本门槛未通过，详见 [Exhaust](exhaust.md)。
 
 ## 3. MVP 诱饵路由（固定 5 条）
 
@@ -111,6 +132,8 @@ CLI：`agent-guard canary new --env demo --placement "D3:password"`、`agent-gua
 
 ## 5. Verified-crawler bypass
 
+v0.4b Web 核心不做 DNS / DNS-over-HTTPS：默认 `crawler.verify: 'ua-bypass'`，自称 Googlebot/Bingbot 等已识别搜索爬虫者永不进入 trap / maze / block，事件 `crawler.verified: false`，不升级严重度；`custom` + `customVerify(ip, ua)` 为运营者验证替代项。以下 DNS 流程仅适用于 Node。
+
 目的：**Googlebot 等合规爬虫永远进不了任何诱饵/maze**。
 
 - 触发条件：请求命中 decoy 路由，且 UA 匹配已知爬虫（Googlebot、Google-InspectionTool、GoogleOther、Bingbot、Applebot、DuckDuckBot、YandexBot、Baiduspider）。detect 默认只在这个窄路径上做 DNS；trap 还在 maze、回放确认/已阻断请求上校验声明的爬虫，callback handler 也会验证，确保其免于 trap/回调告警。
@@ -136,7 +159,7 @@ CLI：`agent-guard canary new --env demo --placement "D3:password"`、`agent-gua
 | `automation_score` | 不加检测分 | v0.4a 自动观测最近 20 个请求间隔的规律性，样本足够才附加 0–1；无独立启用开关，不提升严重级别，不单独触发 block / maze |
 
 - `client_key = sha256(ip/24 或 ipv6/48 + UA)[0:16]`，不存原始 IP 到告警（日志可配置是否保留原 IP，默认保留在本地日志、告警中打码）。
-- 状态存内存 LRU（默认 50k client_key，TTL 30 min）；多实例部署时分数是 per-instance 近似值，MVP 接受此限制（不引入 Redis）。
+- Node 状态存内存 LRU（默认 50k client_key，TTL 30 min）；多实例分数是 per-instance 近似值。Web 必须显式提供 StateStore 才保留跨请求状态；无 store 时关闭 incident / rateLimit / block / timing / maze 会话准入并警告一次。`memoryStore()` 仅单 isolate；持久 store 由运营者提供，不自动承诺全局一致性。
 
 v0.3a / unreleased 新增的关联层独立于上述分数：同一 `client_key` 在默认固定 15 min 窗口内附加可选 `incident`（id、最近 32 项有序 sequence、first_seen/last_seen、low/medium/high confidence）。`incident.windowMs` 可配置，0 关闭；50k 客户端 LRU，序列以四位编码存储。置信度只升不降，不提升严重级别；detect 下不改变 HTTP 响应或诱饵决策，显式 trap 可将 high 用于确认闸门。爬虫与 allowlist 免疫始终优先。robots 只增加内部序列标记，不新增事件类型。共享网络下 client_key 不代表真实用户或登录会话。
 
@@ -270,15 +293,19 @@ export interface AgentGuardConfig {
 
 ## 10. 运行时 adapter
 
-> 包名待定：npm 上 `agent-guard` 已被无关项目占用，建议发布为 `@imwyvern/agent-guard`（见 repo-proposal.md）。下表的 `agent-guard/*` 指该包的 subpath export。
+> 当前包名为 `@imwyvern/agent-guard`，尚未发布到 npm；从源码/git 或本地 `npm pack` tarball 安装。下表使用实际导出后缀，完整接入见 [edge.md](edge.md)。
 
 | 阶段 | Adapter | 说明 |
 |---|---|---|
-| v0.1 | `agent-guard/express` | `app.use(agentGuard(config))`；body 扫描需放在 `express.json()`/`urlencoded()` 之后（文档给出顺序） |
-| v0.1 | `agent-guard/node`（原生 `http`） | `(req, res, next)` 兼容层 + `wrap(handler)`，供原生 http / Next.js custom server / Koa 等 |
-| v0.2（已完成） | `agent-guard/hono` | Node ≥20；有界克隆请求体扫描；edge 仍未实现 |
-| v0.3a / unreleased（已完成） | `agent-guard/fastify`、`agent-guard/koa` | Fastify preHandler / Koa 宿主解析后检查；共享验收、原生 crawler 404 与可选 lure 变换 |
-| v0.4b（未实现） | `agent-guard/cloudflare`、`agent-guard/vercel-edge` | 用 WebCrypto；rDNS 改为 DoH（需显式配置 DoH 端点，否则 Edge 上 crawler 校验依赖平台 `cf.verifiedBot` 等字段） |
+| v0.1 | `./express` | `app.use(agentGuard(config))`；body 扫描需放在 `express.json()`/`urlencoded()` 之后（文档给出顺序） |
+| v0.1 | `./node`（原生 `http`） | `(req, res, next)` 兼容层 + `wrap(guard, handler)`，供原生 http / Next.js custom server / Koa 等 |
+| v0.2（已完成） | `./hono` | Node ≥20；有界克隆请求体扫描；仍使用 Node 核心 |
+| v0.3a / unreleased（已完成） | `./fastify`、`./koa` | Fastify preHandler / Koa 宿主解析后检查；共享验收、原生 crawler 404 与可选 lure 变换 |
+| v0.4b / unreleased（已实现） | `./web` | `createWebGuard`、`memoryStore`；`handle` 返回 `Response \| null`，WebCrypto，无 DNS / DoH；默认 `ua-bypass` 或运营者 `custom` |
+| v0.4b / unreleased（已实现） | `./workers` | `fromEnv(env)` 必需 secret/seed 绑定，无默认密钥；`withAgentGuard` 包装 `{ fetch }`，默认 `CF-Connecting-IP` |
+| v0.4b / unreleased（已实现） | `./next` | `agentGuardMiddleware` 返回 `Response \| undefined`；不 import `next`，必须显式设置可信 `ipHeader` |
+| v0.4b / unreleased（已实现） | `./deno`、`./bun` | `denoHandler` / `bunHandler`，使用宿主连接 IP |
+| v0.4b / unreleased（已实现） | `./hono-web` | `honoWeb` 使用 Web core，与 Node `./hono` 分离，不 import `hono` |
 
 ## 11. 可观测性
 

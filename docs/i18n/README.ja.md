@@ -4,7 +4,7 @@ An AI-agent honeypot middleware for Node and the edge.
 
 （Node とエッジ向けの AI エージェント・ハニーポット・ミドルウェア。）
 
-[English](../../README.md) | [简体中文](README.zh-CN.md) | [繁體中文](README.zh-TW.md) | [日本語](README.ja.md) | [한국어](README.ko.md) | [Español](README.es.md)
+[English](../../README.md) | [简体中文](../i18n/README.zh-CN.md) | [繁體中文](../i18n/README.zh-TW.md) | [日本語](../i18n/README.ja.md) | [한국어](../i18n/README.ko.md) | [Español](../i18n/README.es.md)
 
 ## なぜ必要か
 
@@ -14,7 +14,7 @@ An AI-agent honeypot middleware for Node and the edge.
 
 **現在提供しているものと、まだ提供していないもの。**
 
-- **現在**の対象は HTTP/API 層です。隔離された 5 つのデコイルート、MCP および GraphQL デコイ、不活性カナリア認証情報（`AG-CANARY-…`）。ランタイム依存関係はゼロで、Node ≥20 向けに Express、Node `http`、Hono、Fastify、Koa のアダプターがあります。
+- **現在**の対象は HTTP/API 層です。隔離された 5 つのデコイルート、MCP および GraphQL デコイ、不活性カナリア認証情報（`AG-CANARY-…`）。ランタイム依存関係はゼロで、Node ≥20 向けに Express、Node `http`、Hono、Fastify、Koa のアダプターがあります。加えて v0.4b の Web / Edge アダプター（未リリース）を提供します。
 - **ホストレベルの honeyfile**（ディスク上の偽の `.env`、クラウド認証情報、SSH 鍵、kubeconfig と、アクセス時のアラート）は**計画中**であり、未実装です。将来の `agent-guard seed` コマンドは[ロードマップ](../roadmap.md)にあります。
 - **「偽の成功」による欺瞞** — 攻撃者の AI に侵入が成功したと信じさせる可能性のある模擬環境 — は**計画中**です（オプトイン必須、先に安全性を評価）。未実装です。[deception.md](../deception.md) を参照してください。
 - **攻撃者のトークンを消費する**ことは、まだ**実証されていません**。実験的な迷路のバイト比はシミュレーションで 1:1 であり、下限の 3:1 を下回ります。時間比の数字は 25 ms/request モデルであり、実際の LLM エージェントでの測定ではありません。その測定が終わるまで、トークン消費を期待して迷路を有効にしないでください。[exhaust.md](../exhaust.md) と [trap-mode.md](../trap-mode.md) を参照してください。
@@ -35,7 +35,7 @@ An AI-agent honeypot middleware for Node and the edge.
 - **対応時間の窓** — 運用者向けのインシデントタイムライン、滞在時間（dwell-time）指標、および運用者自身の鍵ローテーション / 遮断スクリプトへのフック。プロセス内のインシデント相関と `dwell_ms` は既に提供済みです。運用者向けタイムラインとフックは未実装です。
 - **隔離されたデコイホスト** — 本番アプリケーションプロセスから分離された専用のデコイ環境。
 - **実エージェントによるトークンコスト評価** — 実験的な迷路を有効にする前に、実際の AI エージェントのトークンを本当に消費するかを測定します。現在のバイト比 1:1 は仮説にすぎません。
-- **Edge アダプター（v0.4b）** — Web 標準コアに加え、Cloudflare Workers、Next.js middleware、Deno、Bun。
+- **Edge アダプター（v0.4b）** — **実装済み（未リリース）**：Web 標準コア、Cloudflare Workers、Next.js middleware / Vercel Edge、Deno、Bun、Hono-web。
 
 詳細な計画は [docs/roadmap.md](../roadmap.md) にあります。範囲と誠実な主張は [docs/positioning.md](../positioning.md) にあります。
 
@@ -110,7 +110,7 @@ const listener = wrap(guard, (_req, res) => res.end('Hello'));
 
 ## Hono（Node ランタイム）
 
-v0.2 の Hono アダプターは `@imwyvern/agent-guard/hono` として利用でき、オプションの `hono` peer を伴います。Node ≥20 が必要です。共有コアはまだ `node:crypto` と Node DNS を使っています。エッジランタイムと WebCrypto コアは v0.4b の予定です。
+v0.2 の Hono アダプターは `@imwyvern/agent-guard/hono` として利用でき、オプションの `hono` peer を伴います。Node ≥20 が必要で、Node コアは `node:crypto` と Node DNS を使います。Workers/Bun/Deno では `@imwyvern/agent-guard/hono-web` と `@imwyvern/agent-guard/web` の `createWebGuard` を使ってください（v0.4b、未リリース）。
 
 ```ts
 import { Hono } from 'hono';
@@ -132,7 +132,121 @@ serve({ fetch: app.fetch, hostname: '127.0.0.1', port: 3000 });
 
 ## Fastify と Koa（Node ランタイム）
 
-v0.3a（未リリース）では `@imwyvern/agent-guard/fastify` と `@imwyvern/agent-guard/koa` の `agentGuard` を追加し、同じ guard または config を受け取ります。Fastify はルートより前に `await app.register(agentGuard(guard))` で登録します。ボディ解析後の `preHandler` で検査します。Koa はサイズ制限付きボディパーサーの後に `app.use(agentGuard(guard))` を配置します。どちらもリクエストストリームを消費せず、ホスト固有のクローラー向け 404、detect モードでのアラートのみのリプレイ検出、オプトインの lure 変換を保ちます。フレームワークはオプションの peer で、コアのランタイム依存関係は増えません。[Fastify デモ](../../examples/fastify-demo/server.ts)、[Koa デモ](../../examples/koa-demo/server.ts)、[アダプターガイド](../community.md)を参照してください。エッジランタイムは引き続きロードマップ上の作業です。
+v0.3a（未リリース）では `@imwyvern/agent-guard/fastify` と `@imwyvern/agent-guard/koa` の `agentGuard` を追加し、同じ guard または config を受け取ります。Fastify はルートより前に `await app.register(agentGuard(guard))` で登録します。ボディ解析後の `preHandler` で検査します。Koa はサイズ制限付きボディパーサーの後に `app.use(agentGuard(guard))` を配置します。どちらもリクエストストリームを消費せず、ホスト固有のクローラー向け 404、detect モードでのアラートのみのリプレイ検出、オプトインの lure 変換を保ちます。フレームワークはオプションの peer で、コアのランタイム依存関係は増えません。[Fastify デモ](../../examples/fastify-demo/server.ts)、[Koa デモ](../../examples/koa-demo/server.ts)、[アダプターガイド](../community.md)を参照してください。
+
+## Edge / Web runtimes
+
+v0.4b はこの**未リリースのツリー**に実装済みで、実行時依存はゼロです。git/ソースまたはローカルの `npm pack` tarball からインストールしてください。npm には未公開です。Web エントリーは WebCrypto とホストの構造的型を使い、アダプターは `next` や `hono` をインポートしません。
+
+`createWebGuard(config)` は Web guard を返します。`await guard.handle(request, ctx?)` は介入時に `Response`、ホストへ通過させる場合に `null` を返します。
+
+| ランタイム | `@imwyvern/agent-guard` に続くインポート接尾辞 | クライアント IP |
+| --- | --- | --- |
+| Web 標準ホスト | `/web`（`createWebGuard`） | ホストの `ctx.clientIp` または明示的な `ipHeader`。なければ `unknown` |
+| Cloudflare Workers | `/workers`（`fromEnv`、`withAgentGuard`） | `fromEnv` の既定値は `CF-Connecting-IP` |
+| Next.js middleware / Vercel Edge | `/next`（`agentGuardMiddleware`） | 運用者による `ipHeader` 設定が必須 |
+| Deno | `/deno`（`denoHandler`） | `remoteAddr.hostname` |
+| Bun | `/bun`（`bunHandler`） | `server.requestIP(request)` |
+| エッジ上の Hono | `/hono-web`（`honoWeb`）+ `/web` | Web guard で `ipHeader` を明示 |
+| Node ≥20 上の Hono | `/hono`（`agentGuard`）+ ルートの Node コア | ソケット IP。信頼できる `clientIp` による上書き |
+
+次の表は `/web` と上記の五つの Web アダプターに適用され、Bun/Deno 上の Hono も含みます。`/hono` は Node コア（`node:crypto` / Node DNS）を維持します。
+
+| 機能 | Web コア / Workers / Next / Deno / Bun / Hono-web | Node 上の Hono（`/hono`） |
+| --- | --- | --- |
+| ステートレス機能 | デコイルート、カナリア生成/再利用検出、HMAC ステートレス迷路**ノード**、fetch アラート、Prometheus（単一 isolate の視点） | 利用可能。メトリクスはプロセス単位 |
+| インシデント相関、rateLimit、block、タイミングスコア、迷路セッションの受け入れ | `StateStore` が必要。未指定なら自動無効化し、guard ごとに一度コンソール警告。`memoryStore()` は isolate ごとで、グローバルではない | 上限付きのプロセス内状態 |
+| クローラーポリシー | 既定の `ua-bypass`：Googlebot/Bingbot など認識対象の検索クローラーを名乗るクライアントは trap/maze/block に入らず、`crawler.verified: false`。`custom` 検証器も利用可能。DNS / DoH なし | Node DNS 検証、または設定したポリシー |
+| `trap.delay` | 既定で無効。エッジでは経過時間に課金されるため非推奨。明示的に有効化しても上限 3000 ms | 既定で無効、オプトイン |
+| 転送ヘッダー | 未設定のヘッダーは信頼しない。明示した `x-forwarded-for` は右端の空でないホップを使うため、信頼できるプロキシが必要 | 明示的に信頼した `clientIp` コールバック |
+| SMTP | 利用不可。fetch による webhook / Slack / Telegram / Feishu を使用 | SMTP は Node のみ |
+
+trap は全ランタイムで既定無効です。署名済み迷路ノードだけでは store なしのセッション受け入れはできません。迷路は引き続き実験段階（シミュレーションのバイト比 1:1）です。永続 store は運用者が提供します。StateStore の例、完全な縮退表、トラブルシューティングは [Edge 運用ガイド](../edge.md) を参照してください。この README の後続の設定・アラート例は Node API 用です。
+
+**Workers** — 環境バインディングで `AG_CANARY_SECRET` と `AG_PROJECT_SEED` を渡します。`fromEnv(env)` は欠落/空の値を拒否し、既定の秘密鍵はありません。この最小例に StateStore はありません。
+
+```ts
+import { fromEnv, withAgentGuard } from '@imwyvern/agent-guard/workers';
+import type { WebContext, WebGuard } from '@imwyvern/agent-guard/web';
+
+let guard: WebGuard | undefined;
+export default {
+  fetch(request: Request, env: Record<string, unknown>, ctx: WebContext) {
+    // Bind AG_CANARY_SECRET and AG_PROJECT_SEED in the host environment.
+    guard ??= fromEnv(env);
+    return withAgentGuard(guard, {
+      fetch: () => new Response('Hello'),
+    }).fetch(request, env, ctx);
+  },
+};
+```
+
+**Next.js / Vercel Edge** — `middleware.ts`。信頼できる入口プロキシが上書きするヘッダーを設定します。アダプターは介入時に `Response`、通過時に `undefined` を返し、`next` をインポートしません。
+
+```ts
+import { createWebGuard } from '@imwyvern/agent-guard/web';
+import { agentGuardMiddleware } from '@imwyvern/agent-guard/next';
+
+const secret = process.env.AG_CANARY_SECRET;
+const projectSeed = process.env.AG_PROJECT_SEED;
+if (!secret || !projectSeed) throw new Error('Set AG_CANARY_SECRET and AG_PROJECT_SEED');
+const guard = createWebGuard({
+  project: 'catalog', env: 'production', mode: 'detect', projectSeed,
+  ipHeader: 'x-real-ip', // Only trust a header overwritten by your ingress.
+  canary: { secret, registry: { version: 1, prefix: 'AG-CANARY-', canaries: [] } },
+});
+export const middleware = agentGuardMiddleware(guard);
+export const config = {
+  matcher: ['/((?!_next/static|_next/image|favicon\\.ico|robots\\.txt|sitemap\\.xml|assets/).*)'],
+};
+```
+
+**Deno** — ローカルの利用側に tarball をインストールし、Deno 2 の `nodeModulesDir: "manual"` を使います。この二つの環境変数の読み取りと、サーバーのネットワークアクセスを許可してください。
+
+```ts
+import { createWebGuard } from '@imwyvern/agent-guard/web';
+import { denoHandler } from '@imwyvern/agent-guard/deno';
+
+const secret = Deno.env.get('AG_CANARY_SECRET');
+const projectSeed = Deno.env.get('AG_PROJECT_SEED');
+if (!secret || !projectSeed) throw new Error('Set AG_CANARY_SECRET and AG_PROJECT_SEED');
+const guard = createWebGuard({
+  project: 'catalog', env: 'production', mode: 'detect', projectSeed,
+  canary: { secret, registry: { version: 1, prefix: 'AG-CANARY-', canaries: [] } },
+});
+Deno.serve(denoHandler(guard, () => new Response('Hello')));
+```
+
+**Bun** — アダプターはサーバーから接続 IP を取得します。
+
+```ts
+import { createWebGuard } from '@imwyvern/agent-guard/web';
+import { bunHandler } from '@imwyvern/agent-guard/bun';
+
+const secret = Bun.env.AG_CANARY_SECRET;
+const projectSeed = Bun.env.AG_PROJECT_SEED;
+if (!secret || !projectSeed) throw new Error('Set AG_CANARY_SECRET and AG_PROJECT_SEED');
+const guard = createWebGuard({
+  project: 'catalog', env: 'production', mode: 'detect', projectSeed,
+  canary: { secret, registry: { version: 1, prefix: 'AG-CANARY-', canaries: [] } },
+});
+Bun.serve({ fetch: bunHandler(guard, () => new Response('Hello')) });
+```
+
+**エッジ上の Hono** — この Workers 例は同じ必須バインディングを使います。Bun/Deno では `createWebGuard` で Web guard を作り、そのホスト用の信頼できる `ipHeader` を設定します。Hono は利用側アプリにインストールしてください。
+
+```ts
+import { Hono } from 'hono';
+import { fromEnv } from '@imwyvern/agent-guard/workers';
+import { honoWeb } from '@imwyvern/agent-guard/hono-web';
+import type { WebGuard } from '@imwyvern/agent-guard/web';
+
+let guard: WebGuard | undefined;
+const app = new Hono<{ Bindings: Record<string, unknown> }>();
+app.use('*', (c, next) => honoWeb(guard ??= fromEnv(c.env))(c, next));
+app.get('/', c => c.text('Hello'));
+export default app;
+```
 
 ## MCP / LLM ツールエンドポイントのデコイ
 
@@ -285,7 +399,7 @@ WAF、DDoS 防御、認証システム、汎用ボットブロッカーではあ
 
 リバースプロンプトインジェクション / counter-injection（E4）は製品に一切含めません。外向きの探索や、guard が第三者に向けて開始するコールバックは行いません。外向きの通知は運用者が設定したアラートアダプターだけで、既存のクローラー識別用 DNS 検証は変わりません。カナリアは不活性な HMAC トークンであり、実在するベンダーの認証情報は使いません。第三者の honeytoken サービス（Canarytokens など）は利用せず、コールバックカナリアは運用者自身のホストでのみ受信します。
 
-Edge アダプター（Cloudflare Workers、Next.js middleware、Deno、Bun、Vercel Edge）は**今回のリリースには含まれず**、Web 標準コアとともに次の **v0.4b** で取り組む予定です。Hono はすでに **Node ≥20** 向けに提供されています。
+Edge / Web ランタイムは**この未リリースの v0.4b ツリーで対応済み**です。永続状態には運用者が提供する store が必要です。`StateStore` がなければインシデント相関、rateLimit、block、タイミングスコア、迷路セッションの受け入れは無効となり、一度警告します。`memoryStore()` は isolate 単位です。既定のクローラーポリシーは未検証の `ua-bypass`（DNS / DoH なし）で、SMTP は Node 専用です。`trap.delay` は既定無効でエッジでは非推奨、明示的に有効化しても上限 3000 ms です。[Edge 運用ガイド](../edge.md) を参照してください。
 
 v0.4a には以下の**明示的なオプトインが必要で、デフォルトでは無効**の連携と制御が実装されています。既定のモードは `mode: 'detect'` のままです。
 
@@ -302,7 +416,8 @@ v0.4a には以下の**明示的なオプトインが必要で、デフォルト
 
 - [位置づけ](../positioning.md) — 趣旨、範囲の境界、誠実な主張の表（主張 / 状態 / 根拠）。
 - [コミュニティ](../community.md) — アダプター、検出シグネチャ、翻訳、RFC の貢献方法。
-- [ロードマップ](../roadmap.md) — 進む方向、v0.4a の完了項目、v0.4b の Edge 計画。persona/deception の拡張は設計段階です。
+- [ロードマップ](../roadmap.md) — 進む方向、v0.4a/v0.4b の完了項目（未リリース）、v0.5+ の計画。persona/deception の拡張は設計段階です。
+- [Edge 運用ガイド](../edge.md) — ランタイムの接続、StateStore の例、縮退とトラブルシューティング。
 - [Exhaust](../exhaust.md) — 実装済みのオプトイン遅延と実験的な迷路。コンテキスト消費（E3）は未実装です。トークン消費は実証されていません。
 - [Deception](../deception.md) — デコイデータをより信じられるものにし、攻撃者の agent がそれを本物として扱う可能性を高める。「偽の成功」は計画中であり、未実装です。
 - [設計](../design.md)、[契約](../codex-contract.md)、[KPI](../kpi.md)、[脅威モデル](../threat-model.md)。先行事例は概念の参考にすぎず、第三者プロジェクトのコードは複製していません。

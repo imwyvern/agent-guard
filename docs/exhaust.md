@@ -89,4 +89,4 @@ canary 回放（critical）或 incident.confidence=high ──► 可进入 E1/E
 3. **E3** 未实现，视 E2 的真实 agent 实测效果再定。
 4. **E4** 不做。
 
-后续决策点：真实 agent 测量是否支持 E2 的成本收益；Web-standard core 与 Edge 适配器留待 v0.4b，不在本批交付。
+后续决策点：真实 agent 测量是否支持 E2 的成本收益；Web-standard core 与 Edge 适配器已在 v0.4b 实现（unreleased）。

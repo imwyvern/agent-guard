@@ -1,6 +1,6 @@
-# agent-guard Roadmap（v0.2 → v0.4b）
+# agent-guard Roadmap（v0.4b 已完成，v0.5+ 规划）
 
-> 状态：v0.4a 已实现（unreleased），叙事与后续方向更新于 2026-11-11（HKT）。作者：agent-guard 维护者。
+> 状态：v0.4a / v0.4b 已实现（unreleased），文档状态更新于 2026-11-11（HKT）；v0.5+ 见 [plan-v0.5-v0.7.md](plan-v0.5-v0.7.md)。作者：agent-guard 维护者。
 > 范围约束不变：**detect + alert only** 为默认；canary 永远 inert；decoy 永远 `noindex`；verified crawler 永远不进 decoy；任何 blocking / budget trap 只能 opt-in 且默认关闭；不做生产环境 reverse prompt injection、不做全站 tarpit、不攻击任何第三方系统；不 fork、不复制其他项目代码（尤其 GPL 的 Beelzebub，只借鉴思路）。
 > 定位与诚实声明见 [positioning.md](positioning.md)：这是服务器层面的**最后一道行程绊线与早期预警 / 延迟层**，不能替代补丁、WAF 或最小权限。
 
@@ -17,7 +17,7 @@
 | 0.3 | **响应时间窗口 / incident timeline** | 部分交付 | v0.3a 已有进程内 incident 关联和 canary 回放的 `dwell_ms`。面向运营者的时间线，以及挂钩到运营者自己的密钥轮换 / 阻断脚本，尚未交付。 |
 | 0.4 | **隔离诱饵主机** | 规划中，未交付 | 与生产应用进程分离的独立诱饵环境。相关讨论见 [distribution.md](distribution.md)。 |
 | 0.5 | **真实 agent 的 token 成本评估** | 规划中，未交付 | 用我们控制的真实 AI agent 测量实验性迷宫是否真的消耗对方 token。当前模拟字节比为 1:1，低于 3:1 下限，**不能声称已消耗攻击者 token**。见 [exhaust.md](exhaust.md)、[trap-mode.md](trap-mode.md)。 |
-| 0.6 | **Edge 适配器（v0.4b）** | 规划中，未交付 | Web-standard core，以及 Cloudflare Workers、Next.js middleware、Deno、Bun。Next.js 另见 issue #4。 |
+| 0.6 | **Edge 适配器（v0.4b）** | ✅ 已完成，unreleased | Web-standard core、Cloudflare Workers、Next.js middleware / Vercel Edge、Deno、Bun、Hono-web。降级与接入见 [edge.md](edge.md)。 |
 
 README 六个语言版本的顶部都有同一份短列表。贡献入口见 [community.md](community.md) 的 roadmap / good first issue 说明。
 
@@ -36,7 +36,7 @@ README 六个语言版本的顶部都有同一份短列表。贡献入口见 [co
 | **robots.txt / AIPREF / ai.txt / llms.txt** | IETF AIPREF：`Content-Usage` 写进 robots.txt 和 HTTP header（`train-ai=n` 等）；`/.well-known/ai.txt`、`llms.txt` 为社区约定 | decoy 路径在 robots.txt `Disallow` → 守规矩的 crawler 永远不会碰；可选输出 `Content-Usage` header；`llms.txt` 是新的 agent 入口（可作为 opt-in lure 位置，但 lure 必须 inert） | 偏好不是强制，不把"违反偏好"本身当攻击 |
 | **MCP / LLM tool endpoint 攻击面**（OWASP MCP Top 10、OWASP MCP Cheat Sheet） | tool poisoning、rug pull、tool shadowing、confused deputy、token 泄露（MCP01）、缺审计（MCP08）、shadow MCP server（MCP09） | 暴露在 HTTP 上的 MCP（Streamable HTTP, JSON-RPC）同样会被扫描：`/mcp`、`/sse`、`tools/list`、`tools/call` 枚举；decoy tool 被调用 = 高置信信号 | decoy tool description **不能含 imperative / 隐藏字符**（否则我们自己就成了 tool poisoning）；不回传诱导文本 |
 
-**定位总结**：其他项目大多是"独立蜜罐"或"agent 侧 tripwire"。agent-guard 的差异点是 **嵌入 Node ≥20 应用的零依赖 middleware（Edge 留待 v0.4b）**，强调 **以零误报为目标（verified crawler / allowlist bypass）+ inert canary + 可观测**；并不保证识别人类或恶意意图。
+**定位总结**：其他项目大多是"独立蜜罐"或"agent 侧 tripwire"。agent-guard 的差异点是 **嵌入 Node ≥20 或 Web / Edge 应用的零运行时依赖 middleware（v0.4b 已实现，unreleased）**，强调 **以零误报为目标（verified crawler / allowlist bypass）+ inert canary + 可观测**；并不保证识别人类或恶意意图。
 
 ## 2. 优先级原则
 
@@ -55,21 +55,21 @@ README 六个语言版本的顶部都有同一份短列表。贡献入口见 [co
 | 2.4 | **Header / log injection 安全** | path、UA、canary id 会进日志、告警和响应头 | 过度清洗影响取证 → 只去控制字符 + 截断，原值长度记录 | CR/LF/控制字符被剥离；单测 |
 | 2.5 | **Property / fuzz tests**（canary parser、request inspector、sanitizer） | 覆盖手写用例想不到的输入 | 测试时间变长 → 固定 seed、限制迭代数 | 永不 throw、round-trip、篡改必拒、时间有上界 |
 | 2.6 | **Repo hygiene**：`SECURITY.md`、`CONTRIBUTING.md`、issue/PR templates、Dependabot（npm）；不使用 GitHub Actions CI/CodeQL（Dan 决定，改为本地 `npm test`/lint 验证） | 公开仓库的基本盘；OpenSSF Scorecard 的前置条件 | — | 本地测试全绿；Dependabot 配置生效 |
-| 2.7 | **Hono adapter**（Node 上验证，`@imwyvern/agent-guard/hono`） | Hono 基于 Web 标准，是走向 Workers / Bun / Deno 的跳板 | core 仍依赖 `node:crypto` → v0.2 先限定 Node runtime，v0.4b 再做 WebCrypto core | AC 主要用例（真人不触发、curl replay 必告警、Googlebot 不进 decoy）在 Hono 上通过 |
+| 2.7 | **Hono adapter**（Node 上验证，`@imwyvern/agent-guard/hono`） | Hono 基于 Web 标准，是走向 Workers / Bun / Deno 的跳板 | `./hono` 保留 Node 核心；v0.4b 已另行实现 `./hono-web` + WebCrypto core（unreleased） | AC 主要用例（真人不触发、curl replay 必告警、Googlebot 不进 decoy）在 Hono 上通过 |
 | 2.8 | **MCP / LLM tool endpoint decoy 示例** | MCP over HTTP 是 2026 年 agent 扫描的新热点 | decoy tool description 自身成为 tool poisoning → description 必须是中性描述、无 imperative、无隐藏字符，并有测试守护 | 示例 app 暴露一个 JSON-RPC `/mcp`：`tools/list` 含 decoy tool，调用即告警，返回 plausible permission error；canary inert；verified crawler 不进入 |
 | 2.9 | **AC-10 测量修正** | autocannon 只给整数毫秒 percentile，p50 ≤ 0.2 ms 的门槛无法被它判定 | 换测量方法可能被视为"放水" → 原 autocannon 数据照常记录，新方法另列，诚实写清 | 新增 `process.hrtime.bigint()` 级别的高分辨率测量（in-process 和 loopback 两种），报告 µs 级 p50/p99 增量并写入 `docs/bench-v0.2.md` |
 
 ## 4. v0.3 —— 多 runtime + 多场景 + 深度检测
 
-> **v0.3a / unreleased 已完成**：Fastify/Koa Node 适配器与共享验收、GraphQL helper/演示、API-only 放置文档、per-session incident、canary propagation tracing、placement linter/CLI，以及 README/五语译本和社区文档。当时为 detect-only；v0.4a 已补充 opt-in、默认关闭的 trap delay/rateLimit/block、实验性 maze、自托管 callback canary、告警 adapters 与 Prometheus 导出；机械 timing 自动观测，不参与处置。Web-standard core / Edge 留待 v0.4b；完整 MCP Streamable HTTP、其余行为信号与 Web Bot Auth 尚未完成。
+> **v0.3a / unreleased 已完成**：Fastify/Koa Node 适配器与共享验收、GraphQL helper/演示、API-only 放置文档、per-session incident、canary propagation tracing、placement linter/CLI，以及 README/五语译本和社区文档。当时为 detect-only；v0.4a 已补充 opt-in、默认关闭的 trap delay/rateLimit/block、实验性 maze、自托管 callback canary、告警 adapters 与 Prometheus 导出；机械 timing 自动观测，不参与处置。Web-standard core / Edge 已在 v0.4b 实现（unreleased）；完整 MCP Streamable HTTP、其余行为信号与 Web Bot Auth 尚未完成。
 
 ### 4.1 Runtimes
 | 项目 | Rationale | Risk | Acceptance |
 | --- | --- | --- | --- |
-| **Web-standard core**（未完成，v0.4b；`Request`→decision，WebCrypto HMAC，无 `node:*` import） | 一份 core 跑所有 edge runtime | WebCrypto 是 async，hot path 变 async → 只在 canary 候选出现时才算 HMAC | core bundle 在 `--platform=neutral` 下构建成功、无 `node:` import |
+| **Web-standard core**（✅ done，v0.4b / unreleased；`./web`） | `Request`/`Response`、WebCrypto HMAC、CryptoProvider 与共享纯逻辑 | 无 canary 候选且无 decoy 的路径不做 HMAC；无 store 时自动降级 | neutral 构建与 `check:neutral`、golden vectors、63 条差分与 Web 共享验收 |
 | **Fastify plugin**、**Koa middleware**（✅ done，v0.3a / unreleased） | Node 主流框架 | Fastify `preHandler` / Koa 宿主有界 body 解析后的顺序 | 每个 adapter 跑通共享 AC 套件 |
-| **Next.js middleware**、**Vercel Edge**、**Cloudflare Workers**（未完成，v0.4b） | 大量站点在 edge | edge 无持久内存 → 状态需外置（KV / Durable Object）或降级为无状态 | Miniflare / `next dev` 下 AC 通过；无状态模式下文档说明哪些信号失效 |
-| **Deno / Bun**（未完成，v0.4b） | 覆盖新 runtime | 测试矩阵膨胀 | CI matrix 中有 smoke test |
+| **Next.js middleware / Vercel Edge**、**Cloudflare Workers**（✅ done，v0.4b / unreleased；`./next`、`./workers`） | 无框架运行时依赖的结构化类型适配器 | 无 store 时关闭 incident / rateLimit / block / timing / maze 会话准入；IP 头需可信入口 | miniflare/workerd 冒烟通过；Next 的 Response / undefined 语义以结构化请求测试，无需安装 Next |
+| **Deno / Bun / Hono-web**（✅ done，v0.4b / unreleased；`./deno`、`./bun`、`./hono-web`） | Web core 的薄适配器；`./hono` 仍为 Node | `memoryStore()` 仅单 isolate；Web 不做 DNS / DoH，默认未验证 `ua-bypass`，无 SMTP | 提供 `smoke:workers` / `smoke:bun` / `smoke:deno`，运行时二进制不存在时如实跳过；Web/适配器测试与 `check:neutral` 通过 |
 
 ### 4.2 Scenarios
 | 场景 | 设计要点 | Acceptance |
@@ -89,11 +89,13 @@ README 六个语言版本的顶部都有同一份短列表。贡献入口见 [co
 | **Web Bot Auth verification** | 正向验证自报身份 agent；verified agent 同 verified crawler 一样 bypass decoy | 草案在演进（Dictionary vs bare string）；key directory 抓取本身是 SSRF 面 → 目录 URL 只允许 https、allowlist、超时、缓存、大小上限 | RFC 9421 测试向量通过；两种 `Signature-Agent` 形式都能解析；过期/篡改签名拒绝 |
 | **Prompt-injection-safe canary placement**（✅ done，v0.3a / unreleased；HTML / JSON / OpenAPI） | canary 文本可能被 agent 读进上下文 → 文本必须是数据，不是指令 | 自己变成 injection 源 → placement linter：禁止 imperative、禁止隐藏字符、禁止 URL 外呼诱导；v0.4a 已提供可选精确 `allowedHosts` 以 lint 运营者的 callback 放置，默认仍严格 | `agent-guard lint <path>` + 单测/文档；所有内置 decoy/lure 与 deception bench 通过 lint |
 
-## 5. v0.4a 已实现 / v0.4b 与后续规划
+## 5. v0.4a / v0.4b 已实现与 v0.5+ 规划
 
-> 第 0 节中的主机 honeyfile、假成功环境、响应时间窗口挂钩、隔离诱饵主机和真实 agent 评估，是 v0.4a 之后的产品方向，与本节的技术债（OTel、CEF/STIX、供应链、Web-standard core / Edge）并行。假成功必须 opt-in 且先做安全评估；迷宫在真实 agent 测量完成前不应作为默认建议启用。
+> 第 0 节中的主机 honeyfile、假成功环境、响应时间窗口挂钩、隔离诱饵主机和真实 agent 评估，是 v0.4a 之后的产品方向，与本节的技术债（OTel、CEF/STIX、供应链）并行；Web-standard core / Edge 已在 v0.4b 完成（unreleased）。后续顺序与验收见 [plan-v0.5-v0.7.md](plan-v0.5-v0.7.md)。假成功必须 opt-in 且先做安全评估；迷宫在真实 agent 测量完成前不应作为默认建议启用。
 
 > **v0.4a / unreleased 已完成**：Slack / Telegram / 飞书 / SMTP 告警 adapters（opt-in、零运行时依赖）；Prometheus 文本导出（不默认挂载、无路径 label）；机械节奏观测（不升严重级别、不单独触发 block/maze）；独立 opt-in 的 delay / rateLimit / block；实验性有界 maze；自托管 callback canary（handler 显式挂载，guard 不 fetch baseUrl）；可选精确 lint 主机放行。默认 `mode: 'detect'`，trap 全部功能开关默认关闭。
+
+> **v0.4b / unreleased 已完成**：CryptoProvider、StateStore / memoryStore、Web-standard core 与六个 Web 导出、neutral 构建与检查、golden / differential / Web AC、Workers/Bun 冒烟、Deno 脚本及 `bench:latency:web`。无 DNS / DoH；`ua-bypass` 或 `custom`；无 store 自动降级；trap 默认关闭，edge delay 不建议启用且上限 3000 ms。完整边界见 [edge.md](edge.md)。
 
 | 项目 | Rationale | Risk | Acceptance |
 | --- | --- | --- | --- |
@@ -115,6 +117,9 @@ README 六个语言版本的顶部都有同一份短列表。贡献入口见 [co
 - 默认 alert-only。
 
 ## 7. 参考
+
+- [Edge / Web 运营指南](edge.md)：接入、StateStore、降级与故障排查。
+- [v0.5–v0.7 实施规划](plan-v0.5-v0.7.md)：后续顺序与验收。
 
 - Sundew: https://sundew.sh/ · Oubliette: https://github.com/oubliettesecurity/oubliette-trap · Drosera: https://droseraproject.org/ · Snare: https://snare.sh/
 - Beelzebub（GPL-3.0，仅参考思路）: https://github.com/mariocandela/beelzebub

@@ -4,7 +4,7 @@ An AI-agent honeypot middleware for Node and the edge.
 
 (Node와 엣지를 위한 AI 에이전트 허니팟 미들웨어.)
 
-[English](../../README.md) | [简体中文](README.zh-CN.md) | [繁體中文](README.zh-TW.md) | [日本語](README.ja.md) | [한국어](README.ko.md) | [Español](README.es.md)
+[English](../../README.md) | [简体中文](../i18n/README.zh-CN.md) | [繁體中文](../i18n/README.zh-TW.md) | [日本語](../i18n/README.ja.md) | [한국어](../i18n/README.ko.md) | [Español](../i18n/README.es.md)
 
 ## 왜 필요한가
 
@@ -14,7 +14,7 @@ An AI-agent honeypot middleware for Node and the edge.
 
 **오늘 제공되는 것과 아직 제공되지 않는 것.**
 
-- **오늘**의 범위는 HTTP/API 계층입니다. 격리된 다섯 개의 디코이 라우트, MCP 및 GraphQL 디코이, 비활성 카나리아 자격 증명(`AG-CANARY-…`). 런타임 의존성은 없으며, Node ≥20에서 Express, Node `http`, Hono, Fastify, Koa 어댑터를 제공합니다.
+- **오늘**의 범위는 HTTP/API 계층입니다. 격리된 다섯 개의 디코이 라우트, MCP 및 GraphQL 디코이, 비활성 카나리아 자격 증명(`AG-CANARY-…`). 런타임 의존성은 없으며, Node ≥20에서 Express, Node `http`, Hono, Fastify, Koa 어댑터를 제공합니다. 또한 v0.4b의 Web / Edge 어댑터가 구현되어 있습니다(아직 릴리스되지 않음).
 - **호스트 수준 honeyfile**(디스크상의 가짜 `.env`, 클라우드 자격 증명, SSH 키, kubeconfig와 접근 시 알림)은 **계획 중**이며 아직 제공되지 않습니다. 미래의 `agent-guard seed` 명령은 [로드맵](../roadmap.md)에 있습니다.
 - **「가짜 성공」 기만** — 공격자의 AI가 침입에 성공했다고 믿게 만들 수 있는 시뮬레이션 환경 — 은 **계획 중**입니다(옵트인 필수, 먼저 안전성 평가). 아직 제공되지 않습니다. [deception.md](../deception.md)를 참고하세요.
 - **공격자의 토큰을 소모한다**는 주장은 아직 **입증되지 않았습니다**. 실험적 미로의 바이트 비율은 시뮬레이션에서 1:1로, 하한인 3:1에 미치지 못합니다. 시간 비율 수치는 25 ms/request 모델이며 실제 LLM agent를 측정한 결과가 아닙니다. 그 측정이 끝나기 전에는 토큰 소모를 기대하고 미로를 켜지 마세요. [exhaust.md](../exhaust.md)와 [trap-mode.md](../trap-mode.md)를 참고하세요.
@@ -35,7 +35,7 @@ An AI-agent honeypot middleware for Node and the edge.
 - **대응 시간 창** — 운영자용 인시던트 타임라인, 체류 시간(dwell-time) 지표, 그리고 운영자 자신의 키 교체 / 차단 스크립트에 연결하는 훅. 프로세스 내 인시던트 상관과 `dwell_ms`는 이미 제공됩니다. 운영자용 타임라인과 훅은 아직 없습니다.
 - **격리된 디코이 호스트** — 프로덕션 애플리케이션 프로세스와 분리된 전용 디코이 환경.
 - **실제 agent 토큰 비용 평가** — 실험적 미로를 켜기 전에 실제 AI agent의 토큰을 정말로 소모하는지 측정합니다. 현재 1:1 바이트 비율은 가설일 뿐입니다.
-- **Edge 어댑터(v0.4b)** — Web 표준 코어와 Cloudflare Workers, Next.js middleware, Deno, Bun.
+- **Edge 어댑터(v0.4b)** — **구현 완료(아직 릴리스되지 않음)**: Web 표준 코어, Cloudflare Workers, Next.js middleware / Vercel Edge, Deno, Bun, Hono-web.
 
 자세한 계획은 [docs/roadmap.md](../roadmap.md)에 있습니다. 범위와 정직한 주장은 [docs/positioning.md](../positioning.md)에 있습니다.
 
@@ -110,7 +110,7 @@ const listener = wrap(guard, (_req, res) => res.end('Hello'));
 
 ## Hono(Node 런타임)
 
-v0.2 Hono 어댑터는 `@imwyvern/agent-guard/hono`로 제공되며, 선택적 `hono` peer를 가집니다. Node ≥20이 필요합니다. 공유 코어는 여전히 `node:crypto`와 Node DNS를 사용합니다. 에지 런타임과 WebCrypto 코어는 v0.4b 작업으로 남아 있습니다.
+v0.2 Hono 어댑터는 `@imwyvern/agent-guard/hono`로 제공되며 선택적 `hono` peer를 가집니다. Node ≥20이 필요하고 Node 코어는 `node:crypto`와 Node DNS를 사용합니다. Workers/Bun/Deno에서는 `@imwyvern/agent-guard/hono-web`과 `@imwyvern/agent-guard/web`의 `createWebGuard`를 사용하세요(v0.4b, 아직 릴리스되지 않음).
 
 ```ts
 import { Hono } from 'hono';
@@ -132,7 +132,121 @@ serve({ fetch: app.fetch, hostname: '127.0.0.1', port: 3000 });
 
 ## Fastify와 Koa(Node 런타임)
 
-v0.3a(미출시)는 `@imwyvern/agent-guard/fastify`와 `@imwyvern/agent-guard/koa`의 `agentGuard`를 추가하며 동일한 guard 또는 config를 받습니다. Fastify 플러그인은 라우트보다 앞에 `await app.register(agentGuard(guard))`로 등록하고, 본문 파싱 후 `preHandler`에서 검사합니다. Koa에서는 크기를 제한하는 본문 파서 뒤에 `app.use(agentGuard(guard))`를 배치합니다. 두 어댑터 모두 요청 스트림을 소비하지 않으며, 호스트 고유의 크롤러 404, detect 모드에서 알림만 수행하는 재사용 탐지, 옵트인 lure 변환을 보존합니다. 프레임워크는 선택적 peer이며 코어 런타임 의존성은 늘지 않습니다. [Fastify 데모](../../examples/fastify-demo/server.ts), [Koa 데모](../../examples/koa-demo/server.ts), [어댑터 가이드](../community.md)를 참고하세요. 엣지 런타임은 계속 로드맵에 있습니다.
+v0.3a(미출시)는 `@imwyvern/agent-guard/fastify`와 `@imwyvern/agent-guard/koa`의 `agentGuard`를 추가하며 동일한 guard 또는 config를 받습니다. Fastify 플러그인은 라우트보다 앞에 `await app.register(agentGuard(guard))`로 등록하고, 본문 파싱 후 `preHandler`에서 검사합니다. Koa에서는 크기를 제한하는 본문 파서 뒤에 `app.use(agentGuard(guard))`를 배치합니다. 두 어댑터 모두 요청 스트림을 소비하지 않으며, 호스트 고유의 크롤러 404, detect 모드에서 알림만 수행하는 재사용 탐지, 옵트인 lure 변환을 보존합니다. 프레임워크는 선택적 peer이며 코어 런타임 의존성은 늘지 않습니다. [Fastify 데모](../../examples/fastify-demo/server.ts), [Koa 데모](../../examples/koa-demo/server.ts), [어댑터 가이드](../community.md)를 참고하세요.
+
+## Edge / Web runtimes
+
+v0.4b는 이 **아직 릴리스되지 않은 트리**에 구현되어 있으며 런타임 의존성은 0개입니다. git/소스 또는 로컬 `npm pack` tarball에서 설치하세요. npm에는 아직 게시되지 않았습니다. Web 진입점은 WebCrypto와 호스트의 구조적 타입을 사용하며, 어댑터는 `next`나 `hono`를 가져오지 않습니다.
+
+`createWebGuard(config)`는 Web guard를 반환합니다. `await guard.handle(request, ctx?)`는 가로챌 때 `Response`, 호스트로 통과시킬 때 `null`을 반환합니다.
+
+| 런타임 | `@imwyvern/agent-guard` 뒤의 가져오기 접미사 | 클라이언트 IP |
+| --- | --- | --- |
+| Web 표준 호스트 | `/web`(`createWebGuard`) | 호스트 `ctx.clientIp` 또는 명시적 `ipHeader`; 없으면 `unknown` |
+| Cloudflare Workers | `/workers`(`fromEnv`, `withAgentGuard`) | `fromEnv` 기본값은 `CF-Connecting-IP` |
+| Next.js middleware / Vercel Edge | `/next`(`agentGuardMiddleware`) | 운영자가 `ipHeader`를 설정해야 함 |
+| Deno | `/deno`(`denoHandler`) | `remoteAddr.hostname` |
+| Bun | `/bun`(`bunHandler`) | `server.requestIP(request)` |
+| 에지의 Hono | `/hono-web`(`honoWeb`) + `/web` | Web guard에서 `ipHeader` 명시 |
+| Node ≥20의 Hono | `/hono`(`agentGuard`) + 루트 Node 코어 | 소켓 IP; 신뢰할 수 있는 `clientIp` 재정의 |
+
+다음 표는 `/web`과 위의 다섯 Web 어댑터에 적용되며 Bun/Deno의 Hono도 포함합니다. `/hono`는 Node 코어(`node:crypto` / Node DNS)를 유지합니다.
+
+| 기능 | Web 코어 / Workers / Next / Deno / Bun / Hono-web | Node의 Hono(`/hono`) |
+| --- | --- | --- |
+| 상태 없이 가능한 기능 | 디코이 경로, 카나리아 생성/재사용 탐지, HMAC 무상태 미로 **노드**, fetch 알림, Prometheus(단일 isolate 관점) | 사용 가능; 지표는 프로세스 단위 |
+| 인시던트 상관, rateLimit, block, 타이밍 점수, 미로 세션 입장 | `StateStore` 필요; 없으면 자동으로 꺼지고 guard마다 콘솔 경고 한 번. `memoryStore()`는 isolate별이며 전역이 아님 | 크기가 제한된 프로세스 내부 상태 |
+| 크롤러 정책 | 기본 `ua-bypass`: Googlebot/Bingbot 등 알려진 검색 크롤러를 자칭하면 trap/maze/block에 들어가지 않음; `crawler.verified: false`. `custom` 검증기 사용 가능. DNS / DoH 없음 | Node DNS 검증 또는 설정된 정책 |
+| `trap.delay` | 기본 꺼짐; 에지에서는 경과 시간 과금 때문에 권장하지 않음; 명시적으로 켜도 최대 3000 ms | 기본 꺼짐, 옵트인 |
+| 전달 헤더 | 미설정 헤더는 신뢰하지 않음; 명시한 `x-forwarded-for`는 오른쪽 끝의 비어 있지 않은 홉을 사용하므로 신뢰할 수 있는 프록시 필요 | 명시적으로 신뢰한 `clientIp` 콜백 |
+| SMTP | 사용 불가; fetch 기반 webhook / Slack / Telegram / Feishu 사용 | SMTP는 Node 전용 |
+
+trap은 모든 런타임에서 기본으로 꺼집니다. 서명된 미로 노드만으로는 store 없는 세션 입장이 허용되지 않습니다. 미로는 여전히 실험적입니다(시뮬레이션 바이트 비율 1:1). 영속 store는 운영자가 제공합니다. StateStore 예제, 전체 기능 축소 표와 문제 해결은 [Edge 운영 가이드](../edge.md)를 참고하세요. 이 README의 뒤쪽 구성 및 알림 예제는 Node API를 설명합니다.
+
+**Workers** — 환경 바인딩으로 `AG_CANARY_SECRET`과 `AG_PROJECT_SEED`를 제공합니다. `fromEnv(env)`는 누락/빈 값을 거부하며 기본 비밀 키가 없습니다. 이 최소 예제에는 StateStore가 없습니다.
+
+```ts
+import { fromEnv, withAgentGuard } from '@imwyvern/agent-guard/workers';
+import type { WebContext, WebGuard } from '@imwyvern/agent-guard/web';
+
+let guard: WebGuard | undefined;
+export default {
+  fetch(request: Request, env: Record<string, unknown>, ctx: WebContext) {
+    // Bind AG_CANARY_SECRET and AG_PROJECT_SEED in the host environment.
+    guard ??= fromEnv(env);
+    return withAgentGuard(guard, {
+      fetch: () => new Response('Hello'),
+    }).fetch(request, env, ctx);
+  },
+};
+```
+
+**Next.js / Vercel Edge** — `middleware.ts`; 신뢰할 수 있는 진입 프록시가 덮어쓰는 헤더를 설정하세요. 어댑터는 가로챌 때 `Response`, 통과할 때 `undefined`를 반환하며 `next`를 가져오지 않습니다.
+
+```ts
+import { createWebGuard } from '@imwyvern/agent-guard/web';
+import { agentGuardMiddleware } from '@imwyvern/agent-guard/next';
+
+const secret = process.env.AG_CANARY_SECRET;
+const projectSeed = process.env.AG_PROJECT_SEED;
+if (!secret || !projectSeed) throw new Error('Set AG_CANARY_SECRET and AG_PROJECT_SEED');
+const guard = createWebGuard({
+  project: 'catalog', env: 'production', mode: 'detect', projectSeed,
+  ipHeader: 'x-real-ip', // Only trust a header overwritten by your ingress.
+  canary: { secret, registry: { version: 1, prefix: 'AG-CANARY-', canaries: [] } },
+});
+export const middleware = agentGuardMiddleware(guard);
+export const config = {
+  matcher: ['/((?!_next/static|_next/image|favicon\\.ico|robots\\.txt|sitemap\\.xml|assets/).*)'],
+};
+```
+
+**Deno** — 로컬 소비 프로젝트에 tarball을 설치하고 Deno 2의 `nodeModulesDir: "manual"`을 사용하세요. 두 환경 바인딩 읽기와 서버 네트워크 접근을 허용하세요.
+
+```ts
+import { createWebGuard } from '@imwyvern/agent-guard/web';
+import { denoHandler } from '@imwyvern/agent-guard/deno';
+
+const secret = Deno.env.get('AG_CANARY_SECRET');
+const projectSeed = Deno.env.get('AG_PROJECT_SEED');
+if (!secret || !projectSeed) throw new Error('Set AG_CANARY_SECRET and AG_PROJECT_SEED');
+const guard = createWebGuard({
+  project: 'catalog', env: 'production', mode: 'detect', projectSeed,
+  canary: { secret, registry: { version: 1, prefix: 'AG-CANARY-', canaries: [] } },
+});
+Deno.serve(denoHandler(guard, () => new Response('Hello')));
+```
+
+**Bun** — 어댑터가 서버에서 연결 IP를 가져옵니다.
+
+```ts
+import { createWebGuard } from '@imwyvern/agent-guard/web';
+import { bunHandler } from '@imwyvern/agent-guard/bun';
+
+const secret = Bun.env.AG_CANARY_SECRET;
+const projectSeed = Bun.env.AG_PROJECT_SEED;
+if (!secret || !projectSeed) throw new Error('Set AG_CANARY_SECRET and AG_PROJECT_SEED');
+const guard = createWebGuard({
+  project: 'catalog', env: 'production', mode: 'detect', projectSeed,
+  canary: { secret, registry: { version: 1, prefix: 'AG-CANARY-', canaries: [] } },
+});
+Bun.serve({ fetch: bunHandler(guard, () => new Response('Hello')) });
+```
+
+**에지의 Hono** — 이 Workers 예제는 동일한 필수 바인딩을 사용합니다. Bun/Deno에서는 `createWebGuard`로 Web guard를 만들고 호스트에 맞는 신뢰할 수 있는 `ipHeader`를 설정하세요. Hono는 소비 애플리케이션에 설치하세요.
+
+```ts
+import { Hono } from 'hono';
+import { fromEnv } from '@imwyvern/agent-guard/workers';
+import { honoWeb } from '@imwyvern/agent-guard/hono-web';
+import type { WebGuard } from '@imwyvern/agent-guard/web';
+
+let guard: WebGuard | undefined;
+const app = new Hono<{ Bindings: Record<string, unknown> }>();
+app.use('*', (c, next) => honoWeb(guard ??= fromEnv(c.env))(c, next));
+app.get('/', c => c.text('Hello'));
+export default app;
+```
 
 ## MCP / LLM 도구 엔드포인트 디코이
 
@@ -285,7 +399,7 @@ WAF, DDoS 방어, 인증 시스템이나 범용 봇 차단기가 아닙니다. �
 
 리버스 프롬프트 인젝션 / counter-injection(E4)은 제품에 절대 포함하지 않습니다. 외부 프로빙이나 guard가 제3자에게 먼저 보내는 콜백은 수행하지 않습니다. 운영자가 설정한 알림 어댑터만 외부 알림 전송의 예외이며, 기존 크롤러 신원 확인용 DNS 검증은 유지합니다. 카나리아는 비활성 HMAC 토큰이며 실제 벤더 자격 증명을 사용하지 않습니다. 제3자 honeytoken 서비스(Canarytokens 등)를 사용하지 않으며 콜백 카나리아는 운영자가 직접 호스팅해야 합니다.
 
-Edge 어댑터(Cloudflare Workers, Next.js middleware, Deno, Bun, Vercel Edge)는 **이번 릴리스에 포함되지 않습니다**. Web 표준 코어와 함께 다음 작업인 **v0.4b**로 남아 있습니다. Hono는 이미 **Node ≥20**에서 지원됩니다.
+Edge / Web 런타임은 **이 미릴리스 v0.4b 트리에서 지원됩니다**. 영속 상태는 운영자가 store를 제공해야 합니다. `StateStore`가 없으면 인시던트 상관, rateLimit, block, 타이밍 점수, 미로 세션 입장이 꺼지고 경고가 한 번 나옵니다. `memoryStore()`는 isolate별입니다. 기본 크롤러 정책은 미검증 `ua-bypass`(DNS / DoH 없음)이며 SMTP는 Node 전용입니다. `trap.delay`는 기본 꺼짐이고 에지에서는 권장하지 않으며 명시적으로 켜도 최대 3000 ms입니다. [Edge 운영 가이드](../edge.md)를 참고하세요.
 
 v0.4a는 다음 연동과 제어를 **명시적 옵트인, 기본 꺼짐**으로 제공합니다. 기본 모드는 여전히 `mode: 'detect'`입니다.
 
@@ -302,7 +416,8 @@ v0.4a는 다음 연동과 제어를 **명시적 옵트인, 기본 꺼짐**으로
 
 - [포지셔닝](../positioning.md) — 취지, 범위 경계, 정직한 주장 표(주장 / 상태 / 근거).
 - [커뮤니티](../community.md) — 어댑터, 탐지 시그니처, 번역, RFC 기여 방법.
-- [로드맵](../roadmap.md) — 진행 방향, v0.4a 완료 항목, v0.4b Edge 계획. persona/deception 확장은 설계 단계입니다.
+- [로드맵](../roadmap.md) — 진행 방향, v0.4a/v0.4b 완료 항목(미릴리스), v0.5+ 계획. persona/deception 확장은 설계 단계입니다.
+- [Edge 운영 가이드](../edge.md) — 런타임 연결, StateStore 예제, 기능 축소와 문제 해결.
 - [Exhaust](../exhaust.md) — 구현된 옵트인 지연과 실험적 미로. 컨텍스트 소모(E3)는 아직 구현되지 않았습니다. 토큰 소모는 입증되지 않았습니다.
 - [Deception](../deception.md) — 디코이 데이터의 신뢰도를 높여 공격자의 agent가 이를 실제 데이터로 여길 수 있게 합니다. 「가짜 성공」은 계획 중이며 아직 제공되지 않습니다.
 - [설계](../design.md), [계약](../codex-contract.md), [KPI](../kpi.md), [위협 모델](../threat-model.md). 선행 사례는 개념만 참고했으며, 제3자 프로젝트 코드는 복사하지 않았습니다.

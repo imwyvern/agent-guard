@@ -4,7 +4,7 @@ An AI-agent honeypot middleware for Node and the edge.
 
 （面向 Node 与边缘运行时的 AI agent 蜜罐中间件。）
 
-[English](../../README.md) | [简体中文](README.zh-CN.md) | [繁體中文](README.zh-TW.md) | [日本語](README.ja.md) | [한국어](README.ko.md) | [Español](README.es.md)
+[English](../../README.md) | [简体中文](../i18n/README.zh-CN.md) | [繁體中文](../i18n/README.zh-TW.md) | [日本語](../i18n/README.ja.md) | [한국어](../i18n/README.ko.md) | [Español](../i18n/README.es.md)
 
 ## 为什么需要它
 
@@ -14,7 +14,7 @@ An AI-agent honeypot middleware for Node and the edge.
 
 **今天交付了什么，什么还没有。**
 
-- **今天**覆盖的是 HTTP/API 层：五条隔离的诱饵路由、MCP 与 GraphQL 诱饵，以及惰性金丝雀凭证（`AG-CANARY-…`）。零运行时依赖；在 Node ≥20 上提供 Express、Node `http`、Hono、Fastify 与 Koa 适配器。
+- **今天**覆盖的是 HTTP/API 层：五条隔离的诱饵路由、MCP 与 GraphQL 诱饵，以及惰性金丝雀凭证（`AG-CANARY-…`）。零运行时依赖；在 Node ≥20 上提供 Express、Node `http`、Hono、Fastify 与 Koa 适配器，以及 v0.4b 的 Web / Edge 适配器（尚未发布）。
 - **主机层 honeyfile**（磁盘上的假 `.env`、云凭证、SSH 密钥或 kubeconfig，并在被访问时告警）是**规划中**的能力，尚未交付。未来的 `agent-guard seed` 命令见[路线图](../roadmap.md)。
 - **「假成功」欺骗**——一套可能让攻击者的 AI 误以为已入侵成功的仿真环境——是**规划中**的能力（必须 opt-in，并先做安全评估），尚未交付。见 [deception.md](../deception.md)。
 - **消耗攻击者的 token** 目前**尚未得到验证**。实验性迷宫在模拟中的字节比为 1:1，低于 3:1 下限；时间比数字来自 25 ms/request 模型，不是对真实 LLM agent 的测量。在完成这项测量之前，不要指望启用迷宫就能消耗对方 token。见 [exhaust.md](../exhaust.md) 和 [trap-mode.md](../trap-mode.md)。
@@ -35,7 +35,7 @@ An AI-agent honeypot middleware for Node and the edge.
 - **响应时间窗口** — 面向运营者的 incident 时间线、dwell-time 指标，以及挂钩到运营者自己的密钥轮换 / 阻断脚本。进程内 incident 关联和 `dwell_ms` 已经交付；面向运营者的时间线与挂钩尚未交付。
 - **隔离诱饵主机** — 与生产应用进程分离的独立诱饵环境。
 - **真实 agent 的 token 成本评估** — 在任何人启用实验性迷宫之前，先测量它是否真的消耗真实 AI agent 的 token。当前 1:1 的字节比只是假设。
-- **Edge 适配器（v0.4b）** — Web-standard core，以及 Cloudflare Workers、Next.js middleware、Deno 和 Bun。
+- **Edge 适配器（v0.4b）** — **已交付（尚未发布）**：Web-standard core、Cloudflare Workers、Next.js middleware / Vercel Edge、Deno、Bun 和 Hono-web。
 
 详细计划见 [docs/roadmap.md](../roadmap.md)。范围边界与诚实声明见 [docs/positioning.md](../positioning.md)。
 
@@ -110,7 +110,7 @@ const listener = wrap(guard, (_req, res) => res.end('Hello'));
 
 ## Hono（Node 运行时）
 
-v0.2 的 Hono 适配器以 `@imwyvern/agent-guard/hono` 提供，并带可选的 `hono` peer。它要求 Node ≥20：共享核心仍使用 `node:crypto` 和 Node DNS。Edge 运行时与 WebCrypto 核心仍留待 v0.4b。
+v0.2 的 Hono 适配器以 `@imwyvern/agent-guard/hono` 提供，并带可选的 `hono` peer。它要求 Node ≥20：Node 核心使用 `node:crypto` 和 Node DNS。在 Workers/Bun/Deno 上，请使用 `@imwyvern/agent-guard/hono-web` 和 `@imwyvern/agent-guard/web` 的 `createWebGuard`（v0.4b，尚未发布）。
 
 ```ts
 import { Hono } from 'hono';
@@ -132,7 +132,121 @@ serve({ fetch: app.fetch, hostname: '127.0.0.1', port: 3000 });
 
 ## Fastify 与 Koa（Node 运行时）
 
-v0.3a（未发布）新增 `@imwyvern/agent-guard/fastify` 与 `@imwyvern/agent-guard/koa` 的 `agentGuard`，接受相同的 guard 或 config。在路由之前通过 `await app.register(agentGuard(guard))` 注册 Fastify 插件；检查在请求体解析后的 `preHandler` 中执行。Koa 使用 `app.use(agentGuard(guard))`，放在有界请求体解析器之后。两个适配器均不消费请求流，并保留宿主原生的爬虫 404、detect 模式下仅告警的重放检测和可选 lure 变换；框架为可选 peer，核心不增加运行时依赖。见 [Fastify 演示](../../examples/fastify-demo/server.ts)、[Koa 演示](../../examples/koa-demo/server.ts)和[适配器指南](../community.md)。边缘运行时仍属路线图工作。
+v0.3a（未发布）新增 `@imwyvern/agent-guard/fastify` 与 `@imwyvern/agent-guard/koa` 的 `agentGuard`，接受相同的 guard 或 config。在路由之前通过 `await app.register(agentGuard(guard))` 注册 Fastify 插件；检查在请求体解析后的 `preHandler` 中执行。Koa 使用 `app.use(agentGuard(guard))`，放在有界请求体解析器之后。两个适配器均不消费请求流，并保留宿主原生的爬虫 404、detect 模式下仅告警的重放检测和可选 lure 变换；框架为可选 peer，核心不增加运行时依赖。见 [Fastify 演示](../../examples/fastify-demo/server.ts)、[Koa 演示](../../examples/koa-demo/server.ts)和[适配器指南](../community.md)。
+
+## Edge / Web runtimes
+
+v0.4b 已在此**尚未发布的代码树**中实现，零运行时依赖。请从 git/源码或本地 `npm pack` tarball 安装；包尚未发布到 npm。Web 入口使用 WebCrypto 和宿主的结构化类型；适配器不导入 `next` 或 `hono`。
+
+`createWebGuard(config)` 返回 Web guard；`await guard.handle(request, ctx?)` 在拦截时得到 `Response`，放行给宿主时得到 `null`。
+
+| 运行时 | `@imwyvern/agent-guard` 后的导入后缀 | 客户端 IP |
+| --- | --- | --- |
+| Web 标准宿主 | `/web`（`createWebGuard`） | 宿主 `ctx.clientIp` 或显式 `ipHeader`；否则为 `unknown` |
+| Cloudflare Workers | `/workers`（`fromEnv`、`withAgentGuard`） | `fromEnv` 默认使用 `CF-Connecting-IP` |
+| Next.js middleware / Vercel Edge | `/next`（`agentGuardMiddleware`） | 运营者必须设置 `ipHeader` |
+| Deno | `/deno`（`denoHandler`） | `remoteAddr.hostname` |
+| Bun | `/bun`（`bunHandler`） | `server.requestIP(request)` |
+| 边缘上的 Hono | `/hono-web`（`honoWeb`）+ `/web` | 在 Web guard 上显式设置 `ipHeader` |
+| Node ≥20 上的 Hono | `/hono`（`agentGuard`）+ 根入口的 Node 核心 | 套接字 IP；受信任的 `clientIp` 覆盖 |
+
+下表适用于 `/web` 和上面的五个 Web 适配器，包括 Bun/Deno 上的 Hono。`/hono` 保留 Node 核心（`node:crypto` / Node DNS）。
+
+| 功能 | Web 核心 / Workers / Next / Deno / Bun / Hono-web | Node 上的 Hono（`/hono`） |
+| --- | --- | --- |
+| 无状态功能 | 诱饵路由、金丝雀生成/重放检测、HMAC 无状态迷宫**节点**、fetch 告警、Prometheus（单 isolate 视角） | 可用；指标按进程统计 |
+| incident 关联、rateLimit、block、节奏分数、迷宫会话准入 | 需要 `StateStore`；无 store → 自动关闭，每个 guard 给出一次控制台警告。`memoryStore()` 仅限单 isolate，从不代表全局 | 有界的进程内状态 |
+| 爬虫策略 | 默认 `ua-bypass`：自称 Googlebot/Bingbot 等已识别搜索爬虫的客户端永不进入 trap/maze/block；`crawler.verified: false`。允许 `custom` 验证器。不做 DNS / DoH | Node DNS 验证或配置的策略 |
+| `trap.delay` | 默认关闭；边缘按墙钟时间计费，不建议启用；显式开启时上限 3000 ms | 默认关闭，须主动启用 |
+| 转发头 | 未配置的头不受信任；显式配置 `x-forwarded-for` 时取最右侧非空一跳，需要可信代理 | 显式受信任的 `clientIp` 回调 |
+| SMTP | 不可用；改用基于 fetch 的 webhook / Slack / Telegram / 飞书 | 仅 Node 提供 SMTP |
+
+所有运行时的 trap 均默认关闭。没有 store 时，签名迷宫节点不会授予会话准入；迷宫仍为实验性功能（模拟字节比 1:1）。持久 store 由运营者提供。StateStore 示例、完整降级表与故障排查见 [Edge 运营指南](../edge.md)。本 README 后续的配置和告警示例描述的是 Node API。
+
+**Workers** — 通过环境绑定提供 `AG_CANARY_SECRET` 和 `AG_PROJECT_SEED`；`fromEnv(env)` 会拒绝缺失/空值，没有默认密钥。此最小示例没有 StateStore。
+
+```ts
+import { fromEnv, withAgentGuard } from '@imwyvern/agent-guard/workers';
+import type { WebContext, WebGuard } from '@imwyvern/agent-guard/web';
+
+let guard: WebGuard | undefined;
+export default {
+  fetch(request: Request, env: Record<string, unknown>, ctx: WebContext) {
+    // Bind AG_CANARY_SECRET and AG_PROJECT_SEED in the host environment.
+    guard ??= fromEnv(env);
+    return withAgentGuard(guard, {
+      fetch: () => new Response('Hello'),
+    }).fetch(request, env, ctx);
+  },
+};
+```
+
+**Next.js / Vercel Edge** — `middleware.ts`；配置可信入口代理会覆盖的头。适配器拦截时返回 `Response`，放行时返回 `undefined`，不导入 `next`。
+
+```ts
+import { createWebGuard } from '@imwyvern/agent-guard/web';
+import { agentGuardMiddleware } from '@imwyvern/agent-guard/next';
+
+const secret = process.env.AG_CANARY_SECRET;
+const projectSeed = process.env.AG_PROJECT_SEED;
+if (!secret || !projectSeed) throw new Error('Set AG_CANARY_SECRET and AG_PROJECT_SEED');
+const guard = createWebGuard({
+  project: 'catalog', env: 'production', mode: 'detect', projectSeed,
+  ipHeader: 'x-real-ip', // Only trust a header overwritten by your ingress.
+  canary: { secret, registry: { version: 1, prefix: 'AG-CANARY-', canaries: [] } },
+});
+export const middleware = agentGuardMiddleware(guard);
+export const config = {
+  matcher: ['/((?!_next/static|_next/image|favicon\\.ico|robots\\.txt|sitemap\\.xml|assets/).*)'],
+};
+```
+
+**Deno** — 在本地消费端安装 tarball，并使用 Deno 2 的 `nodeModulesDir: "manual"`；允许读取这两个环境绑定及服务器网络访问。
+
+```ts
+import { createWebGuard } from '@imwyvern/agent-guard/web';
+import { denoHandler } from '@imwyvern/agent-guard/deno';
+
+const secret = Deno.env.get('AG_CANARY_SECRET');
+const projectSeed = Deno.env.get('AG_PROJECT_SEED');
+if (!secret || !projectSeed) throw new Error('Set AG_CANARY_SECRET and AG_PROJECT_SEED');
+const guard = createWebGuard({
+  project: 'catalog', env: 'production', mode: 'detect', projectSeed,
+  canary: { secret, registry: { version: 1, prefix: 'AG-CANARY-', canaries: [] } },
+});
+Deno.serve(denoHandler(guard, () => new Response('Hello')));
+```
+
+**Bun** — 适配器从服务器取得连接 IP。
+
+```ts
+import { createWebGuard } from '@imwyvern/agent-guard/web';
+import { bunHandler } from '@imwyvern/agent-guard/bun';
+
+const secret = Bun.env.AG_CANARY_SECRET;
+const projectSeed = Bun.env.AG_PROJECT_SEED;
+if (!secret || !projectSeed) throw new Error('Set AG_CANARY_SECRET and AG_PROJECT_SEED');
+const guard = createWebGuard({
+  project: 'catalog', env: 'production', mode: 'detect', projectSeed,
+  canary: { secret, registry: { version: 1, prefix: 'AG-CANARY-', canaries: [] } },
+});
+Bun.serve({ fetch: bunHandler(guard, () => new Response('Hello')) });
+```
+
+**边缘上的 Hono** — 此 Workers 示例使用相同的必填绑定。在 Bun/Deno 上用 `createWebGuard` 创建 Web guard，并按宿主配置可信的 `ipHeader`。请在消费应用中安装 Hono。
+
+```ts
+import { Hono } from 'hono';
+import { fromEnv } from '@imwyvern/agent-guard/workers';
+import { honoWeb } from '@imwyvern/agent-guard/hono-web';
+import type { WebGuard } from '@imwyvern/agent-guard/web';
+
+let guard: WebGuard | undefined;
+const app = new Hono<{ Bindings: Record<string, unknown> }>();
+app.use('*', (c, next) => honoWeb(guard ??= fromEnv(c.env))(c, next));
+app.get('/', c => c.text('Hello'));
+export default app;
+```
 
 ## MCP / LLM 工具端点诱饵
 
@@ -285,7 +399,7 @@ curl -s -H "Authorization: Bearer $TOKEN" http://127.0.0.1:3000/api/internal/adm
 
 反向提示注入 / counter-injection（E4）永不进入产品。不做出站探测，也不由 guard 主动向第三方回连；运营者配置的告警 adapters 是唯一的出站通知例外，既有爬虫身份 DNS 校验不变。金丝雀始终是 inert HMAC 令牌，不是真实厂商凭证。不使用第三方 honeytoken 服务（Canarytokens 等）；callback canary 仅由运营者自托管。
 
-Edge 适配器（Cloudflare Workers、Next.js middleware、Deno、Bun、Vercel Edge）**不在本次发布范围内**，与 Web-standard core 一并留待下一批 **v0.4b**。Hono 已支持 **Node ≥20**。
+Edge / Web 运行时**已在尚未发布的 v0.4b 代码树中支持**。持久状态须由运营者提供 store：没有 `StateStore` 时，incident 关联、rateLimit、block、节奏分数和迷宫会话准入均关闭，并给出一次警告；`memoryStore()` 仅限单 isolate。爬虫默认使用未经验证的 `ua-bypass`（无 DNS / DoH）；SMTP 仅限 Node；`trap.delay` 默认关闭，边缘不建议启用，显式开启时上限 3000 ms。见 [Edge 运营指南](../edge.md)。
 
 v0.4a 已实现以下**显式 opt-in、默认关闭**的集成与控制；默认仍为 `mode: 'detect'`：
 
@@ -302,7 +416,8 @@ v0.4a 已实现以下**显式 opt-in、默认关闭**的集成与控制；默认
 
 - [定位说明](../positioning.md) — 项目叙事、范围边界，以及诚实声明表（声明 / 状态 / 证据）。
 - [社区参与](../community.md) — 如何贡献适配器、检测特征、译本和 RFC。
-- [路线图](../roadmap.md) — 前进方向、v0.4a 完成项与 v0.4b Edge 计划；persona/deception 扩展仍属设计。
+- [路线图](../roadmap.md) — 前进方向、v0.4a/v0.4b 完成项（尚未发布）与 v0.5+ 计划；persona/deception 扩展仍属设计。
+- [Edge 运营指南](../edge.md) — 运行时接入、StateStore 示例、降级与故障排查。
 - [Exhaust](../exhaust.md) — 已实现的 opt-in 延迟与实验性迷宫；上下文消耗（E3）尚未实现；消耗 token 尚未得到验证。
 - [Deception](../deception.md) — 提高诱饵数据的可信度，让攻击者的 agent 可能把它当成真实数据；「假成功」是规划中的能力，尚未交付。
 - [设计](../design.md)、[合同](../codex-contract.md)、[KPI](../kpi.md)和[威胁模型](../threat-model.md)。先前工作仅用于启发概念；未复制任何第三方项目代码。
