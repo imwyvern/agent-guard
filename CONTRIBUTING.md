@@ -15,7 +15,7 @@ npm run lint
 npm test
 ```
 
-Add focused tests for behavior changes and update relevant documentation and `CHANGELOG.md`. Keep changes small enough to review. Benchmarks and Lighthouse are separate local research tools and are not part of the regular CI checks.
+Add focused tests for behavior changes and update relevant documentation and `CHANGELOG.md`. Translations live in `docs/i18n/` and should be updated when `README.md` changes. Keep changes small enough to review. Benchmarks and Lighthouse are separate local research tools and are not part of the regular CI checks.
 
 Open a pull request describing the problem, the resulting behavior, and the validation performed. Use concise imperative commit subjects in the existing `type: description` style, for example `fix: reject forged canary checksums`, `test: cover crawler bypass`, or `docs: clarify setup`.
 
