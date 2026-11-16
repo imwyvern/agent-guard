@@ -2,7 +2,7 @@
 
 This page states what agent-guard is for, what it ships today, and what it does not claim. It is the honest companion to the README.
 
-Status: 2026-11-11 (HKT), v0.5a unreleased source tree; no npm publication or version tag. Author: agent-guard maintainers.
+Status: 2026-11-16 (HKT), v0.5b first-batch unreleased source tree; no npm publication or version tag. Author: agent-guard maintainers.
 
 ## The pitch
 
@@ -50,6 +50,8 @@ Parts of that pitch are the direction of travel, not present-tense capability. T
 | "Fake success": the attacker's AI believes it has breached the server and receives a simulated environment | **Planned**, not shipped | Design only, in [deception.md](deception.md); needs safety assessment and separate approval before opt-in implementation |
 | Host honeyfiles with optional read alerts | **Shipped in this unreleased v0.5a tree**, with Linux-log caveat | [seed implementation](../src/seed/plan.ts), [safe paths](../src/seed/paths.ts), [watch parser](../src/watch/parser.ts), [operator guide](seed.md): dry-run default; explicit 0600 writes/no overwrite; deterministic inert values, no real vendor formats/prefixes; operator-hosted endpoints only; read-only Linux logs, no direct read sensor, no trap/block on `honeyfile_read` |
 | Incident timeline, bounded log, summaries, incident CLI, escalation/reminders and response hooks | **Shipped in this unreleased v0.5a tree**; file log/escalation/hooks are Node-only, opt-in | [incident CLI](../src/cli/incident.ts), [log](../src/log/file.ts), [escalation](../src/incident/escalation.ts), [hooks](../src/hooks/runner.ts), [guide](incident-response.md): first touch/first successful alert/event dwell, no path/UA/IP labels, same-file ack visibility, capped reminders; no shell, fresh five-key env, execution caps, failures isolated from inspect |
+| Zero-code proxy, init wizard and read-only HTTP access-log watch | **Implemented, unreleased v0.5b first batch** | [Entry-point guide](distribution.md), [proxy tests](../test/integration/proxy.test.ts), [init tests](../test/unit/init.test.ts), [log tests](../test/unit/access-log.test.ts): fixed upstream, fail-open, loopback default, diff-only init, no header/body visibility in logs; detect / alert-only, no new DNS |
+| Docker / Compose / ingress snippets and Workers templates / Helm | **Planned**, not shipped | E-2 / E-5 and DI-8 remain future work in [distribution.md](distribution.md) |
 | Isolated decoy host, separate from the production application process | **Planned**, not shipped | Programs/templates only are planned; operators deploy; [distribution.md](distribution.md) |
 | Edge adapters (Workers, Next.js / Vercel Edge, Deno, Bun, Hono-web) and a Web-standard core | **Implemented, unreleased v0.4b**; state/crawler/transport degradation applies | [Operator guide](edge.md); golden vectors, 63 differentials, Web AC, and local smoke scripts (`smoke:workers`, `smoke:bun`, `smoke:deno`; skipped when a runtime binary is absent) |
 | Real-agent token-cost evaluation before anyone should enable the maze | **Planned**, not shipped | No model budget set; required by [exhaust.md](exhaust.md) and [trap-mode.md](trap-mode.md) |

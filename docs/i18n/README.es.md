@@ -56,6 +56,20 @@ npm pack --dry-run
 
 Para un consumidor local aparte, cree un tarball con `npm pack` e instale `./imwyvern-agent-guard-0.1.0.tgz`. El tarball contiene solo `dist/`, `schema/`, el readme/changelog y los avisos legales. `private: true` impide la publicación.
 
+## Zero-code entry points (unreleased) — Entradas sin cambiar código
+
+v0.5b implementa tres entradas locales con cero dependencias de runtime. Compila primero desde el código fuente; `npx @imwyvern/agent-guard` solo funcionará después de publicar en npm, lo cual sigue requiriendo aprobación aparte.
+
+```sh
+node dist/cli/main.js proxy --upstream http://127.0.0.1:3000 --init-secrets
+node dist/cli/main.js init --dir ./my-app
+node dist/cli/main.js watch --log ./access.log --format combined
+```
+
+`proxy` usa detect / alert-only, escucha en `127.0.0.1:8080` por defecto y aplica fail-open si falla la inspección o supera su presupuesto de cálculo de 50 ms. Conserva una ventana de inspección de 16 KiB y transmite cuerpos mayores por streaming. Devuelve 502 si el upstream no está disponible y 504 al agotar el tiempo. Una dirección pública requiere `--allow-public-bind`. El retraso de login existente de D5 queda fuera del presupuesto de cálculo. Si falta la configuración, `--init-secrets` crea un `.env` adyacente con modo 0600, sin sobrescribir ni imprimir secretos.
+
+`init` detecta el framework y solo imprime un unified diff por defecto; `--write` crea configuración y ejemplo de integración sin sobrescribir archivos ni modificar fuentes o hooks. Para el modo de logs, proporciona `AG_CANARY_SECRET` y `AG_PROJECT_SEED` mediante el entorno o usa `--config`. `watch --log` lee combined/common/JSON desde el final (`--from-start` incluye el historial) y detecta señuelos y canarios en rutas y consultas. Los logs suelen omitir cabeceras y cuerpos: la reutilización en Bearer/cabeceras/cuerpo es invisible. Las declaraciones UA de crawlers quedan sin verificar y no se consulta DNS. El modo de logs nunca activa trap/block. Docker y la evaluación con agentes reales siguen **planned**. Véase [configuración y límites](../distribution.md).
+
 ## Express
 
 ```ts

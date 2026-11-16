@@ -54,6 +54,20 @@ npm pack --dry-run
 
 For a separate local consumer, create a tarball with `npm pack` and install `./imwyvern-agent-guard-0.1.0.tgz`. The tarball contains only `dist/`, `schema/`, the readme/changelog, and legal notices. `private: true` prevents publishing.
 
+## Zero-code entry points (unreleased)
+
+v0.5b implements three local entry points with zero runtime dependencies. Build from source first; `npx @imwyvern/agent-guard` will work only after npm publication, which still requires separate approval.
+
+```sh
+node dist/cli/main.js proxy --upstream http://127.0.0.1:3000 --init-secrets
+node dist/cli/main.js init --dir ./my-app
+node dist/cli/main.js watch --log ./access.log --format combined
+```
+
+`proxy` is detect / alert-only, binds to `127.0.0.1:8080` by default, and fails open when inspection fails or exceeds its 50 ms computation budget. It streams larger bodies after a 16 KiB inspection window; upstream failures return 502, timeouts 504. Public binds require `--allow-public-bind`. D5 retains its intentional login delay outside the computation budget. `--init-secrets` creates a private 0600 `.env` beside a missing config without overwriting it or printing secrets.
+
+`init` detects the framework and only prints a unified diff by default; `--write` creates config/setup files without overwriting files or modifying application source/hooks. For log mode, supply `AG_CANARY_SECRET` and `AG_PROJECT_SEED` through the environment or use `--config`. `watch --log` reads combined/common/JSON logs from EOF (`--from-start` reads history), reporting decoy hits and canary replay in paths/query strings. Logs usually omit headers and bodies, so Bearer/header/body replay is invisible; crawler UA claims stay unverified, with no DNS. Log mode never traps or blocks. Docker packaging and real-agent evaluation remain **planned**. See [entry-point configuration and limits](docs/distribution.md).
+
 ## Express
 
 ```ts

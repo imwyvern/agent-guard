@@ -90,3 +90,22 @@ Node 的 `AGENT_GUARD_TRAP=off` 与 `guard.setTrapEnabled(false)` 可运行时�
 - **Hooks 自保**：SIGTERM 后 1000 ms SIGKILL 的超时、每小时上限、每 hook 并发与模块全局上限；无无界队列，stdout/stderr 丢弃。失败/超时/拒绝仅发 `hook_result`，不影响 inspect。直接子进程终止并不隔离所有后代。guard 不轮换密钥、不改防火墙；[示例](examples/hooks/README.md) 仅日志/打印，不调用网络、不做破坏性操作。
 
 操作步骤见 [seed.md](seed.md) 与 [incident-response.md](incident-response.md)。假成功仍需安全评估与单独批准；独立诱饵主机仍规划为程序/模板且不替运营者部署。真实 agent 评测预算未设定，不能声称已消耗攻击者 token；E4 仍禁止，以上功能不替代 WAF、补丁或最小权限。
+
+
+## 9. v0.5b proxy / init / HTTP-log 边界（2026-11-16 HKT，unreleased）
+
+proxy 首次进入请求数据通路，零运行时依赖、固定 HTTP(S) origin、默认 detect / alert-only。库的默认行为不变；proxy / HTTP-log 入口使用未验证 UA bypass，不新增 DNS。日志模式只读、无 trap/block/hooks，不配置系统日志工具。用法见 [distribution.md](distribution.md)。
+
+| 新攻击面 | 缓解与边界 |
+| --- | --- |
+| 开放代理 / SSRF / CONNECT 隧道 | 只从运营者 --upstream 选择目标；拒绝非 HTTP(S)、credentials/path/query/fragment；Host、绝对 URI、query 不改变连接目标；不跟随响应重定向；CONNECT/Upgrade 405 |
+| 头部走私 / 不一致分帧 | 使用 Node 严格 HTTP parser；双向移除 hop-by-hop 与 Connection 点名头；重新分帧、保留端到端重复头；不做原始 TCP 隧道。运营者仍须让入口与上游采用一致协议/解析策略 |
+| 请求体缓冲 / 慢上传耗尽 | 只保存 16 KiB 检查窗口，窗口最多等 50 ms；其余流式转发/背压；上游总 deadline，客户端中断销毁上游；超出窗口会漏检，不能代替宿主大小/连接/速率限制 |
+| 公开绑定 / 源站绕过 | 默认 127.0.0.1；非回环必须 --allow-public-bind 并 stderr 警告；仅接受 IP literal；运营者限制 ingress 与源站访问 |
+| 伪造转发 IP | 默认 socket IP，只有显式 --trusted-proxy CIDR 才从右向左遍历 XFF，到不可信 hop 停止；Forwarded 不参与选择 |
+| 检查故障吞掉业务 / 上游故障 | 检查抛错或超时 fail-open 并记录固定 alert_failed 错误；D5 既有故意延迟另计。上游失败 502、deadline 504；已发送响应头后中断流；停机最多等待 5 s |
+| init 覆写项目 / 执行不可信代码 | 只读 package.json / tsconfig 元数据；默认 diff，--write 独占创建 0644；固定目录内目标，拒绝穿越/符号链接；不改源文件/hooks，不安装、不执行项目代码 |
+| 初次密钥泄漏 | 配置只有环境引用；显式 --init-secrets 且配置不存在时才创建 0600 .env，不覆盖、不打印 secret；不执行 dotenv shell 内容 |
+| HTTP 日志伪造 / 过量输入 / 可见性不足 | 行长/每 tick 字节/事件速率有界；轮转/截断/畸形行安全处理；事件 source: access_log；日志不等于可信身份或实时检测，头/body/Bearer 不可见、UA 未验证，无 DNS |
+
+代理仅向固定的运营者上游发送业务请求。proxy 与 HTTP-log 入口的其他出站仅限显式配置的告警 adapter。诱饵始终 inert、noindex/no-store，不认证、不调用业务服务。Docker 与真实 agent 评测未交付。

@@ -56,6 +56,20 @@ npm pack --dry-run
 
 別のローカル利用側では、`npm pack` で tarball を作成し、`./imwyvern-agent-guard-0.1.0.tgz` をインストールしてください。tarball に含まれるのは `dist/`、`schema/`、readme/changelog、および法的通知のみです。`private: true` により公開は防止されます。
 
+## Zero-code entry points (unreleased) — コード変更なしの導入
+
+v0.5b ではランタイム依存ゼロのローカル入口を三つ実装しています。まずソースからビルドしてください。`npx @imwyvern/agent-guard` は npm 公開後のみ利用可能で、公開には別途承認が必要です。
+
+```sh
+node dist/cli/main.js proxy --upstream http://127.0.0.1:3000 --init-secrets
+node dist/cli/main.js init --dir ./my-app
+node dist/cli/main.js watch --log ./access.log --format combined
+```
+
+`proxy` は detect / alert-only で、既定では `127.0.0.1:8080` にバインドします。検査失敗または 50 ms の計算予算超過時は fail-open です。検査用の 16 KiB だけを保持し、大きい本文はストリーム転送します。上流接続失敗は 502、タイムアウトは 504。公開バインドには `--allow-public-bind` が必要です。D5 の既存ログイン遅延は計算予算の外です。設定が存在しない場合、`--init-secrets` は隣に 0600 の `.env` を作成し、上書きも秘密値の表示もしません。
+
+`init` はフレームワークを検出し、既定では unified diff のみ表示します。`--write` は設定と接続例を新規作成し、既存ファイルやアプリのソース、hooks を変更しません。ログモードでは環境変数 `AG_CANARY_SECRET` と `AG_PROJECT_SEED`、または `--config` を指定します。`watch --log` は combined/common/JSON を末尾から読み（履歴は `--from-start`）、パスとクエリのデコイ到達・canary 再利用を検出します。ログには通常ヘッダーや本文がないため Bearer/ヘッダー/本文の再利用は見えません。クローラー UA は未検証で、DNS は使いません。ログモードは trap/block を行いません。Docker と実 agent 評価は **planned** です。[設定と制限](../distribution.md)を参照してください。
+
 ## Express
 
 ```ts

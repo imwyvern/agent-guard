@@ -78,6 +78,10 @@ Default `mode: 'detect'` remains alert-only. `mode: 'trap'` exposes independent,
 
 Preserve dry-run defaults, 0600/no-overwrite/path safety, deterministic inert values without real vendor credential formats/prefixes, and operator-hosted endpoints only. Watch only parses operator-configured auditd/inotifywait access logs: no in-process read sensor, no trap/block, no cross-process identity correlation. Preserve the distinction between incident dwell and canary issuance dwell, bounded retention, no path/UA/IP metric labels, and same-file `log.file` acknowledgment visibility. Hooks stay default-off and Node-only, with literal argv/no shell, five-key fresh environment, time/rate/concurrency caps and isolated `hook_result` failures. The guard itself does not rotate keys or change firewalls.
 
+### Zero-code entry points (v0.5b first batch, unreleased)
+
+`proxy`, `init` and HTTP `watch --log` are implemented; they are not open implementation ideas. See [distribution.md](distribution.md) and [validation](bench-v0.5b.md). Preserve a fixed upstream, fail-open inspection, loopback binding by default, bounded streaming, diff-only init and exclusive non-overwriting writes. Access logs are read-only with bounded lines/rate/rotation handling; header/body replay is invisible and crawler claims remain unverified without DNS. These entry points stay detect / alert-only, with no trap/block from logs. Docker/Compose/ingress snippets and Workers templates/Helm are planned separately.
+
 ### Persona / scenario pack (roadmap)
 
 GraphQL helpers and a [local demo](../examples/graphql-demo/server.ts) ship in v0.3a (unreleased); see also the [API-only placement guide](scenarios/api-only.md) and existing [MCP scenario](scenarios/mcp.md). Richer decoy personas and a reusable pack format for docs sites, cloud-console style, and other scenarios remain **roadmap proposals**. See [deception.md](deception.md) and [docs/scenarios/](scenarios/). If you want to contribute a pack, open a [design RFC](../.github/ISSUE_TEMPLATE/rfc.md) first and describe the format, isolation rules, and tests. Do not add a pack loader to the core until that RFC is accepted.
@@ -100,6 +104,7 @@ README translations live in [`docs/i18n/`](i18n/). When `README.md` changes, upd
 
 The direction of travel is listed in the README and in [roadmap.md §0](roadmap.md#0-方向接下来往哪里走). Useful starting points, consistent with [positioning.md](positioning.md):
 
+- **HTTP access-log fixtures and operator docs** — improve synthetic combined/common/JSON samples and field mapping/truncation troubleshooting for the shipped log mode; keep input read-only, bounded and free of real credentials or personal data.
 - **Honeyfile operator docs** — improve Linux auditd/inotifywait configuration and troubleshooting examples for the shipped seed/watch commands; keep templates operator-run and read alerts log-only. Changes to layout or privilege boundaries need an RFC.
 - **Fake-success environment** — design-only until a safety assessment lands. Open an RFC before any runtime change. The simulation must stay synthetic, inert, cookie-free, and opt-in. See [deception.md](deception.md).
 - **Incident-response docs** — improve examples of retained timelines, same-file acknowledgments and print/log-only hooks for the shipped commands. Preserve bounded state and default-off escalation/hooks; do not advertise built-in key rotation or firewall changes.

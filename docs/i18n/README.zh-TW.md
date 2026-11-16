@@ -56,6 +56,20 @@ npm pack --dry-run
 
 若要在單獨的本機使用端使用，用 `npm pack` 建立 tarball，並安裝 `./imwyvern-agent-guard-0.1.0.tgz`。tarball 只包含 `dist/`、`schema/`、readme/changelog 以及法律聲明。`private: true` 可避免發佈。
 
+## Zero-code entry points (unreleased) — 零程式碼入口
+
+v0.5b 已實作三個本機入口，執行時期相依仍為零。請先從原始碼建置；只有 npm 發佈後才能使用 `npx @imwyvern/agent-guard`，發佈仍需另行批准。
+
+```sh
+node dist/cli/main.js proxy --upstream http://127.0.0.1:3000 --init-secrets
+node dist/cli/main.js init --dir ./my-app
+node dist/cli/main.js watch --log ./access.log --format combined
+```
+
+`proxy` 僅 detect / alert-only，預設綁定 `127.0.0.1:8080`；檢查失敗或超過 50 ms 計算預算時 fail-open。只保留 16 KiB 檢查視窗，大請求本文以串流轉送；上游無法連線回傳 502，逾時回傳 504。公開綁定需 `--allow-public-bind`。D5 原有登入延遲不計入計算預算。設定檔不存在時，`--init-secrets` 在旁邊建立 0600 `.env`，不覆寫、不列印密鑰。
+
+`init` 自動辨識框架，預設只列印 unified diff；`--write` 僅新增設定與接入片段，不覆寫檔案，不改應用程式原始碼或 hooks。日誌模式透過環境變數提供 `AG_CANARY_SECRET` 與 `AG_PROJECT_SEED`，或使用 `--config`。`watch --log` 從檔案末尾讀取 combined/common/JSON（`--from-start` 才讀歷史），偵測路徑/查詢中的誘餌命中與 canary 重播。日誌通常沒有標頭與本文，無法看見 Bearer/標頭/本文重播；爬蟲 UA 僅標為未驗證，不做 DNS。日誌模式不觸發 trap/block。Docker 與真實 agent 評測仍為 **planned**。見[入口設定與限制](../distribution.md)。
+
 ## Express
 
 ```ts

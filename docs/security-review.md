@@ -151,3 +151,23 @@ Callback and maze tokens have fixed-width base32 fields and length-bounded paths
 | `/&/g` | `src/decoys/index.ts` | Fixed-width validation or linear character scan; covered by the existing 100k input timing test. |
 | `/</g` | `src/decoys/index.ts` | Fixed-width validation or linear character scan; covered by the existing 100k input timing test. |
 | `/"/g` | `src/decoys/index.ts` | Fixed-width validation or linear character scan; covered by the existing 100k input timing test. |
+
+
+## v0.5b entry-point regex audit (2026-11-16 HKT)
+
+Proxy parses only fixed-origin request targets; log tokenization uses a linear character walker. Init rewrites only generated templates. New literals retain bounded inputs and have no nested ambiguous quantifiers.
+
+| Regex | File | Review |
+| --- | --- | --- |
+| `/^(AG_CANARY_SECRET\|AG_WEBHOOK_SECRET\|AG_PROJECT_SEED)=([a-f0-9]{64})$/` | `src/cli/entry-config.ts` | Anchored/disjoint or linear scans; config/project metadata is local; HTTP headers and body windows/log lines are bounded. Covered by unchanged 100k adversarial timing assertions. |
+| `/^\$\{(AG_[A-Z_]+)\}$/` | `src/cli/entry-config.ts` | Anchored/disjoint or linear scans; config/project metadata is local; HTTP headers and body windows/log lines are bounded. Covered by unchanged 100k adversarial timing assertions. |
+| `/import \{ ([^}]+) \} from '([^']+)';/g` | `src/cli/init.ts` | Anchored/disjoint or linear scans; config/project metadata is local; HTTP headers and body windows/log lines are bounded. Covered by unchanged 100k adversarial timing assertions. |
+| `/\.ts$/` | `src/cli/init.ts` | Anchored/disjoint or linear scans; config/project metadata is local; HTTP headers and body windows/log lines are bounded. Covered by unchanged 100k adversarial timing assertions. |
+| `/^(?:\[([^\]]+)\]\|([^:]+)):(\d+)$/` | `src/cli/proxy.ts` | Anchored/disjoint or linear scans; config/project metadata is local; HTTP headers and body windows/log lines are bounded. Covered by unchanged 100k adversarial timing assertions. |
+| `/^\d+$/` | `src/cli/proxy.ts` | Anchored/disjoint or linear scans; config/project metadata is local; HTTP headers and body windows/log lines are bounded. Covered by unchanged 100k adversarial timing assertions. |
+| `/^\d+$/` | `src/cli/proxy.ts` | Anchored/disjoint or linear scans; config/project metadata is local; HTTP headers and body windows/log lines are bounded. Covered by unchanged 100k adversarial timing assertions. |
+| `/^https?:\/\/[^/?#]+([^#]*)/i` | `src/proxy/server.ts` | Anchored/disjoint or linear scans; config/project metadata is local; HTTP headers and body windows/log lines are bounded. Covered by unchanged 100k adversarial timing assertions. |
+| `/^\[\|\]$/g` | `src/proxy/server.ts` | Anchored/disjoint or linear scans; config/project metadata is local; HTTP headers and body windows/log lines are bounded. Covered by unchanged 100k adversarial timing assertions. |
+| `/^[a-fA-F0-9]{2}$/` | `src/watch/access.ts` | Anchored/disjoint or linear scans; config/project metadata is local; HTTP headers and body windows/log lines are bounded. Covered by unchanged 100k adversarial timing assertions. |
+| `/^(\d{2})\/([A-Za-z]{3})\/(\d{4}):(\d{2}:\d{2}:\d{2}) ([+-]\d{4})$/` | `src/watch/access.ts` | Anchored/disjoint or linear scans; config/project metadata is local; HTTP headers and body windows/log lines are bounded. Covered by unchanged 100k adversarial timing assertions. |
+| `/\r$/` | `src/watch/access.ts` | Anchored/disjoint or linear scans; config/project metadata is local; HTTP headers and body windows/log lines are bounded. Covered by unchanged 100k adversarial timing assertions. |

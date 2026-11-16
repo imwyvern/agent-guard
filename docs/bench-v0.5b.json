@@ -1,0 +1,2126 @@
+{
+  "baselineCommit": "b8e40a1",
+  "node": "v24.22.1",
+  "latency": [
+    {
+      "tree": "v0.5a",
+      "run": 1,
+      "status": "failed",
+      "generatedAt": "2026-11-16T02:03:49.737Z",
+      "method": {
+        "transport": "127.0.0.1 HTTP/1.1 keep-alive; server and load generator in separate child processes",
+        "runs": 3,
+        "connections": [
+          100,
+          10
+        ],
+        "durationSeconds": 3,
+        "warmupSeconds": 1,
+        "load": "closed-loop, one in-flight request per connection, no rate limit or pipelining",
+        "histogram": "integer µs rounded up; sorted array; nearest rank ceil(q*n); per-mode median of run percentiles; delta = on median - off median",
+        "boundary": "requests started before deadline are drained and included; throughput denominator includes drain; warmup uses the same Agent, separate histogram",
+        "thresholds": {
+          "p50DeltaUs": 200,
+          "p99DeltaUs": 1000,
+          "heapDeltaBytes": 10000000,
+          "clients": 50000
+        },
+        "primaryConnections": 100
+      },
+      "memory": {
+        "clients": 50000,
+        "heapDeltaBytes": 8598296,
+        "gc": true
+      },
+      "microbenchmark": {
+        "method": "await guard.inspect(human homepage); includes await, decision check, metrics, bounds and scanning; excludes adapter/HTTP",
+        "warmupIterations": 20000,
+        "iterations": 100000,
+        "runs": 3,
+        "samplesNsPerOp": [
+          2378.72108,
+          2350.92812,
+          2406.56367
+        ],
+        "medianNsPerOp": 2378.72108
+      },
+      "rows": [
+        {
+          "demo": "express",
+          "connections": 100,
+          "primary": true,
+          "off": {
+            "latencyUs": {
+              "p50": 2657,
+              "p90": 2982,
+              "p99": 3618,
+              "p99_9": 5488
+            },
+            "requestsPerSecond": 36475.88499845495,
+            "errors": 0
+          },
+          "on": {
+            "latencyUs": {
+              "p50": 2757,
+              "p90": 3226,
+              "p99": 4921,
+              "p99_9": 5961
+            },
+            "requestsPerSecond": 34853.958417007314,
+            "errors": 0
+          },
+          "deltaUs": {
+            "p50": 100,
+            "p90": 244,
+            "p99": 1303,
+            "p99_9": 473
+          },
+          "clean": true,
+          "latencyPassed": false,
+          "samples": {
+            "off": [
+              {
+                "p50": 2626,
+                "p90": 2966,
+                "p99": 3607,
+                "p99_9": 5094
+              },
+              {
+                "p50": 2863,
+                "p90": 3240,
+                "p99": 4058,
+                "p99_9": 6247
+              },
+              {
+                "p50": 2657,
+                "p90": 2982,
+                "p99": 3618,
+                "p99_9": 5488
+              }
+            ],
+            "on": [
+              {
+                "p50": 2757,
+                "p90": 3226,
+                "p99": 4921,
+                "p99_9": 5961
+              },
+              {
+                "p50": 2827,
+                "p90": 3247,
+                "p99": 5097,
+                "p99_9": 6116
+              },
+              {
+                "p50": 2645,
+                "p90": 3103,
+                "p99": 4850,
+                "p99_9": 5779
+              }
+            ]
+          }
+        },
+        {
+          "demo": "express",
+          "connections": 10,
+          "primary": false,
+          "off": {
+            "latencyUs": {
+              "p50": 230,
+              "p90": 437,
+              "p99": 543,
+              "p99_9": 779
+            },
+            "requestsPerSecond": 37634.29388668095,
+            "errors": 0
+          },
+          "on": {
+            "latencyUs": {
+              "p50": 234,
+              "p90": 438,
+              "p99": 550,
+              "p99_9": 783
+            },
+            "requestsPerSecond": 36681.48463896092,
+            "errors": 0
+          },
+          "deltaUs": {
+            "p50": 4,
+            "p90": 1,
+            "p99": 7,
+            "p99_9": 4
+          },
+          "clean": true,
+          "latencyPassed": true,
+          "samples": {
+            "off": [
+              {
+                "p50": 233,
+                "p90": 439,
+                "p99": 546,
+                "p99_9": 778
+              },
+              {
+                "p50": 230,
+                "p90": 437,
+                "p99": 543,
+                "p99_9": 779
+              },
+              {
+                "p50": 223,
+                "p90": 435,
+                "p99": 541,
+                "p99_9": 785
+              }
+            ],
+            "on": [
+              {
+                "p50": 230,
+                "p90": 432,
+                "p99": 550,
+                "p99_9": 845
+              },
+              {
+                "p50": 237,
+                "p90": 442,
+                "p99": 569,
+                "p99_9": 783
+              },
+              {
+                "p50": 234,
+                "p90": 438,
+                "p99": 547,
+                "p99_9": 726
+              }
+            ]
+          }
+        },
+        {
+          "demo": "node",
+          "connections": 100,
+          "primary": true,
+          "off": {
+            "latencyUs": {
+              "p50": 2862,
+              "p90": 3322,
+              "p99": 4095,
+              "p99_9": 5447
+            },
+            "requestsPerSecond": 33886.3666634835,
+            "errors": 0
+          },
+          "on": {
+            "latencyUs": {
+              "p50": 2726,
+              "p90": 3125,
+              "p99": 3818,
+              "p99_9": 5590
+            },
+            "requestsPerSecond": 35552.52877545607,
+            "errors": 0
+          },
+          "deltaUs": {
+            "p50": -136,
+            "p90": -197,
+            "p99": -277,
+            "p99_9": 143
+          },
+          "clean": true,
+          "latencyPassed": true,
+          "samples": {
+            "off": [
+              {
+                "p50": 2683,
+                "p90": 3109,
+                "p99": 3749,
+                "p99_9": 4997
+              },
+              {
+                "p50": 2866,
+                "p90": 3322,
+                "p99": 4095,
+                "p99_9": 5546
+              },
+              {
+                "p50": 2862,
+                "p90": 3387,
+                "p99": 4652,
+                "p99_9": 5447
+              }
+            ],
+            "on": [
+              {
+                "p50": 2814,
+                "p90": 3125,
+                "p99": 3704,
+                "p99_9": 5590
+              },
+              {
+                "p50": 2726,
+                "p90": 3135,
+                "p99": 3908,
+                "p99_9": 5423
+              },
+              {
+                "p50": 2724,
+                "p90": 3087,
+                "p99": 3818,
+                "p99_9": 5629
+              }
+            ]
+          }
+        },
+        {
+          "demo": "node",
+          "connections": 10,
+          "primary": false,
+          "off": {
+            "latencyUs": {
+              "p50": 233,
+              "p90": 439,
+              "p99": 570,
+              "p99_9": 824
+            },
+            "requestsPerSecond": 36424.2642717851,
+            "errors": 0
+          },
+          "on": {
+            "latencyUs": {
+              "p50": 237,
+              "p90": 443,
+              "p99": 565,
+              "p99_9": 808
+            },
+            "requestsPerSecond": 36082.89832801304,
+            "errors": 0
+          },
+          "deltaUs": {
+            "p50": 4,
+            "p90": 4,
+            "p99": -5,
+            "p99_9": -16
+          },
+          "clean": true,
+          "latencyPassed": true,
+          "samples": {
+            "off": [
+              {
+                "p50": 232,
+                "p90": 439,
+                "p99": 590,
+                "p99_9": 824
+              },
+              {
+                "p50": 233,
+                "p90": 438,
+                "p99": 544,
+                "p99_9": 713
+              },
+              {
+                "p50": 237,
+                "p90": 462,
+                "p99": 570,
+                "p99_9": 833
+              }
+            ],
+            "on": [
+              {
+                "p50": 237,
+                "p90": 453,
+                "p99": 567,
+                "p99_9": 785
+              },
+              {
+                "p50": 229,
+                "p90": 435,
+                "p99": 550,
+                "p99_9": 808
+              },
+              {
+                "p50": 239,
+                "p90": 443,
+                "p99": 565,
+                "p99_9": 820
+              }
+            ]
+          }
+        },
+        {
+          "demo": "hono",
+          "connections": 100,
+          "primary": true,
+          "off": {
+            "latencyUs": {
+              "p50": 2839,
+              "p90": 3262,
+              "p99": 4327,
+              "p99_9": 5836
+            },
+            "requestsPerSecond": 34072.017137482835,
+            "errors": 0
+          },
+          "on": {
+            "latencyUs": {
+              "p50": 2800,
+              "p90": 3492,
+              "p99": 5332,
+              "p99_9": 6689
+            },
+            "requestsPerSecond": 34040.96882761068,
+            "errors": 0
+          },
+          "deltaUs": {
+            "p50": -39,
+            "p90": 230,
+            "p99": 1005,
+            "p99_9": 853
+          },
+          "clean": true,
+          "latencyPassed": false,
+          "samples": {
+            "off": [
+              {
+                "p50": 2805,
+                "p90": 3185,
+                "p99": 3964,
+                "p99_9": 5746
+              },
+              {
+                "p50": 2850,
+                "p90": 3262,
+                "p99": 4327,
+                "p99_9": 5836
+              },
+              {
+                "p50": 2839,
+                "p90": 3349,
+                "p99": 4344,
+                "p99_9": 6194
+              }
+            ],
+            "on": [
+              {
+                "p50": 2799,
+                "p90": 3492,
+                "p99": 5404,
+                "p99_9": 6422
+              },
+              {
+                "p50": 2847,
+                "p90": 3566,
+                "p99": 5332,
+                "p99_9": 6689
+              },
+              {
+                "p50": 2800,
+                "p90": 3204,
+                "p99": 5317,
+                "p99_9": 7390
+              }
+            ]
+          }
+        },
+        {
+          "demo": "hono",
+          "connections": 10,
+          "primary": false,
+          "off": {
+            "latencyUs": {
+              "p50": 245,
+              "p90": 459,
+              "p99": 574,
+              "p99_9": 811
+            },
+            "requestsPerSecond": 35445.34961199602,
+            "errors": 0
+          },
+          "on": {
+            "latencyUs": {
+              "p50": 235,
+              "p90": 435,
+              "p99": 554,
+              "p99_9": 799
+            },
+            "requestsPerSecond": 36946.65319659477,
+            "errors": 0
+          },
+          "deltaUs": {
+            "p50": -10,
+            "p90": -24,
+            "p99": -20,
+            "p99_9": -12
+          },
+          "clean": true,
+          "latencyPassed": true,
+          "samples": {
+            "off": [
+              {
+                "p50": 245,
+                "p90": 459,
+                "p99": 579,
+                "p99_9": 773
+              },
+              {
+                "p50": 239,
+                "p90": 457,
+                "p99": 572,
+                "p99_9": 811
+              },
+              {
+                "p50": 252,
+                "p90": 460,
+                "p99": 574,
+                "p99_9": 812
+              }
+            ],
+            "on": [
+              {
+                "p50": 235,
+                "p90": 435,
+                "p99": 554,
+                "p99_9": 771
+              },
+              {
+                "p50": 237,
+                "p90": 436,
+                "p99": 676,
+                "p99_9": 996
+              },
+              {
+                "p50": 221,
+                "p90": 431,
+                "p99": 549,
+                "p99_9": 799
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "tree": "v0.5b",
+      "run": 1,
+      "status": "failed",
+      "generatedAt": "2026-11-16T02:19:52.771Z",
+      "method": {
+        "transport": "127.0.0.1 HTTP/1.1 keep-alive; server and load generator in separate child processes",
+        "runs": 3,
+        "connections": [
+          100,
+          10
+        ],
+        "durationSeconds": 3,
+        "warmupSeconds": 1,
+        "load": "closed-loop, one in-flight request per connection, no rate limit or pipelining",
+        "histogram": "integer µs rounded up; sorted array; nearest rank ceil(q*n); per-mode median of run percentiles; delta = on median - off median",
+        "boundary": "requests started before deadline are drained and included; throughput denominator includes drain; warmup uses the same Agent, separate histogram",
+        "thresholds": {
+          "p50DeltaUs": 200,
+          "p99DeltaUs": 1000,
+          "heapDeltaBytes": 10000000,
+          "clients": 50000
+        },
+        "primaryConnections": 100
+      },
+      "memory": {
+        "clients": 50000,
+        "heapDeltaBytes": 8599144,
+        "gc": true
+      },
+      "microbenchmark": {
+        "method": "await guard.inspect(human homepage); includes await, decision check, metrics, bounds and scanning; excludes adapter/HTTP",
+        "warmupIterations": 20000,
+        "iterations": 100000,
+        "runs": 3,
+        "samplesNsPerOp": [
+          2402.26448,
+          2294.12711,
+          2286.95538
+        ],
+        "medianNsPerOp": 2294.12711
+      },
+      "rows": [
+        {
+          "demo": "express",
+          "connections": 100,
+          "primary": true,
+          "off": {
+            "latencyUs": {
+              "p50": 3005,
+              "p90": 3501,
+              "p99": 4604,
+              "p99_9": 5912
+            },
+            "requestsPerSecond": 32095.632788442745,
+            "errors": 0
+          },
+          "on": {
+            "latencyUs": {
+              "p50": 2891,
+              "p90": 3337,
+              "p99": 4792,
+              "p99_9": 5949
+            },
+            "requestsPerSecond": 33571.81782432237,
+            "errors": 0
+          },
+          "deltaUs": {
+            "p50": -114,
+            "p90": -164,
+            "p99": 188,
+            "p99_9": 37
+          },
+          "clean": true,
+          "latencyPassed": true,
+          "samples": {
+            "off": [
+              {
+                "p50": 3005,
+                "p90": 3501,
+                "p99": 4777,
+                "p99_9": 6159
+              },
+              {
+                "p50": 3014,
+                "p90": 3546,
+                "p99": 4604,
+                "p99_9": 5912
+              },
+              {
+                "p50": 2953,
+                "p90": 3420,
+                "p99": 3980,
+                "p99_9": 5740
+              }
+            ],
+            "on": [
+              {
+                "p50": 2938,
+                "p90": 3536,
+                "p99": 4953,
+                "p99_9": 6796
+              },
+              {
+                "p50": 2891,
+                "p90": 3337,
+                "p99": 4614,
+                "p99_9": 5949
+              },
+              {
+                "p50": 2806,
+                "p90": 3220,
+                "p99": 4792,
+                "p99_9": 5890
+              }
+            ]
+          }
+        },
+        {
+          "demo": "express",
+          "connections": 10,
+          "primary": false,
+          "off": {
+            "latencyUs": {
+              "p50": 236,
+              "p90": 443,
+              "p99": 558,
+              "p99_9": 831
+            },
+            "requestsPerSecond": 36393.90860886172,
+            "errors": 0
+          },
+          "on": {
+            "latencyUs": {
+              "p50": 241,
+              "p90": 450,
+              "p99": 611,
+              "p99_9": 925
+            },
+            "requestsPerSecond": 34965.32911181773,
+            "errors": 0
+          },
+          "deltaUs": {
+            "p50": 5,
+            "p90": 7,
+            "p99": 53,
+            "p99_9": 94
+          },
+          "clean": true,
+          "latencyPassed": true,
+          "samples": {
+            "off": [
+              {
+                "p50": 237,
+                "p90": 443,
+                "p99": 568,
+                "p99_9": 831
+              },
+              {
+                "p50": 236,
+                "p90": 452,
+                "p99": 557,
+                "p99_9": 748
+              },
+              {
+                "p50": 227,
+                "p90": 439,
+                "p99": 558,
+                "p99_9": 870
+              }
+            ],
+            "on": [
+              {
+                "p50": 247,
+                "p90": 450,
+                "p99": 602,
+                "p99_9": 857
+              },
+              {
+                "p50": 241,
+                "p90": 444,
+                "p99": 611,
+                "p99_9": 925
+              },
+              {
+                "p50": 241,
+                "p90": 454,
+                "p99": 703,
+                "p99_9": 1018
+              }
+            ]
+          }
+        },
+        {
+          "demo": "node",
+          "connections": 100,
+          "primary": true,
+          "off": {
+            "latencyUs": {
+              "p50": 2821,
+              "p90": 3280,
+              "p99": 5138,
+              "p99_9": 9263
+            },
+            "requestsPerSecond": 33891.35889176621,
+            "errors": 0
+          },
+          "on": {
+            "latencyUs": {
+              "p50": 2896,
+              "p90": 3349,
+              "p99": 4860,
+              "p99_9": 8361
+            },
+            "requestsPerSecond": 33200.13758293761,
+            "errors": 0
+          },
+          "deltaUs": {
+            "p50": 75,
+            "p90": 69,
+            "p99": -278,
+            "p99_9": -902
+          },
+          "clean": true,
+          "latencyPassed": true,
+          "samples": {
+            "off": [
+              {
+                "p50": 2808,
+                "p90": 3280,
+                "p99": 5138,
+                "p99_9": 9263
+              },
+              {
+                "p50": 2882,
+                "p90": 3247,
+                "p99": 4033,
+                "p99_9": 6340
+              },
+              {
+                "p50": 2821,
+                "p90": 3281,
+                "p99": 5882,
+                "p99_9": 10395
+              }
+            ],
+            "on": [
+              {
+                "p50": 2982,
+                "p90": 3497,
+                "p99": 4770,
+                "p99_9": 6432
+              },
+              {
+                "p50": 2896,
+                "p90": 3349,
+                "p99": 5025,
+                "p99_9": 10212
+              },
+              {
+                "p50": 2813,
+                "p90": 3283,
+                "p99": 4860,
+                "p99_9": 8361
+              }
+            ]
+          }
+        },
+        {
+          "demo": "node",
+          "connections": 10,
+          "primary": false,
+          "off": {
+            "latencyUs": {
+              "p50": 235,
+              "p90": 452,
+              "p99": 587,
+              "p99_9": 874
+            },
+            "requestsPerSecond": 35925.308594200986,
+            "errors": 0
+          },
+          "on": {
+            "latencyUs": {
+              "p50": 235,
+              "p90": 443,
+              "p99": 580,
+              "p99_9": 837
+            },
+            "requestsPerSecond": 36229.15414682416,
+            "errors": 0
+          },
+          "deltaUs": {
+            "p50": 0,
+            "p90": -9,
+            "p99": -7,
+            "p99_9": -37
+          },
+          "clean": true,
+          "latencyPassed": true,
+          "samples": {
+            "off": [
+              {
+                "p50": 236,
+                "p90": 452,
+                "p99": 587,
+                "p99_9": 830
+              },
+              {
+                "p50": 230,
+                "p90": 436,
+                "p99": 550,
+                "p99_9": 874
+              },
+              {
+                "p50": 235,
+                "p90": 463,
+                "p99": 597,
+                "p99_9": 988
+              }
+            ],
+            "on": [
+              {
+                "p50": 221,
+                "p90": 434,
+                "p99": 550,
+                "p99_9": 831
+              },
+              {
+                "p50": 236,
+                "p90": 459,
+                "p99": 580,
+                "p99_9": 837
+              },
+              {
+                "p50": 235,
+                "p90": 443,
+                "p99": 589,
+                "p99_9": 876
+              }
+            ]
+          }
+        },
+        {
+          "demo": "hono",
+          "connections": 100,
+          "primary": true,
+          "off": {
+            "latencyUs": {
+              "p50": 3052,
+              "p90": 3383,
+              "p99": 4204,
+              "p99_9": 6150
+            },
+            "requestsPerSecond": 31899.203562139723,
+            "errors": 0
+          },
+          "on": {
+            "latencyUs": {
+              "p50": 2825,
+              "p90": 3566,
+              "p99": 5644,
+              "p99_9": 6710
+            },
+            "requestsPerSecond": 33615.05756237458,
+            "errors": 0
+          },
+          "deltaUs": {
+            "p50": -227,
+            "p90": 183,
+            "p99": 1440,
+            "p99_9": 560
+          },
+          "clean": true,
+          "latencyPassed": false,
+          "samples": {
+            "off": [
+              {
+                "p50": 2755,
+                "p90": 3251,
+                "p99": 4204,
+                "p99_9": 5640
+              },
+              {
+                "p50": 3076,
+                "p90": 3383,
+                "p99": 4147,
+                "p99_9": 6278
+              },
+              {
+                "p50": 3052,
+                "p90": 3649,
+                "p99": 4865,
+                "p99_9": 6150
+              }
+            ],
+            "on": [
+              {
+                "p50": 2812,
+                "p90": 3420,
+                "p99": 5373,
+                "p99_9": 6429
+              },
+              {
+                "p50": 2825,
+                "p90": 3566,
+                "p99": 5677,
+                "p99_9": 6710
+              },
+              {
+                "p50": 3012,
+                "p90": 3613,
+                "p99": 5644,
+                "p99_9": 8545
+              }
+            ]
+          }
+        },
+        {
+          "demo": "hono",
+          "connections": 10,
+          "primary": false,
+          "off": {
+            "latencyUs": {
+              "p50": 236,
+              "p90": 458,
+              "p99": 556,
+              "p99_9": 770
+            },
+            "requestsPerSecond": 36209.50255529919,
+            "errors": 0
+          },
+          "on": {
+            "latencyUs": {
+              "p50": 245,
+              "p90": 454,
+              "p99": 605,
+              "p99_9": 827
+            },
+            "requestsPerSecond": 35021.94500625439,
+            "errors": 0
+          },
+          "deltaUs": {
+            "p50": 9,
+            "p90": -4,
+            "p99": 49,
+            "p99_9": 57
+          },
+          "clean": true,
+          "latencyPassed": true,
+          "samples": {
+            "off": [
+              {
+                "p50": 236,
+                "p90": 446,
+                "p99": 549,
+                "p99_9": 714
+              },
+              {
+                "p50": 245,
+                "p90": 458,
+                "p99": 573,
+                "p99_9": 832
+              },
+              {
+                "p50": 235,
+                "p90": 458,
+                "p99": 556,
+                "p99_9": 770
+              }
+            ],
+            "on": [
+              {
+                "p50": 245,
+                "p90": 454,
+                "p99": 615,
+                "p99_9": 827
+              },
+              {
+                "p50": 245,
+                "p90": 459,
+                "p99": 605,
+                "p99_9": 920
+              },
+              {
+                "p50": 233,
+                "p90": 439,
+                "p99": 552,
+                "p99_9": 746
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "tree": "v0.5a",
+      "run": 2,
+      "status": "failed",
+      "generatedAt": "2026-11-16T02:23:08.548Z",
+      "method": {
+        "transport": "127.0.0.1 HTTP/1.1 keep-alive; server and load generator in separate child processes",
+        "runs": 3,
+        "connections": [
+          100,
+          10
+        ],
+        "durationSeconds": 3,
+        "warmupSeconds": 1,
+        "load": "closed-loop, one in-flight request per connection, no rate limit or pipelining",
+        "histogram": "integer µs rounded up; sorted array; nearest rank ceil(q*n); per-mode median of run percentiles; delta = on median - off median",
+        "boundary": "requests started before deadline are drained and included; throughput denominator includes drain; warmup uses the same Agent, separate histogram",
+        "thresholds": {
+          "p50DeltaUs": 200,
+          "p99DeltaUs": 1000,
+          "heapDeltaBytes": 10000000,
+          "clients": 50000
+        },
+        "primaryConnections": 100
+      },
+      "memory": {
+        "clients": 50000,
+        "heapDeltaBytes": 8598680,
+        "gc": true
+      },
+      "microbenchmark": {
+        "method": "await guard.inspect(human homepage); includes await, decision check, metrics, bounds and scanning; excludes adapter/HTTP",
+        "warmupIterations": 20000,
+        "iterations": 100000,
+        "runs": 3,
+        "samplesNsPerOp": [
+          2479.86247,
+          2442.68019,
+          2426.94851
+        ],
+        "medianNsPerOp": 2442.68019
+      },
+      "rows": [
+        {
+          "demo": "express",
+          "connections": 100,
+          "primary": true,
+          "off": {
+            "latencyUs": {
+              "p50": 2882,
+              "p90": 3286,
+              "p99": 3898,
+              "p99_9": 5646
+            },
+            "requestsPerSecond": 33696.39974700925,
+            "errors": 0
+          },
+          "on": {
+            "latencyUs": {
+              "p50": 2869,
+              "p90": 3325,
+              "p99": 5262,
+              "p99_9": 6397
+            },
+            "requestsPerSecond": 32938.469944461416,
+            "errors": 0
+          },
+          "deltaUs": {
+            "p50": -13,
+            "p90": 39,
+            "p99": 1364,
+            "p99_9": 751
+          },
+          "clean": true,
+          "latencyPassed": false,
+          "samples": {
+            "off": [
+              {
+                "p50": 2882,
+                "p90": 3340,
+                "p99": 4091,
+                "p99_9": 6184
+              },
+              {
+                "p50": 2899,
+                "p90": 3267,
+                "p99": 3825,
+                "p99_9": 5646
+              },
+              {
+                "p50": 2837,
+                "p90": 3286,
+                "p99": 3898,
+                "p99_9": 5599
+              }
+            ],
+            "on": [
+              {
+                "p50": 2857,
+                "p90": 3270,
+                "p99": 5181,
+                "p99_9": 6140
+              },
+              {
+                "p50": 2940,
+                "p90": 3440,
+                "p99": 5262,
+                "p99_9": 6397
+              },
+              {
+                "p50": 2869,
+                "p90": 3325,
+                "p99": 8197,
+                "p99_9": 8802
+              }
+            ]
+          }
+        },
+        {
+          "demo": "express",
+          "connections": 10,
+          "primary": false,
+          "off": {
+            "latencyUs": {
+              "p50": 249,
+              "p90": 457,
+              "p99": 610,
+              "p99_9": 845
+            },
+            "requestsPerSecond": 34781.39764418602,
+            "errors": 0
+          },
+          "on": {
+            "latencyUs": {
+              "p50": 235,
+              "p90": 438,
+              "p99": 584,
+              "p99_9": 856
+            },
+            "requestsPerSecond": 36281.015977189076,
+            "errors": 0
+          },
+          "deltaUs": {
+            "p50": -14,
+            "p90": -19,
+            "p99": -26,
+            "p99_9": 11
+          },
+          "clean": true,
+          "latencyPassed": true,
+          "samples": {
+            "off": [
+              {
+                "p50": 237,
+                "p90": 443,
+                "p99": 554,
+                "p99_9": 756
+              },
+              {
+                "p50": 249,
+                "p90": 457,
+                "p99": 610,
+                "p99_9": 845
+              },
+              {
+                "p50": 289,
+                "p90": 613,
+                "p99": 856,
+                "p99_9": 1235
+              }
+            ],
+            "on": [
+              {
+                "p50": 235,
+                "p90": 446,
+                "p99": 568,
+                "p99_9": 767
+              },
+              {
+                "p50": 236,
+                "p90": 438,
+                "p99": 584,
+                "p99_9": 875
+              },
+              {
+                "p50": 235,
+                "p90": 434,
+                "p99": 589,
+                "p99_9": 856
+              }
+            ]
+          }
+        },
+        {
+          "demo": "node",
+          "connections": 100,
+          "primary": true,
+          "off": {
+            "latencyUs": {
+              "p50": 2970,
+              "p90": 3388,
+              "p99": 5515,
+              "p99_9": 6248
+            },
+            "requestsPerSecond": 32750.91616183096,
+            "errors": 0
+          },
+          "on": {
+            "latencyUs": {
+              "p50": 2931,
+              "p90": 3518,
+              "p99": 4688,
+              "p99_9": 5989
+            },
+            "requestsPerSecond": 32701.40711250716,
+            "errors": 0
+          },
+          "deltaUs": {
+            "p50": -39,
+            "p90": 130,
+            "p99": -827,
+            "p99_9": -259
+          },
+          "clean": true,
+          "latencyPassed": true,
+          "samples": {
+            "off": [
+              {
+                "p50": 2928,
+                "p90": 3388,
+                "p99": 5515,
+                "p99_9": 6248
+              },
+              {
+                "p50": 3141,
+                "p90": 4695,
+                "p99": 6662,
+                "p99_9": 9655
+              },
+              {
+                "p50": 2970,
+                "p90": 3367,
+                "p99": 4131,
+                "p99_9": 5944
+              }
+            ],
+            "on": [
+              {
+                "p50": 2931,
+                "p90": 3587,
+                "p99": 4652,
+                "p99_9": 6102
+              },
+              {
+                "p50": 2973,
+                "p90": 3518,
+                "p99": 5037,
+                "p99_9": 5989
+              },
+              {
+                "p50": 2898,
+                "p90": 3460,
+                "p99": 4688,
+                "p99_9": 5899
+              }
+            ]
+          }
+        },
+        {
+          "demo": "node",
+          "connections": 10,
+          "primary": false,
+          "off": {
+            "latencyUs": {
+              "p50": 273,
+              "p90": 472,
+              "p99": 793,
+              "p99_9": 976
+            },
+            "requestsPerSecond": 30303.608777785437,
+            "errors": 0
+          },
+          "on": {
+            "latencyUs": {
+              "p50": 243,
+              "p90": 446,
+              "p99": 605,
+              "p99_9": 907
+            },
+            "requestsPerSecond": 35153.33224617461,
+            "errors": 0
+          },
+          "deltaUs": {
+            "p50": -30,
+            "p90": -26,
+            "p99": -188,
+            "p99_9": -69
+          },
+          "clean": true,
+          "latencyPassed": true,
+          "samples": {
+            "off": [
+              {
+                "p50": 248,
+                "p90": 466,
+                "p99": 612,
+                "p99_9": 907
+              },
+              {
+                "p50": 273,
+                "p90": 472,
+                "p99": 793,
+                "p99_9": 976
+              },
+              {
+                "p50": 409,
+                "p90": 577,
+                "p99": 910,
+                "p99_9": 1508
+              }
+            ],
+            "on": [
+              {
+                "p50": 243,
+                "p90": 446,
+                "p99": 627,
+                "p99_9": 907
+              },
+              {
+                "p50": 243,
+                "p90": 444,
+                "p99": 605,
+                "p99_9": 1109
+              },
+              {
+                "p50": 257,
+                "p90": 469,
+                "p99": 597,
+                "p99_9": 851
+              }
+            ]
+          }
+        },
+        {
+          "demo": "hono",
+          "connections": 100,
+          "primary": true,
+          "off": {
+            "latencyUs": {
+              "p50": 2937,
+              "p90": 3475,
+              "p99": 5222,
+              "p99_9": 6420
+            },
+            "requestsPerSecond": 32343.056563488935,
+            "errors": 0
+          },
+          "on": {
+            "latencyUs": {
+              "p50": 2853,
+              "p90": 3523,
+              "p99": 5342,
+              "p99_9": 6674
+            },
+            "requestsPerSecond": 33471.647053280816,
+            "errors": 0
+          },
+          "deltaUs": {
+            "p50": -84,
+            "p90": 48,
+            "p99": 120,
+            "p99_9": 254
+          },
+          "clean": true,
+          "latencyPassed": true,
+          "samples": {
+            "off": [
+              {
+                "p50": 2937,
+                "p90": 3475,
+                "p99": 6457,
+                "p99_9": 8170
+              },
+              {
+                "p50": 2977,
+                "p90": 3602,
+                "p99": 4595,
+                "p99_9": 6221
+              },
+              {
+                "p50": 2843,
+                "p90": 3332,
+                "p99": 5222,
+                "p99_9": 6420
+              }
+            ],
+            "on": [
+              {
+                "p50": 2878,
+                "p90": 3647,
+                "p99": 5669,
+                "p99_9": 7256
+              },
+              {
+                "p50": 2853,
+                "p90": 3523,
+                "p99": 5342,
+                "p99_9": 6674
+              },
+              {
+                "p50": 2808,
+                "p90": 3306,
+                "p99": 5301,
+                "p99_9": 6402
+              }
+            ]
+          }
+        },
+        {
+          "demo": "hono",
+          "connections": 10,
+          "primary": false,
+          "off": {
+            "latencyUs": {
+              "p50": 241,
+              "p90": 457,
+              "p99": 576,
+              "p99_9": 773
+            },
+            "requestsPerSecond": 35797.25231597548,
+            "errors": 0
+          },
+          "on": {
+            "latencyUs": {
+              "p50": 235,
+              "p90": 443,
+              "p99": 640,
+              "p99_9": 990
+            },
+            "requestsPerSecond": 35856.89904977158,
+            "errors": 0
+          },
+          "deltaUs": {
+            "p50": -6,
+            "p90": -14,
+            "p99": 64,
+            "p99_9": 217
+          },
+          "clean": true,
+          "latencyPassed": true,
+          "samples": {
+            "off": [
+              {
+                "p50": 237,
+                "p90": 461,
+                "p99": 561,
+                "p99_9": 750
+              },
+              {
+                "p50": 241,
+                "p90": 446,
+                "p99": 578,
+                "p99_9": 839
+              },
+              {
+                "p50": 242,
+                "p90": 457,
+                "p99": 576,
+                "p99_9": 773
+              }
+            ],
+            "on": [
+              {
+                "p50": 235,
+                "p90": 443,
+                "p99": 591,
+                "p99_9": 925
+              },
+              {
+                "p50": 231,
+                "p90": 443,
+                "p99": 640,
+                "p99_9": 990
+              },
+              {
+                "p50": 248,
+                "p90": 464,
+                "p99": 767,
+                "p99_9": 1325
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "tree": "v0.5b",
+      "run": 2,
+      "status": "failed",
+      "generatedAt": "2026-11-16T02:26:22.244Z",
+      "method": {
+        "transport": "127.0.0.1 HTTP/1.1 keep-alive; server and load generator in separate child processes",
+        "runs": 3,
+        "connections": [
+          100,
+          10
+        ],
+        "durationSeconds": 3,
+        "warmupSeconds": 1,
+        "load": "closed-loop, one in-flight request per connection, no rate limit or pipelining",
+        "histogram": "integer µs rounded up; sorted array; nearest rank ceil(q*n); per-mode median of run percentiles; delta = on median - off median",
+        "boundary": "requests started before deadline are drained and included; throughput denominator includes drain; warmup uses the same Agent, separate histogram",
+        "thresholds": {
+          "p50DeltaUs": 200,
+          "p99DeltaUs": 1000,
+          "heapDeltaBytes": 10000000,
+          "clients": 50000
+        },
+        "primaryConnections": 100
+      },
+      "memory": {
+        "clients": 50000,
+        "heapDeltaBytes": 8599144,
+        "gc": true
+      },
+      "microbenchmark": {
+        "method": "await guard.inspect(human homepage); includes await, decision check, metrics, bounds and scanning; excludes adapter/HTTP",
+        "warmupIterations": 20000,
+        "iterations": 100000,
+        "runs": 3,
+        "samplesNsPerOp": [
+          2527.03962,
+          2316.08722,
+          2283.64264
+        ],
+        "medianNsPerOp": 2316.08722
+      },
+      "rows": [
+        {
+          "demo": "express",
+          "connections": 100,
+          "primary": true,
+          "off": {
+            "latencyUs": {
+              "p50": 2897,
+              "p90": 3321,
+              "p99": 4078,
+              "p99_9": 5810
+            },
+            "requestsPerSecond": 33630.73505228914,
+            "errors": 0
+          },
+          "on": {
+            "latencyUs": {
+              "p50": 2913,
+              "p90": 3393,
+              "p99": 5268,
+              "p99_9": 6327
+            },
+            "requestsPerSecond": 32965.91154203917,
+            "errors": 0
+          },
+          "deltaUs": {
+            "p50": 16,
+            "p90": 72,
+            "p99": 1190,
+            "p99_9": 517
+          },
+          "clean": true,
+          "latencyPassed": false,
+          "samples": {
+            "off": [
+              {
+                "p50": 2954,
+                "p90": 3342,
+                "p99": 4093,
+                "p99_9": 5810
+              },
+              {
+                "p50": 2774,
+                "p90": 3164,
+                "p99": 4078,
+                "p99_9": 8308
+              },
+              {
+                "p50": 2897,
+                "p90": 3321,
+                "p99": 4000,
+                "p99_9": 5586
+              }
+            ],
+            "on": [
+              {
+                "p50": 2945,
+                "p90": 3393,
+                "p99": 4907,
+                "p99_9": 6327
+              },
+              {
+                "p50": 2913,
+                "p90": 3686,
+                "p99": 5268,
+                "p99_9": 6128
+              },
+              {
+                "p50": 2846,
+                "p90": 3325,
+                "p99": 5362,
+                "p99_9": 7138
+              }
+            ]
+          }
+        },
+        {
+          "demo": "express",
+          "connections": 10,
+          "primary": false,
+          "off": {
+            "latencyUs": {
+              "p50": 230,
+              "p90": 439,
+              "p99": 549,
+              "p99_9": 768
+            },
+            "requestsPerSecond": 37137.52462518004,
+            "errors": 0
+          },
+          "on": {
+            "latencyUs": {
+              "p50": 232,
+              "p90": 436,
+              "p99": 592,
+              "p99_9": 845
+            },
+            "requestsPerSecond": 36804.67298956885,
+            "errors": 0
+          },
+          "deltaUs": {
+            "p50": 2,
+            "p90": -3,
+            "p99": 43,
+            "p99_9": 77
+          },
+          "clean": true,
+          "latencyPassed": true,
+          "samples": {
+            "off": [
+              {
+                "p50": 230,
+                "p90": 436,
+                "p99": 529,
+                "p99_9": 732
+              },
+              {
+                "p50": 229,
+                "p90": 447,
+                "p99": 558,
+                "p99_9": 775
+              },
+              {
+                "p50": 233,
+                "p90": 439,
+                "p99": 549,
+                "p99_9": 768
+              }
+            ],
+            "on": [
+              {
+                "p50": 229,
+                "p90": 436,
+                "p99": 558,
+                "p99_9": 806
+              },
+              {
+                "p50": 232,
+                "p90": 432,
+                "p99": 592,
+                "p99_9": 845
+              },
+              {
+                "p50": 248,
+                "p90": 452,
+                "p99": 654,
+                "p99_9": 912
+              }
+            ]
+          }
+        },
+        {
+          "demo": "node",
+          "connections": 100,
+          "primary": true,
+          "off": {
+            "latencyUs": {
+              "p50": 3017,
+              "p90": 3578,
+              "p99": 5211,
+              "p99_9": 6630
+            },
+            "requestsPerSecond": 31874.695786277676,
+            "errors": 0
+          },
+          "on": {
+            "latencyUs": {
+              "p50": 3012,
+              "p90": 3541,
+              "p99": 4740,
+              "p99_9": 6644
+            },
+            "requestsPerSecond": 32149.3706658477,
+            "errors": 0
+          },
+          "deltaUs": {
+            "p50": -5,
+            "p90": -37,
+            "p99": -471,
+            "p99_9": 14
+          },
+          "clean": true,
+          "latencyPassed": true,
+          "samples": {
+            "off": [
+              {
+                "p50": 3112,
+                "p90": 3694,
+                "p99": 5799,
+                "p99_9": 8028
+              },
+              {
+                "p50": 3017,
+                "p90": 3578,
+                "p99": 5211,
+                "p99_9": 6586
+              },
+              {
+                "p50": 2864,
+                "p90": 3307,
+                "p99": 4664,
+                "p99_9": 6630
+              }
+            ],
+            "on": [
+              {
+                "p50": 3025,
+                "p90": 3541,
+                "p99": 4740,
+                "p99_9": 6869
+              },
+              {
+                "p50": 3012,
+                "p90": 3556,
+                "p99": 4907,
+                "p99_9": 6644
+              },
+              {
+                "p50": 2853,
+                "p90": 3194,
+                "p99": 3938,
+                "p99_9": 5687
+              }
+            ]
+          }
+        },
+        {
+          "demo": "node",
+          "connections": 10,
+          "primary": false,
+          "off": {
+            "latencyUs": {
+              "p50": 234,
+              "p90": 441,
+              "p99": 563,
+              "p99_9": 819
+            },
+            "requestsPerSecond": 36368.00691938497,
+            "errors": 0
+          },
+          "on": {
+            "latencyUs": {
+              "p50": 229,
+              "p90": 445,
+              "p99": 558,
+              "p99_9": 888
+            },
+            "requestsPerSecond": 37042.69444258194,
+            "errors": 0
+          },
+          "deltaUs": {
+            "p50": -5,
+            "p90": 4,
+            "p99": -5,
+            "p99_9": 69
+          },
+          "clean": true,
+          "latencyPassed": true,
+          "samples": {
+            "off": [
+              {
+                "p50": 234,
+                "p90": 445,
+                "p99": 579,
+                "p99_9": 852
+              },
+              {
+                "p50": 228,
+                "p90": 435,
+                "p99": 535,
+                "p99_9": 755
+              },
+              {
+                "p50": 235,
+                "p90": 441,
+                "p99": 563,
+                "p99_9": 819
+              }
+            ],
+            "on": [
+              {
+                "p50": 229,
+                "p90": 446,
+                "p99": 553,
+                "p99_9": 767
+              },
+              {
+                "p50": 223,
+                "p90": 436,
+                "p99": 558,
+                "p99_9": 888
+              },
+              {
+                "p50": 235,
+                "p90": 445,
+                "p99": 602,
+                "p99_9": 891
+              }
+            ]
+          }
+        },
+        {
+          "demo": "hono",
+          "connections": 100,
+          "primary": true,
+          "off": {
+            "latencyUs": {
+              "p50": 2730,
+              "p90": 3088,
+              "p99": 3927,
+              "p99_9": 5697
+            },
+            "requestsPerSecond": 35690.75018122351,
+            "errors": 0
+          },
+          "on": {
+            "latencyUs": {
+              "p50": 2713,
+              "p90": 3163,
+              "p99": 5421,
+              "p99_9": 6760
+            },
+            "requestsPerSecond": 35451.26619250463,
+            "errors": 0
+          },
+          "deltaUs": {
+            "p50": -17,
+            "p90": 75,
+            "p99": 1494,
+            "p99_9": 1063
+          },
+          "clean": true,
+          "latencyPassed": false,
+          "samples": {
+            "off": [
+              {
+                "p50": 2870,
+                "p90": 3319,
+                "p99": 5190,
+                "p99_9": 6800
+              },
+              {
+                "p50": 2730,
+                "p90": 3088,
+                "p99": 3852,
+                "p99_9": 5697
+              },
+              {
+                "p50": 2680,
+                "p90": 3056,
+                "p99": 3927,
+                "p99_9": 5629
+              }
+            ],
+            "on": [
+              {
+                "p50": 2682,
+                "p90": 3153,
+                "p99": 5202,
+                "p99_9": 5927
+              },
+              {
+                "p50": 2713,
+                "p90": 3163,
+                "p99": 5421,
+                "p99_9": 8154
+              },
+              {
+                "p50": 2738,
+                "p90": 3527,
+                "p99": 5505,
+                "p99_9": 6760
+              }
+            ]
+          }
+        },
+        {
+          "demo": "hono",
+          "connections": 10,
+          "primary": false,
+          "off": {
+            "latencyUs": {
+              "p50": 233,
+              "p90": 442,
+              "p99": 585,
+              "p99_9": 812
+            },
+            "requestsPerSecond": 36479.61734263368,
+            "errors": 0
+          },
+          "on": {
+            "latencyUs": {
+              "p50": 222,
+              "p90": 426,
+              "p99": 559,
+              "p99_9": 848
+            },
+            "requestsPerSecond": 37912.27263640694,
+            "errors": 0
+          },
+          "deltaUs": {
+            "p50": -11,
+            "p90": -16,
+            "p99": -26,
+            "p99_9": 36
+          },
+          "clean": true,
+          "latencyPassed": true,
+          "samples": {
+            "off": [
+              {
+                "p50": 237,
+                "p90": 466,
+                "p99": 585,
+                "p99_9": 812
+              },
+              {
+                "p50": 233,
+                "p90": 442,
+                "p99": 591,
+                "p99_9": 997
+              },
+              {
+                "p50": 230,
+                "p90": 436,
+                "p99": 545,
+                "p99_9": 794
+              }
+            ],
+            "on": [
+              {
+                "p50": 222,
+                "p90": 426,
+                "p99": 551,
+                "p99_9": 830
+              },
+              {
+                "p50": 220,
+                "p90": 429,
+                "p99": 596,
+                "p99_9": 848
+              },
+              {
+                "p50": 228,
+                "p90": 404,
+                "p99": 559,
+                "p99_9": 853
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "proxy": {
+    "generatedAt": "2026-11-16T02:31:09.972Z",
+    "node": "v24.22.1",
+    "method": "local HTTP, one in-flight keep-alive GET; 100 warmup + 1000 measured requests/mode/run, 3 interleaved runs; same-process upstream/proxy/client; informational only",
+    "rows": [
+      {
+        "direct": {
+          "p50Us": 60.785,
+          "p99Us": 249.558
+        },
+        "proxy": {
+          "p50Us": 153.212,
+          "p99Us": 461.492
+        }
+      },
+      {
+        "proxy": {
+          "p50Us": 115.272,
+          "p99Us": 373.362
+        },
+        "direct": {
+          "p50Us": 38.138,
+          "p99Us": 134.868
+        }
+      },
+      {
+        "direct": {
+          "p50Us": 36.021,
+          "p99Us": 81.82
+        },
+        "proxy": {
+          "p50Us": 107.333,
+          "p99Us": 365.936
+        }
+      }
+    ],
+    "medianDeltaUs": {
+      "p50": 77.13400000000001,
+      "p99": 238.49400000000003
+    },
+    "threshold": null
+  },
+  "bundles": [
+    {
+      "file": "bun.js",
+      "identical": true,
+      "sha256": "076f81b267d1320f9368e1a38af74ffa708165346f272ab62e1efc43c1fdab93"
+    },
+    {
+      "file": "deno.js",
+      "identical": true,
+      "sha256": "362e7c2a7420bd4e9206652f2872a90f8054826ff8687f27f15372ff3cf468f1"
+    },
+    {
+      "file": "express.cjs",
+      "identical": true,
+      "sha256": "4c3d30c6fd69a51d039bd054021790702d5ece76a49029aaf85b94e4b34541d5"
+    },
+    {
+      "file": "express.js",
+      "identical": true,
+      "sha256": "72f3fe4d7d7275f6094580ae7c46c56996aded9a00e97d117a9a833c013561c9"
+    },
+    {
+      "file": "fastify.cjs",
+      "identical": true,
+      "sha256": "389e5f231c9df4158726d81098eb96cc998246bdaa9974501dfd64b129e3e2d6"
+    },
+    {
+      "file": "fastify.js",
+      "identical": true,
+      "sha256": "b731ad5f7a0a1cd83f80164969aadb7fff01156535215853d0482bbf0e993cd6"
+    },
+    {
+      "file": "hono-web.js",
+      "identical": true,
+      "sha256": "229b113c91e5169968f8e1600a74698f02204122c7040eb7e542b3774bf9e42c"
+    },
+    {
+      "file": "hono.cjs",
+      "identical": true,
+      "sha256": "0af1e81d2b771100d44873a5c7681b652bc918c781d21ea570d1e0658abe8577"
+    },
+    {
+      "file": "hono.js",
+      "identical": true,
+      "sha256": "aef24f6282822452dba42892159f04b9a07125fc70dbf64873c8a0182d7d85ac"
+    },
+    {
+      "file": "index.cjs",
+      "identical": true,
+      "sha256": "be0e9c11d36547d50e63bb0fded4e5dcdbe306bb2b9397740e125d953141acac"
+    },
+    {
+      "file": "index.js",
+      "identical": true,
+      "sha256": "5ab83c10f271207034e259c44be9d96c6318dd6ae2de8d10e82b9df4a2634c3b"
+    },
+    {
+      "file": "koa.cjs",
+      "identical": true,
+      "sha256": "bb1e471248ce3031b06e420231ddfc70019ee2231582d1c2705d0a862d227bca"
+    },
+    {
+      "file": "koa.js",
+      "identical": true,
+      "sha256": "0d4803638f0cd9f58423a3e62de01b9666142fbfacf95d1052afc86b9f32351a"
+    },
+    {
+      "file": "next.js",
+      "identical": true,
+      "sha256": "af22745faa65b9fb807f2f369825f25b883ebecbda64470d1aeee443b49b13ac"
+    },
+    {
+      "file": "node.cjs",
+      "identical": true,
+      "sha256": "a3f907f19f75d6230b19dea1523a65b649379058a8b64bb598b7c4a4b975ef2e"
+    },
+    {
+      "file": "node.js",
+      "identical": true,
+      "sha256": "304be28981e1bc34774c2ed158f0bfea39ee517502f82886efcc9624122741c0"
+    },
+    {
+      "file": "web.js",
+      "identical": true,
+      "sha256": "76d86ddc77e631602b774a616cb6eb34c1fafb0aa65b3877d88a9fdf7cfc1962"
+    },
+    {
+      "file": "workers.js",
+      "identical": true,
+      "sha256": "163c022f62baab42195b3358c7e1fe9605746d9fc1c84b71a6b10a8c774b2224"
+    }
+  ],
+  "smoke": {
+    "ordinaryBytesEqual": true,
+    "decoyNoindex": true,
+    "decoyEvent": true,
+    "upstreamStoppedStatus": 502
+  }
+}
