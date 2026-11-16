@@ -22,8 +22,12 @@ export interface WatchSession {
 }
 
 export function createWatcher(options: WatchOptions): WatchSession {
+    return createWatchSession(options, createLogParser(options));
+}
+
+export function createWatchSession(options: Omit<WatchOptions, keyof ParserOptions> & Pick<WatchOptions, 'maxLineBytes'>,
+    parser: { parseLine(line: string): AgentGuardEvent[]; reset(): void }): WatchSession {
     const interval = boundedInteger(options.intervalMs ?? 500, 60000);
-    const parser = createLogParser(options);
     const follower = createLogFollower(options.logPath, { fromStart: options.fromStart, maxLineBytes: options.maxLineBytes, onReset: parser.reset });
     // Delivery status is kept out of the hit JSONL stream. All notification
     // delivery, redaction, retries and deduplication belong to the dispatcher.

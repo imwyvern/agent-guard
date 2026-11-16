@@ -61,6 +61,7 @@
     "env": {
       "type": "string"
     },
+    "source": { "const": "access_log" },
     "req": {
       "type": "object",
       "required": [

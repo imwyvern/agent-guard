@@ -200,6 +200,7 @@
     "bench:deception-lint": "node --import tsx bench/deception-lint.ts",
     "bench:simulate": "node --import tsx bench/simulate.ts",
     "bench:latency": "node --import tsx bench/latency.ts",
+    "bench:proxy": "node --import tsx bench/proxy.ts",
     "bench:latency:hr": "node --import tsx bench/latency-hr.ts",
     "bench:latency:web": "node --import tsx bench/latency-web.ts",
     "smoke:workers": "node --import tsx scripts/smoke-workers.ts",

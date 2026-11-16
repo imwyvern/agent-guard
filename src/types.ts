@@ -51,6 +51,8 @@ export interface AgentGuardEvent {
     severity: Severity;
     project: string;
     env: string;
+    /** Present only for observations from read-only HTTP access logs. */
+    source?: 'access_log';
     req: {
         method: string;
         path: string;
