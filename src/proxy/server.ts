@@ -1,6 +1,6 @@
 import { createServer, request as httpRequest, type IncomingMessage } from 'node:http';
 import { request as httpsRequest } from 'node:https';
-import type { Socket } from 'node:net';
+import { isIP, type Socket } from 'node:net';
 import { toRequest, type ParsedRequest } from '../adapters/node.js';
 import { inspectGraphqlRequest } from '../scenarios/graphql.js';
 import { inspectMcpRequest } from '../scenarios/mcp.js';
@@ -34,6 +34,7 @@ export function fixedUpstream(input: string): URL {
     return url;
 }
 function originTarget(target: string): string {
+    if (target === '*') return target;
     if (target.startsWith('/')) return target; // Includes //: still a path on the fixed origin.
     const absolute = /^https?:\/\/[^/?#]+([^#]*)/i.exec(target);
     const path = absolute?.[1] || '/';
@@ -63,6 +64,7 @@ async function window(req: IncomingMessage): Promise<Buffer> {
 
 export function createProxy(options: ProxyOptions): { server: ReturnType<typeof createServer>; close(): Promise<void> } {
     const upstream = fixedUpstream(options.upstream), timeout = options.timeoutMs ?? 30000;
+    const hostname = upstream.hostname.replace(/^\[|\]$/g, '');
     const budget = options.inspectTimeoutMs ?? 50;
     for (const value of [timeout, budget]) if (!Number.isSafeInteger(value) || value < 1) throw new Error('invalid proxy timeout');
     if (options.config.mode !== 'detect') throw new Error('proxy requires detect mode');
@@ -78,6 +80,8 @@ export function createProxy(options: ProxyOptions): { server: ReturnType<typeof 
         req.on('error', () => {});
         const forward = (prefix: Buffer): void => {
             if (req.aborted || res.destroyed) return;
+            // Do not invent an end-to-end Date header when the origin omits it.
+            res.sendDate = false;
             let finished = false;
             const fail = (status: number) => {
                 if (finished) return;
@@ -88,7 +92,9 @@ export function createProxy(options: ProxyOptions): { server: ReturnType<typeof 
                 outgoing.destroy();
             };
             const outgoing = (upstream.protocol === 'https:' ? httpsRequest : httpRequest)({
-                protocol: upstream.protocol, hostname: upstream.hostname.replace(/^\[|\]$/g, ''), port: upstream.port || undefined,
+                protocol: upstream.protocol, hostname, port: upstream.port || undefined,
+                // Pin TLS identity too: an incoming Host must not choose SNI.
+                ...(upstream.protocol === 'https:' ? { servername: isIP(hostname) ? '' : hostname } : {}),
                 method: req.method, path: originTarget(req.url ?? '/'), headers: endToEndHeaders(req),
                 // The target is fixed here; Host and absolute request targets never select it.
             }, response => {

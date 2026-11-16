@@ -1,4 +1,5 @@
 import { createServer, request, type RequestOptions, type Server } from 'node:http';
+import { createServer as createHttpsServer, globalAgent as httpsAgent } from 'node:https';
 import { connect } from 'node:net';
 import { once } from 'node:events';
 import { spawn } from 'node:child_process';
@@ -11,6 +12,7 @@ import { createProxy } from '../../src/proxy/server.js';
 import { proxyOptions, trustedClientIp } from '../../src/cli/proxy.js';
 import type { AgentGuard, AgentGuardEvent } from '../../src/types.js';
 import { config, request as agRequest } from '../helpers.js';
+import { certificate, privateKey } from '../unit/smtp-tls-fixture.js';
 
 const closers: Array<() => Promise<unknown>> = [];
 afterEach(async () => { vi.unstubAllEnvs(); await Promise.all(closers.splice(0).map(close => close())); });
@@ -105,6 +107,17 @@ it('pins the upstream for Host, absolute URI, // paths and target query paramete
     }
     expect(seen).toEqual(['/absolute?q=1', '//192.0.2.1:1/path', '/?upstream=http://192.0.2.1:1']);
 });
+it('pins HTTPS TLS identity while preserving the incoming Host header', async () => {
+    const priorCa = httpsAgent.options.ca;
+    httpsAgent.options.ca = certificate;
+    const upstream = createHttpsServer({ cert: certificate, key: privateKey }, (req, res) => res.end(String(req.headers.host)));
+    try {
+        const direct = await listen(upstream);
+        const via = await proxy(direct.replace('http:', 'https:'));
+        const response = await get(via.url, { headers: { host: 'attacker.invalid:9' } });
+        expect(response.status).toBe(200); expect(response.body.toString()).toBe('attacker.invalid:9');
+    } finally { httpsAgent.options.ca = priorCa; await close(upstream); }
+});
 it('rejects CONNECT and Upgrade without tunneling', async () => {
     const via = await proxy('http://127.0.0.1:1');
     for (const requestLine of ['CONNECT attacker.invalid:443 HTTP/1.1\r\nHost: attacker.invalid', 'GET / HTTP/1.1\r\nHost: attacker.invalid\r\nConnection: upgrade\r\nUpgrade: websocket']) {
@@ -124,6 +137,21 @@ it('removes hop-by-hop and Connection-nominated headers in both directions', asy
     const via = await proxy(direct);
     const response = await get(via.url, { headers: { connection: 'x-remove', 'x-remove': 'hidden', 'x-keep': 'value' } });
     expect(response.status).toBe(202); expect(response.headers['x-remove-response']).toBeUndefined(); expect(response.headers['x-keep-response']).toBe('visible');
+});
+it('preserves the absence of the upstream Date header', async () => {
+    const upstream = createServer((_req, res) => { res.sendDate = false; res.end('undated'); });
+    const direct = await listen(upstream); closers.push(() => close(upstream));
+    const via = await proxy(direct);
+    expect((await get(direct)).headers.date).toBeUndefined();
+    const response = await get(via.url);
+    expect(response.body.toString()).toBe('undated'); expect(response.headers.date).toBeUndefined();
+});
+it('preserves OPTIONS asterisk targets and absolute URI path/query bytes', async () => {
+    const upstream = createServer((req, res) => res.end(req.method + ' ' + req.url));
+    const direct = await listen(upstream); closers.push(() => close(upstream));
+    const via = await proxy(direct);
+    expect((await get(via.url, { method: 'OPTIONS', path: '*' })).body.toString()).toBe('OPTIONS *');
+    expect((await get(via.url, { path: 'http://attacker.invalid/a/../b?raw=%2f' })).body.toString()).toBe('GET /a/../b?raw=%2f');
 });
 it('streams an 8 MiB upload before EOF, bounds inspected bytes, and preserves all binary bytes', async () => {
     let received = 0, first!: () => void;
