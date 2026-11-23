@@ -5,6 +5,7 @@
 ## [Unreleased]
 
 ### Changed
+- 2026-11-23 (HKT)：`.github/dependabot.yml` 忽略 `typescript` 与 `graphql` 的 semver-major 更新（需单独评审迁移）；dev-dependencies 分组仅合并 minor / patch，其余 major 更新单独成 PR。关闭捆绑 TypeScript 7 / graphql 17 的 Dependabot PR #14（未合并）。非 CI 工作流，未新增 GitHub Actions。
 - 2026-11-23 (HKT)，v0.5b 第二批（unreleased）：同步 README 与五语译本、distribution、plan、roadmap、positioning 与 community 的 E-2 / DI-8 状态与证据；区分本地源码模板与已发布产物，注明容器绑定和宿主机回环端口边界、只读根文件系统不依赖 --init-secrets、网关保留 noindex / robots 与 crawler 豁免。Workers 模板 / Helm、真实 agent 评测仍 planned；无运行时改动，未发布镜像/npm、未打 tag、无新增 CI。
 - 2026-11-16 (HKT)，v0.5b 第一批（unreleased）：同步 README/五语译本、distribution、plan、roadmap、positioning、threat model 与 community；明确代理进入数据通路的固定目标/头处理/有界 body/绑定边界、日志缺少头/body 与未验证 UA。E-1/E-3/E-4 已实现；Docker、Workers 模板/Helm 与真实 agent 评测仍 planned。未发 npm、未打 tag、无新增 CI。
 - 2026-11-11 (HKT)，v0.4b（unreleased）：README 与 zh-CN / zh-TW / ja / ko / es 五语译本加入 Edge 支持/降级矩阵与一致的接入示例；同步路线图、核心分层、威胁模型、社区与分发边界。无 StateStore 时 incident / rateLimit / block / timing / maze 会话准入自动关闭并警告；`memoryStore()` 仅单 isolate；Web 默认 `ua-bypass`（未验证、无 DNS / DoH）、无 SMTP，trap 默认关闭，edge delay 不建议启用且显式启用上限 3000 ms。未发 npm、未打 tag。
