@@ -68,7 +68,34 @@ node dist/cli/main.js watch --log ./access.log --format combined
 
 `init` detects the framework and only prints a unified diff by default; `--write` creates config/setup files without overwriting files or modifying application source/hooks. For log mode, supply `AG_CANARY_SECRET` and `AG_PROJECT_SEED` through the environment or use `--config`. `watch --log` reads combined/common/JSON logs from EOF (`--from-start` reads history), reporting decoy hits and canary replay in paths/query strings. Logs usually omit headers and bodies, so Bearer/header/body replay is invisible; crawler UA claims stay unverified, with no DNS. Log mode never traps or blocks. See [entry-point configuration and limits](docs/distribution.md).
 
-Docker / Compose and nginx / Caddy / Traefik snippets are available as **local source templates (unreleased)**: non-root, read-only root filesystem, host port bound to `127.0.0.1` by default, detect / alert-only. Build your own local image and inject secrets at runtime; no official image has been published. [Local deployment and SBOM guide](deploy/README.md). Real AI-agent evaluation and Workers templates / Helm remain **planned**.
+Docker / Compose and nginx / Caddy / Traefik snippets are available as **local source templates (unreleased)**: non-root, read-only root filesystem, host port bound to `127.0.0.1` by default, detect / alert-only. Build your own local image and inject secrets at runtime; no official image has been published. [Local deployment and SBOM guide](deploy/README.md). Helm remains **planned**. Real AI-agent evaluation (#11) has **not yet run; budget pending**.
+
+The [Workers template](deploy/workers/README.md) is implemented in `deploy/workers/` as a **local source template (v0.5c, unreleased)**, supplied only in git and excluded from the npm package. It is detect-only, lazily reuses one guard per isolate, and configures no alert destination or StateStore. This repository has not deployed or published a Worker or template artifact. Build from source for local `wrangler dev`; use local ignored `.dev.vars` for development and `wrangler secret put AG_CANARY_SECRET` / `wrangler secret put AG_PROJECT_SEED` for an operator-managed environment. Never put secret values in Wrangler `[vars]`.
+
+## Web Bot Auth (v0.5c, unreleased)
+
+The Web Bot Auth verifier is **implemented, unreleased**, and opt-in via `webBotAuth.enabled` (default `false`; disabled means no signature parsing). It follows `draft-ietf-webbotauth-httpsig-protocol-01` / RFC 9421, accepting both Dictionary `Signature-Agent` and the legacy bare-string form. Ed25519 support in WebCrypto is required; verification uses WebCrypto only, and unavailable algorithms grant no trust. Node and all Web adapters share this verification path; existing crawler policies still apply.
+
+Static JWKS per trusted agent is the default: **no outbound fetch**. Optional `fetchKeys` requires an operator-provided `fetcher` and exact, case-insensitive `allowHosts` (no wildcards/subdomains). URLs must be HTTPS, with no credentials, fragment or non-default port; redirects are refused. Fetch timeout defaults to 2000 ms (maximum 5000); body size defaults to 64 KiB (maximum 256 KiB). The bounded cache holds 256 URLs, positive TTL up to 24 h and negative results for 30 s; an optional operator `StateStore` can share cached keys.
+
+Only a valid signature whose `Signature-Agent` URL is listed in `trustedAgents` grants verified-agent trust and bypasses decoys, maze and every trap action. Untrusted, invalid, expired or unsupported signatures are treated exactly like unsigned requests for decisions; only observational `web_bot_auth` metadata may differ. Replace the public-key placeholder below with your trusted agent's Ed25519 public key:
+
+```ts
+import type { WebBotAuthOptions } from '@imwyvern/agent-guard/web';
+
+const webBotAuth: WebBotAuthOptions = {
+  enabled: true,
+  trustedAgents: [{
+    url: 'https://agent.example/jwks.json',
+    keys: { keys: [{
+      kty: 'OKP', crv: 'Ed25519', x: 'REPLACE_WITH_AGENT_PUBLIC_KEY_BASE64URL',
+    }] },
+  }],
+};
+// Replace x with the agent's public key; pass webBotAuth into createAgentGuard or createWebGuard.
+```
+
+`WebBotAuthVerifier` and the optional `acceptSignatureHeader({ label?, legacy? })` helper are exported from the root and `/web` entries. The helper returns an `Accept-Signature` value; it is never added automatically to any response. See [configuration, limits and replay boundaries](docs/edge.md#web-bot-auth-configuration).
 
 ## Express
 

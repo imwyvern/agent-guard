@@ -1,6 +1,6 @@
-# agent-guard Roadmap（v0.5b 两批入口已实现，后续规划）
+# agent-guard Roadmap（v0.5c Workers 模板与 Web Bot Auth 已实现，unreleased）
 
-> 状态：v0.4a / v0.4b / v0.5a 已实现（unreleased，未发 npm、未打 tag），v0.5b proxy/init/HTTP-log watch 与第二批 Docker/Compose/网关本地模板、本地 SBOM 也已实现（unreleased，无公开镜像），文档状态更新于 2026-11-23（HKT）；v0.5+ 见 [plan-v0.5-v0.7.md](plan-v0.5-v0.7.md)。作者：agent-guard 维护者。
+> 状态：v0.4a / v0.4b / v0.5a 已实现（unreleased，未发 npm、未打 tag），v0.5b proxy/init/HTTP-log watch 与第二批 Docker/Compose/网关本地模板、本地 SBOM 也已实现（unreleased，无公开镜像），v0.5c Workers 本地源码模板与 Web Bot Auth 验证器已实现（unreleased，无部署或发布）；文档状态更新于 2026-11-23（HKT）；v0.5+ 见 [plan-v0.5-v0.7.md](plan-v0.5-v0.7.md)。作者：agent-guard 维护者。
 > 范围约束不变：**detect + alert only** 为默认；canary 永远 inert；decoy 永远 `noindex`；verified crawler 永远不进 decoy；任何 blocking / budget trap 只能 opt-in 且默认关闭；不做生产环境 reverse prompt injection、不做全站 tarpit、不攻击任何第三方系统；不 fork、不复制其他项目代码（尤其 GPL 的 Beelzebub，只借鉴思路）。
 > 定位与诚实声明见 [positioning.md](positioning.md)：这是服务器层面的**最后一道行程绊线与早期预警 / 延迟层**，不能替代补丁、WAF 或最小权限。
 
@@ -16,16 +16,16 @@
 | 0.2 | **假成功仿真环境** | 规划中，未交付 | opt-in，先做安全评估。让攻击者的 AI 可能误以为已入侵成功，并继续在假数据上行动。见 [deception.md](deception.md)。现有 D2/D5 仍始终拒绝。 |
 | 0.3 | **响应时间窗口 / incident timeline** | ✅ v0.5a 已实现，unreleased | timeline 字段、Node 有界 0600 `log.file`、无 path/UA/IP labels 的 summaries、`incident list` / `show` / `ack`；升级/提醒与 Node hooks 均 opt-in、默认关闭，Web/Edge 无 hooks。CLI ack 只有写到同一 `log.file` 才被进程看到。guard 不轮换密钥、不改防火墙，示例仅记录日志。见 [incident-response.md](incident-response.md)。 |
 | 0.4 | **隔离诱饵主机** | 规划中，未交付 | 与生产应用进程分离的独立诱饵环境；仅计划提供程序/模板，不替运营者部署。相关讨论见 [distribution.md](distribution.md)。 |
-| 0.5 | **真实 agent 的 token 成本评估** | 规划中，未交付 | 模型预算未设定；计划用我们控制的真实 AI agent 测量实验性迷宫是否真的消耗对方 token。当前模拟字节比为 1:1，低于 3:1 下限，**不能声称已消耗攻击者 token**。见 [exhaust.md](exhaust.md)、[trap-mode.md](trap-mode.md)。 |
+| 0.5 | **真实 agent 的 token 成本评估（#11）** | 尚未运行；预算待定 |计划用我们控制的真实 AI agent 测量实验性迷宫是否真的消耗对方 token。当前模拟字节比为 1:1，低于 3:1 下限，**不能声称已消耗攻击者 token**。见 [exhaust.md](exhaust.md)、[trap-mode.md](trap-mode.md)。 |
 | 0.6 | **Edge 适配器（v0.4b）** | ✅ 已完成，unreleased | Web-standard core、Cloudflare Workers、Next.js middleware / Vercel Edge、Deno、Bun、Hono-web。降级与接入见 [edge.md](edge.md)。 |
 
 README 六个语言版本的顶部都有同一份短列表。贡献入口见 [community.md](community.md) 的 roadmap / good first issue 说明。
 
-> **v0.5b 两批入口已实现 / unreleased**：E-1 固定上游 proxy（fail-open、默认回环、detect）、E-3 默认 diff 的 init、E-4 只读 HTTP access-log watch（路径/query 检测，无头/body、无 DNS）；E-2 [Docker/Compose/网关本地模板与本地 SBOM](../deploy/README.md)（非 root、只读、宿主机只绑 127.0.0.1，无发布镜像）。DI-1～DI-8e 已有本地测试，DI-8f 无 Docker 时明确 skip。Workers 模板/Helm 与真实 agent 评测仍 planned。用法与证据见 [distribution.md](distribution.md)，第一批验证见 [bench-v0.5b.md](bench-v0.5b.md)。
+> **v0.5b 两批入口已实现 / unreleased**：E-1 固定上游 proxy（fail-open、默认回环、detect）、E-3 默认 diff 的 init、E-4 只读 HTTP access-log watch（路径/query 检测，无头/body、无 DNS）；E-2 [Docker/Compose/网关本地模板与本地 SBOM](../deploy/README.md)（非 root、只读、宿主机只绑 127.0.0.1，无发布镜像）。DI-1～DI-8e 已有本地测试，DI-8f 无 Docker 时明确 skip。v0.5c 的 [Workers 本地源码模板](../deploy/workers/README.md) 已实现（unreleased，固定 detect-only，仅 git、不进 npm 包，无部署或发布）；Helm 仍 planned，真实 agent 评测 #11 尚未运行、预算待定。用法与证据见 [distribution.md](distribution.md)，第一批验证见 [bench-v0.5b.md](bench-v0.5b.md)。
 
 ## 1. 现状扫描（Landscape，2026-11）
 
-2026-11-23（HKT）同类动态：Beelzebub 仓库现位于 [beelzebub-labs/beelzebub](https://github.com/beelzebub-labs/beelzebub)（GPL-3.0），本周主要为 mcp-go 与文档依赖更新，无新功能需跟进；仅借鉴思路，不复制代码。Web Bot Auth 正式草案仍是 `draft-ietf-webbotauth-httpsig-protocol-01`（2026-10-29），编辑稿日期 2026-11-15，尚无 -02；本批不实现验证器。
+2026-11-23（HKT）同类动态：Beelzebub 仓库现位于 [beelzebub-labs/beelzebub](https://github.com/beelzebub-labs/beelzebub)（GPL-3.0），本周主要为 mcp-go 与文档依赖更新，无新功能需跟进；仅借鉴思路，不复制代码。Web Bot Auth 正式草案仍是 `draft-ietf-webbotauth-httpsig-protocol-01`（2026-10-29），编辑稿日期 2026-11-15，本实现依据 -01，兼容 legacy bare-string `Signature-Agent`；验证器与 Node/Web 信任接入现已在 v0.5c 实现（unreleased）。
 
 | 项目 / 机制 | 定位 | 对 agent-guard 的启发 | 我们不做的部分 |
 | --- | --- | --- | --- |
@@ -36,7 +36,7 @@ README 六个语言版本的顶部都有同一份短列表。贡献入口见 [co
 | **Snare**（snare.sh, Apache-2.0） | 在开发机上放 inert 凭据（awsproc、ssh、kubeconfig、npm scope…），"use-based" 检测：只在凭据被**使用**时报警 | **use > read** 的高精度原则，与我们 canary replay 一致；分 precision tier | 不碰客户端/开发机，只做服务端 |
 | **agent-canary / decoy-tripwire / mcp-canary / Agent Tripwire** | 面向 agent runtime 的 tripwire：decoy MCP tools、honeytoken 写进 tool description、per-run marker | ① `P(touch(C) | compliant) ≈ 0` 作为 canary 设计判据；② benign trip rate、time-to-trip 等指标；③ MCP decoy tool 返回 "plausible permission error" | 我们只做 HTTP 侧，不做 agent-side broker / fail-closed |
 | **Cloudflare AI Labyrinth** | 对不守 no-crawl 的 crawler 注入隐形 `nofollow` 链接，进入 AI 生成的迷宫；只记录不拦截 | 隐形链接 + `nofollow` + `noindex` + "Served vs Crawls" 比率指标 | **不做无限迷宫 / 全站 tarpit**；最多 opt-in 的有限深度 maze |
-| **Web Bot Auth**（IETF `webbotauth` WG，`draft-ietf-webbotauth-httpsig-protocol-01`，基于 RFC 9421 HTTP Message Signatures） | agent 用 Ed25519 对 `@authority` 等组件签名；`Signature-Agent` 指向 `/.well-known/http-message-signatures-directory` JWKS；`tag="web-bot-auth"` | 可以**正向验证**自报身份的 agent，比 UA + rDNS 更强；verified agent 同样不进 decoy | 注意：新草案 `Signature-Agent` 是 Dictionary，Cloudflare 生产仍是旧 bare-string 形式，两者都要兼容 |
+| **Web Bot Auth**（IETF `webbotauth` WG，`draft-ietf-webbotauth-httpsig-protocol-01`，基于 RFC 9421 HTTP Message Signatures） | agent 用 Ed25519 对 `@authority` 与 `signature-agent` 等组件签名；`Signature-Agent` 直接指向 HTTPS JWKS；`tag="web-bot-auth"` | **v0.5c 已实现 / unreleased**：默认关闭、静态 JWKS 无出站；只有签名有效且 URL 列入 trustedAgents 才 bypass decoy/maze/trap | -01 Dictionary 与 legacy bare-string 均兼容；仅 WebCrypto Ed25519；可选 fetcher 受精确 allowHosts、HTTPS、禁重定向、超时/大小与缓存上限约束 |
 | **robots.txt / AIPREF / ai.txt / llms.txt** | IETF AIPREF：`Content-Usage` 写进 robots.txt 和 HTTP header（`train-ai=n` 等）；`/.well-known/ai.txt`、`llms.txt` 为社区约定 | decoy 路径在 robots.txt `Disallow` → 守规矩的 crawler 永远不会碰；可选输出 `Content-Usage` header；`llms.txt` 是新的 agent 入口（可作为 opt-in lure 位置，但 lure 必须 inert） | 偏好不是强制，不把"违反偏好"本身当攻击 |
 | **MCP / LLM tool endpoint 攻击面**（OWASP MCP Top 10、OWASP MCP Cheat Sheet） | tool poisoning、rug pull、tool shadowing、confused deputy、token 泄露（MCP01）、缺审计（MCP08）、shadow MCP server（MCP09） | 暴露在 HTTP 上的 MCP（Streamable HTTP, JSON-RPC）同样会被扫描：`/mcp`、`/sse`、`tools/list`、`tools/call` 枚举；decoy tool 被调用 = 高置信信号 | decoy tool description **不能含 imperative / 隐藏字符**（否则我们自己就成了 tool poisoning）；不回传诱导文本 |
 
@@ -65,7 +65,7 @@ README 六个语言版本的顶部都有同一份短列表。贡献入口见 [co
 
 ## 4. v0.3 —— 多 runtime + 多场景 + 深度检测
 
-> **v0.3a / unreleased 已完成**：Fastify/Koa Node 适配器与共享验收、GraphQL helper/演示、API-only 放置文档、per-session incident、canary propagation tracing、placement linter/CLI，以及 README/五语译本和社区文档。当时为 detect-only；v0.4a 已补充 opt-in、默认关闭的 trap delay/rateLimit/block、实验性 maze、自托管 callback canary、告警 adapters 与 Prometheus 导出；机械 timing 自动观测，不参与处置。Web-standard core / Edge 已在 v0.4b 实现（unreleased）；完整 MCP Streamable HTTP、其余行为信号与 Web Bot Auth 尚未完成。
+> **v0.3a / unreleased 已完成**：Fastify/Koa Node 适配器与共享验收、GraphQL helper/演示、API-only 放置文档、per-session incident、canary propagation tracing、placement linter/CLI，以及 README/五语译本和社区文档。当时为 detect-only；v0.4a 已补充 opt-in、默认关闭的 trap delay/rateLimit/block、实验性 maze、自托管 callback canary、告警 adapters 与 Prometheus 导出；机械 timing 自动观测，不参与处置。Web-standard core / Edge 已在 v0.4b 实现（unreleased）；Web Bot Auth 已在 v0.5c 实现（unreleased）；完整 MCP Streamable HTTP 与其余行为信号仍未完成。
 
 ### 4.1 Runtimes
 | 项目 | Rationale | Risk | Acceptance |
@@ -90,7 +90,7 @@ README 六个语言版本的顶部都有同一份短列表。贡献入口见 [co
 | **Per-session correlation**（✅ done，v0.3a / unreleased）：同一 `client_key` 的 decoy-hit 序列（robots → `.env` → admin API）附加可选 incident 字段（默认固定 15 min 窗口；最近 32 次观察；50k 客户端 LRU） | 单点 hit 有噪声，序列才是 agent 的典型 kill chain | client_key 在 NAT / 代理下合并多人 → detect 下 incident 只补充置信度；v0.4a opt-in trap 可用 high confidence 准入 | v1 可选字段，不新增事件类型；序列、响应不变、50k 客户端 ≤10 MB 内存测试 |
 | **Canary propagation tracing**（✅ done，v0.3a / unreleased）：每个 canary 绑定 placement（哪个页面/文件/字段），replay 时报告"在 A 处泄露、在 B 处被回放、间隔多久、跨了几个 client_key" | 回答"agent 从哪里拿到的" | 进程内 50k 记录 LRU、24h TTL；下发未知则省略 dwell，重放 client_keys_seen 上限 8 | 告警新增 `leaked_at` / `replayed_at` / 可选 `dwell_ms` / `client_keys_seen`，保留原有 canary 字段 |
 | **Mechanical timing**（✅ done，v0.4a / unreleased）：`automation_score` 基于最近 20 个请求间隔，自动观测、无独立启用开关；无静态资源加载、跳过 robots、HEAD/OPTIONS 枚举等其余信号仍待做 | 不依赖易伪造的 UA，也不依赖 TLS 指纹（middleware 拿不到） | 误伤自动化测试/监控 → 只输出 `automation` 轴分数，永不单独判 `agent`（借鉴 Drosera 三轴） | 真人 / 爬虫模拟流量误报 0 |
-| **Web Bot Auth verification** | 正向验证自报身份 agent；verified agent 同 verified crawler 一样 bypass decoy | 草案在演进（Dictionary vs bare string）；key directory 抓取本身是 SSRF 面 → 目录 URL 只允许 https、allowlist、超时、缓存、大小上限 | RFC 9421 测试向量通过；两种 `Signature-Agent` 形式都能解析；过期/篡改签名拒绝 |
+| **Web Bot Auth verification（✅ done，v0.5c / unreleased）** | 基于 `draft-ietf-webbotauth-httpsig-protocol-01`，兼容 legacy bare-string；仅签名有效且运营者信任的 URL 才同 verified crawler 一样 bypass decoy/maze/全部 trap | 默认关闭、WebCrypto Ed25519、静态 JWKS 无出站；可选 fetcher 的精确 allowHosts / HTTPS / 禁重定向 / 超时 / 大小 / 有界缓存；(agent URL, key) 绑定；expires + 覆盖组件限制重放，无 nonce store | [验签与向量](../test/unit/web-bot-auth-vectors.test.ts)、[抓取限制](../test/unit/web-bot-auth-fetch.test.ts)、[Node/Web guards](../test/unit/web-bot-auth-guards.test.ts)、[适配器](../test/unit/web-bot-auth-adapters.test.ts)；[配置](edge.md#web-bot-auth-configuration) |
 | **Prompt-injection-safe canary placement**（✅ done，v0.3a / unreleased；HTML / JSON / OpenAPI） | canary 文本可能被 agent 读进上下文 → 文本必须是数据，不是指令 | 自己变成 injection 源 → placement linter：禁止 imperative、禁止隐藏字符、禁止 URL 外呼诱导；v0.4a 已提供可选精确 `allowedHosts` 以 lint 运营者的 callback 放置，默认仍严格 | `agent-guard lint <path>` + 单测/文档；所有内置 decoy/lure 与 deception bench 通过 lint |
 
 ## 5. v0.4a / v0.4b / v0.5a 已实现与后续规划
@@ -117,7 +117,7 @@ README 六个语言版本的顶部都有同一份短列表。贡献入口见 [co
 - 不 fork BLA，不复制任何第三方代码（Beelzebub GPL 尤其不碰）。
 - E4 reverse prompt injection / counter-injection 永不进入产品，也不进路线图；不做全站 tarpit；不对任何第三方发起探测、反制或利用。
 - 不使用真实厂商凭证或第三方 honeytoken 服务（Canarytokens 等）；自托管 callback 只接收入站，guard 不主动请求 baseUrl。运营者配置的告警 adapters 是唯一的出站通知例外；爬虫身份 DNS 校验维持原边界。
-- canary 不可被用于真实认证；decoy 不返回真实数据；verified crawler / allowlist 永不进入 decoy/trap（verified agent 待实现）。
+- canary 不可被用于真实认证；decoy 不返回真实数据；verified crawler / allowlist 永不进入 decoy/trap；Web Bot Auth 也只对签名有效且 trustedAgents 已配置的 agent URL 授予相同豁免。
 - 默认 alert-only。
 
 ## 7. 参考

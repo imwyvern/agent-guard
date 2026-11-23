@@ -70,7 +70,34 @@ node dist/cli/main.js watch --log ./access.log --format combined
 
 `init` detecta el framework y solo imprime un unified diff por defecto; `--write` crea configuración y ejemplo de integración sin sobrescribir archivos ni modificar fuentes o hooks. Para el modo de logs, proporciona `AG_CANARY_SECRET` y `AG_PROJECT_SEED` mediante el entorno o usa `--config`. `watch --log` lee combined/common/JSON desde el final (`--from-start` incluye el historial) y detecta señuelos y canarios en rutas y consultas. Los logs suelen omitir cabeceras y cuerpos: la reutilización en Bearer/cabeceras/cuerpo es invisible. Las declaraciones UA de crawlers quedan sin verificar y no se consulta DNS. El modo de logs nunca activa trap/block. Véase [configuración y límites](../distribution.md).
 
-Docker / Compose y los ejemplos de nginx / Caddy / Traefik están disponibles como **plantillas de código fuente locales (unreleased)**: usuario no root, sistema de archivos raíz de solo lectura y puerto del host vinculado por defecto únicamente a `127.0.0.1`, en detect / alert-only. Compila tu propia imagen local e inyecta los secretos al ejecutarla; no se ha publicado ninguna imagen oficial. Véase la [guía local de despliegue y SBOM](../../deploy/README.md). La evaluación con agentes de IA reales y las plantillas Workers / Helm siguen **planned**.
+Docker / Compose y los ejemplos de nginx / Caddy / Traefik están disponibles como **plantillas de código fuente locales (unreleased)**: usuario no root, sistema de archivos raíz de solo lectura y puerto del host vinculado por defecto únicamente a `127.0.0.1`, en detect / alert-only. Compila tu propia imagen local e inyecta los secretos al ejecutarla; no se ha publicado ninguna imagen oficial. Véase la [guía local de despliegue y SBOM](../../deploy/README.md). Helm sigue **planned**. La evaluación con agentes de IA reales (#11) **aún no se ha ejecutado; presupuesto pendiente**.
+
+La [plantilla Workers](../../deploy/workers/README.md) está implementada en `deploy/workers/` como **plantilla de código fuente local (v0.5c, unreleased)**, disponible solo en git y excluida del paquete npm. Fija detect-only, inicializa el guard de forma diferida y lo reutiliza por isolate, sin destino de alertas ni StateStore. Este repositorio no ha desplegado ni publicado un Worker ni un artefacto de plantilla. Compila desde las fuentes para usar `wrangler dev` en local; usa `.dev.vars` ignorado para desarrollo y `wrangler secret put AG_CANARY_SECRET` / `wrangler secret put AG_PROJECT_SEED` en un entorno gestionado por el operador. Nunca pongas secretos en `[vars]` de Wrangler.
+
+## Web Bot Auth (v0.5c, unreleased)
+
+El verificador Web Bot Auth está **implementado, sin publicar**, y se activa mediante `webBotAuth.enabled` (por defecto `false`; desactivado no analiza firmas). Sigue `draft-ietf-webbotauth-httpsig-protocol-01` / RFC 9421 y acepta tanto `Signature-Agent` Dictionary como el formato bare-string anterior. Requiere WebCrypto con Ed25519; solo usa WebCrypto y los algoritmos no disponibles no otorgan confianza. Node y todos los adaptadores Web comparten esta verificación; las políticas de crawler existentes también se aplican.
+
+Por defecto usa JWKS estáticos por agente de confianza: **sin fetch saliente**. El `fetchKeys` opcional exige un `fetcher` del operador y `allowHosts` exactos, sin distinguir mayúsculas (sin comodines ni coincidencia de subdominios). Solo permite URL HTTPS, sin credenciales, fragment ni puertos no predeterminados; rechaza redirecciones. El timeout es de 2000 ms por defecto (máximo 5000); el body es de 64 KiB (máximo 256 KiB). La caché acotada guarda 256 URL, resultados positivos hasta 24 h y negativos durante 30 s; un StateStore opcional del operador permite compartir las claves en caché.
+
+Solo una firma válida cuyo URL `Signature-Agent` figure en `trustedAgents` otorga confianza de verified-agent y evita señuelos, maze y todas las acciones trap. Las firmas no confiables, inválidas, caducadas o no compatibles se tratan exactamente como peticiones sin firma al decidir; solo pueden variar los metadatos de observación `web_bot_auth`. Sustituye el marcador de clave pública por la clave pública Ed25519 del agente de confianza:
+
+```ts
+import type { WebBotAuthOptions } from '@imwyvern/agent-guard/web';
+
+const webBotAuth: WebBotAuthOptions = {
+  enabled: true,
+  trustedAgents: [{
+    url: 'https://agent.example/jwks.json',
+    keys: { keys: [{
+      kty: 'OKP', crv: 'Ed25519', x: 'REPLACE_WITH_AGENT_PUBLIC_KEY_BASE64URL',
+    }] },
+  }],
+};
+// Replace x with the agent's public key; pass webBotAuth into createAgentGuard or createWebGuard.
+```
+
+Las entradas raíz y `/web` exportan `WebBotAuthVerifier` y el helper opcional `acceptSignatureHeader({ label?, legacy? })`. El helper devuelve un valor `Accept-Signature`; nunca se añade automáticamente a ninguna respuesta. Véanse [configuración, límites y frontera de repetición](../edge.md#web-bot-auth-configuration).
 
 ## Express
 

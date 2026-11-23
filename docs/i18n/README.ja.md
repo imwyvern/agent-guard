@@ -70,7 +70,34 @@ node dist/cli/main.js watch --log ./access.log --format combined
 
 `init` はフレームワークを検出し、既定では unified diff のみ表示します。`--write` は設定と接続例を新規作成し、既存ファイルやアプリのソース、hooks を変更しません。ログモードでは環境変数 `AG_CANARY_SECRET` と `AG_PROJECT_SEED`、または `--config` を指定します。`watch --log` は combined/common/JSON を末尾から読み（履歴は `--from-start`）、パスとクエリのデコイ到達・canary 再利用を検出します。ログには通常ヘッダーや本文がないため Bearer/ヘッダー/本文の再利用は見えません。クローラー UA は未検証で、DNS は使いません。ログモードは trap/block を行いません。[設定と制限](../distribution.md)を参照してください。
 
-Docker / Compose と nginx / Caddy / Traefik の設定例を**ローカルソースのテンプレート（unreleased）**として提供しています。非 root、読み取り専用のルートファイルシステムで動作し、ホストのポートは既定で `127.0.0.1` のみにバインドします。detect / alert-only を維持します。ローカルでイメージをビルドし、秘密値は実行時に注入してください。公式イメージは未公開です。[ローカル導入と SBOM ガイド](../../deploy/README.md)を参照してください。実 AI agent 評価と Workers テンプレート / Helm は引き続き **planned** です。
+Docker / Compose と nginx / Caddy / Traefik の設定例を**ローカルソースのテンプレート（unreleased）**として提供しています。非 root、読み取り専用のルートファイルシステムで動作し、ホストのポートは既定で `127.0.0.1` のみにバインドします。detect / alert-only を維持します。ローカルでイメージをビルドし、秘密値は実行時に注入してください。公式イメージは未公開です。[ローカル導入と SBOM ガイド](../../deploy/README.md)を参照してください。 Helm は引き続き **planned** です。実 AI agent 評価（#11）は**未実施、予算待ち**です。
+
+[Workers テンプレート](../../deploy/workers/README.md) は `deploy/workers/` に実装済みの**ローカルソーステンプレート（v0.5c、unreleased）**です。git のみで提供され、npm パッケージには含まれません。detect-only を固定し、isolate 内で guard を遅延初期化して再利用します。通知先や StateStore は設定されていません。本リポジトリは Worker をデプロイ・公開しておらず、テンプレート成果物も公開していません。ソースをビルドしてから `wrangler dev` でローカル開発してください。ローカルの秘密値は無視対象の `.dev.vars`、運用者管理の環境では `wrangler secret put AG_CANARY_SECRET` / `wrangler secret put AG_PROJECT_SEED` を使います。Wrangler の `[vars]` に秘密値を置かないでください。
+
+## Web Bot Auth (v0.5c, unreleased)
+
+Web Bot Auth 検証器は**実装済み、未リリース**です。`webBotAuth.enabled` で明示的に有効化します（既定 `false`、無効時は署名を解析しません）。`draft-ietf-webbotauth-httpsig-protocol-01` / RFC 9421 に基づき、Dictionary の `Signature-Agent` と旧 bare-string 形式の両方を受け付けます。Ed25519 対応の WebCrypto が必要です。検証は WebCrypto のみを使い、非対応アルゴリズムには信頼を与えません。Node とすべての Web アダプターが同じ検証経路を使い、既存のクローラーポリシーも適用されます。
+
+既定は信頼する agent ごとの静的 JWKS で、**外向きの取得はありません**。任意の `fetchKeys` には運用者の `fetcher` と、大文字小文字を区別しない完全一致の `allowHosts` が必要です（ワイルドカードやサブドメイン一致なし）。URL は HTTPS のみで、認証情報、fragment、非既定ポートは禁止し、リダイレクトを拒否します。取得タイムアウトは既定 2000 ms、上限 5000、body は既定 64 KiB、上限 256 KiB です。有界キャッシュは最大 256 URL、成功 TTL は最大 24 h、失敗は 30 s です。任意の運用者 StateStore で鍵キャッシュを共有できます。
+
+署名が有効で `Signature-Agent` URL が `trustedAgents` に列挙されている場合だけ verified-agent として信頼し、デコイ、maze、すべての trap 処理を回避します。未信頼、無効、期限切れ、非対応の署名は、判断上は未署名リクエストと完全に同じ扱いです。観測用の `web_bot_auth` メタデータだけが異なる場合があります。以下の公開鍵プレースホルダーを、信頼する agent の Ed25519 公開鍵に置き換えてください：
+
+```ts
+import type { WebBotAuthOptions } from '@imwyvern/agent-guard/web';
+
+const webBotAuth: WebBotAuthOptions = {
+  enabled: true,
+  trustedAgents: [{
+    url: 'https://agent.example/jwks.json',
+    keys: { keys: [{
+      kty: 'OKP', crv: 'Ed25519', x: 'REPLACE_WITH_AGENT_PUBLIC_KEY_BASE64URL',
+    }] },
+  }],
+};
+// Replace x with the agent's public key; pass webBotAuth into createAgentGuard or createWebGuard.
+```
+
+ルートと `/web` は `WebBotAuthVerifier` と任意の `acceptSignatureHeader({ label?, legacy? })` ヘルパーを公開します。ヘルパーは `Accept-Signature` 値を返しますが、レスポンスに自動追加されることはありません。[設定、制限、リプレイの境界](../edge.md#web-bot-auth-configuration)を参照してください。
 
 ## Express
 

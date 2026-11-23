@@ -1,6 +1,6 @@
 # 下一阶段实施规划：服务器层预警与拖延（v0.4b → v0.7）
 
-> 状态：v0.4b 与拆分后的 v0.5a 已实现于 unreleased 代码树（未发 npm、未打 tag）；v0.5b proxy / init / HTTP-log watch 与第二批 Docker / Compose / 网关片段 / 本地 SBOM 已实现（unreleased，本地源码模板，无公开镜像）。Workers 模板 / Helm、真实 agent 评测及 v0.6 / v0.7 仍规划中。更新于 2026-11-23（HKT）。
+> 状态：v0.4b 与拆分后的 v0.5a 已实现于 unreleased 代码树（未发 npm、未打 tag）；v0.5b proxy / init / HTTP-log watch 与第二批 Docker / Compose / 网关片段 / 本地 SBOM 已实现（unreleased，本地源码模板，无公开镜像）。v0.5c Workers 本地源码模板与 Web Bot Auth 验证器已实现（unreleased，无部署/发布）；Helm 与 v0.6 / v0.7 仍规划中，真实 agent 评测 #11 尚未运行、预算待定。更新于 2026-11-23（HKT）。
 > 起点：Dan 的定位——「放假配置和假密钥，攻击者的 AI 一碰就告警，再拖慢它，给运维留出处置时间」。本文保留版本计划，并以 [seed.md](seed.md)、[incident-response.md](incident-response.md) 与 [positioning.md](positioning.md) 标注当前已实现范围。
 > 范围约束不变：canary 永远 inert、不用任何真实厂商凭据格式、不做生产环境 reverse prompt injection、不做对第三方的外联探测、默认 detect-only、trap 与 deception 全部 opt-in。agent-guard 只提供程序和部署模板，**不替任何人部署**。
 
@@ -10,7 +10,8 @@
 | --- | --- | --- | --- |
 | v0.4b（已实现，unreleased） | Web 标准核心 + Edge 适配器 | Edge 适配器 | 无 |
 | v0.5a（已实现，unreleased） | 服务器层与处置 | ① seed / Linux-log watch ② incident timeline / CLI / log.file / metrics / opt-in escalation 与 Node hooks | v0.4a |
-| v0.5b（两批入口已实现，unreleased） | 一键入口与评测 | ③ proxy / init / HTTP-log 模式与 Docker / Compose / 网关本地模板、本地 SBOM 已实现；Workers 模板 / Helm 与 ④ 真实 AI 代理评测仍 planned（预算未设定） | v0.5a |
+| v0.5b（两批入口已实现，unreleased） | 一键入口与评测 | ③ proxy / init / HTTP-log 模式与 Docker / Compose / 网关本地模板、本地 SBOM 已实现；Workers 模板由 v0.5c 交付本地源码；Helm 仍 planned，④ 真实 AI 代理评测尚未运行、预算待定（#11） | v0.5a |
+| v0.5c（已实现，unreleased） | Workers 模板与正向身份验证 | E-5 detect-only 本地源码模板；WebCrypto Web Bot Auth（草案 -01，兼容 legacy bare-string），验签默认关闭、无默认出站 | v0.5b / Web core |
 | v0.6 | 欺骗层 | ⑤ 统一人设 + 分层泄露 + 假成功（opt-in） | v0.5 的评测框架（先量化，再启用） |
 | v0.7 | 独立蜜罐机 | ⑥ `decoy-host` 独立进程 / 容器，与真实业务隔离 | v0.5 假文件、v0.6 人设 |
 
@@ -66,11 +67,15 @@
 
 第二批 E-2 / DI-8 已提供 [deploy 本地模板](../deploy/README.md)：Node 20.19 slim 多阶段、UID 65532、只读根文件系统、cap_drop ALL、no-new-privileges、宿主机默认只绑定 127.0.0.1、内部 upstream；nginx / Caddy / Traefik 终止 TLS 后转发 guard，保留 noindex 与 crawler 豁免。密钥仅由运营者 env_file 注入，不依赖 --init-secrets。本机 `npm run sbom` 生成 gitignored CycloneDX，不提交或发布。证据为 [DI-8a–e 测试](../test/unit/deploy.test.ts)；[DI-8f](../test/integration/docker.test.ts) 在无 Docker 时明确 skip。本项目不发布镜像或代部署，npm 包 files 不变。
 
-Workers 模板 / Helm（E-5）与真实 agent 评测仍 planned。npm 发布仍需 Dan 单独批准；发布前用 `node dist/cli/main.js <cmd>` 或源码运行，`npx @imwyvern/agent-guard` 仅在发布后可用。
+v0.5c 已实现 [Workers 本地源码模板](../deploy/workers/README.md)（E-5，仅 git、不进 npm 包，固定 detect-only，无默认 StateStore/告警目的地，模块级惰性复用）；使用本地 `.dev.vars` 或运营者环境的 `wrangler secret put` 注入秘密值，不部署或发布 Worker。Helm 仍 planned，真实 agent 评测 #11 尚未运行、预算待定。npm 发布仍需 Dan 单独批准；发布前用 `node dist/cli/main.js <cmd>` 或源码运行，`npx @imwyvern/agent-guard` 仅在发布后可用。
+
+### v0.5c Web Bot Auth（已实现 / unreleased）
+
+依据 `draft-ietf-webbotauth-httpsig-protocol-01` / RFC 9421，兼容 Dictionary 与 legacy bare-string `Signature-Agent`。`webBotAuth.enabled` 默认 false，静态 JWKS 默认无出站，仅 WebCrypto Ed25519；可选注入 fetcher 受精确 allowHosts、HTTPS、禁重定向、超时/大小与有界缓存限制。密钥按 (agent URL, key) 绑定，仅签名有效且 URL 列入 `trustedAgents` 才 bypass decoy/maze/全部 trap；不可信或无效签名不改变未签名请求的决策，原有 crawler 策略保留。`acceptSignatureHeader` 从不自动加入响应。无 nonce store，重放由 expires 与覆盖组件限定。详见 [配置与边界](edge.md#web-bot-auth-configuration) 及 [v0.5c 合同](codex-contract-v0.5c.md)。
 
 ## 4. 真实 AI 代理评测框架（v0.5b，规划 / 未实现，`bench/agents`）
 
-模型预算未设定，尚未开跑；当前模拟 maze 字节比仍 1:1，消耗攻击者 token 未得到证明。
+Issue #11 尚未运行、预算待定；当前模拟 maze 字节比仍 1:1，消耗攻击者 token 未得到证明。
 
 **目标**：用证据而不是假设，回答「它真的会被骗吗？真的会耗 token 吗？」
 

@@ -70,7 +70,34 @@ node dist/cli/main.js watch --log ./access.log --format combined
 
 `init` 自動辨識框架，預設只列印 unified diff；`--write` 僅新增設定與接入片段，不覆寫檔案，不改應用程式原始碼或 hooks。日誌模式透過環境變數提供 `AG_CANARY_SECRET` 與 `AG_PROJECT_SEED`，或使用 `--config`。`watch --log` 從檔案末尾讀取 combined/common/JSON（`--from-start` 才讀歷史），偵測路徑/查詢中的誘餌命中與 canary 重播。日誌通常沒有標頭與本文，無法看見 Bearer/標頭/本文重播；爬蟲 UA 僅標為未驗證，不做 DNS。日誌模式不觸發 trap/block。見[入口設定與限制](../distribution.md)。
 
-Docker / Compose 與 nginx / Caddy / Traefik 片段已作為**本機原始碼範本（unreleased）**提供：非 root、唯讀根檔案系統，主機連接埠預設只繫結 `127.0.0.1`，detect / alert-only。請自行建置本機映像並在執行時注入密鑰；尚未發佈官方映像。見[本機部署與 SBOM 指南](../../deploy/README.md)。真實 AI agent 評測與 Workers 範本 / Helm 仍為 **planned**。
+Docker / Compose 與 nginx / Caddy / Traefik 片段已作為**本機原始碼範本（unreleased）**提供：非 root、唯讀根檔案系統，主機連接埠預設只繫結 `127.0.0.1`，detect / alert-only。請自行建置本機映像並在執行時注入密鑰；尚未發佈官方映像。見[本機部署與 SBOM 指南](../../deploy/README.md)。 Helm 仍為 **planned**。真實 AI agent 評測（#11）**尚未執行；預算待定**。
+
+[Workers 範本](../../deploy/workers/README.md) 已在 `deploy/workers/` 實作，是**本機原始碼範本（v0.5c，unreleased）**，僅隨 git 提供，不進入 npm 套件。範本固定 detect-only，在 isolate 內延遲初始化並重用 guard，不設定警示目的地或 StateStore。本儲存庫未部署或發佈 Worker，也未發佈範本產物。先從原始碼建置，再用 `wrangler dev` 本機開發；本機密鑰放在忽略的 `.dev.vars`，營運者自行管理的環境使用 `wrangler secret put AG_CANARY_SECRET` / `wrangler secret put AG_PROJECT_SEED`。不要把密鑰值放入 Wrangler `[vars]`。
+
+## Web Bot Auth (v0.5c, unreleased)
+
+Web Bot Auth 驗證器**已實作、未發佈**，透過 `webBotAuth.enabled` 明確啟用（預設 `false`；關閉時不剖析簽章）。依據 `draft-ietf-webbotauth-httpsig-protocol-01` / RFC 9421，同時接受 Dictionary `Signature-Agent` 與舊版 bare-string 形式。需要 WebCrypto 支援 Ed25519；驗證僅使用 WebCrypto，不支援的演算法不授予信任。Node 與所有 Web 轉接器共用此驗證路徑，既有爬蟲策略繼續適用。
+
+預設使用每個可信 agent 的靜態 JWKS，**無出站擷取**。可選 `fetchKeys` 必須提供營運者的 `fetcher` 與精確、不區分大小寫的 `allowHosts`（無萬用字元或子網域比對）。URL 僅限 HTTPS，不含憑證、fragment 或非預設連接埠；拒絕重新導向。擷取逾時預設 2000 ms、上限 5000；body 預設 64 KiB、上限 256 KiB。有界快取最多 256 個 URL，正結果 TTL 最長 24 h，負結果 30 s；可選營運者 StateStore 可共用金鑰快取。
+
+只有簽章有效且 `Signature-Agent` URL 列入 `trustedAgents` 才獲得 verified-agent 信任，略過誘餌、maze 及全部 trap 處置。不受信任、無效、過期或不支援的簽章在決策上與未簽章請求完全一致，僅觀測性 `web_bot_auth` 中繼資料可能不同。將下方公鑰預留位置替換為可信 agent 的 Ed25519 公鑰：
+
+```ts
+import type { WebBotAuthOptions } from '@imwyvern/agent-guard/web';
+
+const webBotAuth: WebBotAuthOptions = {
+  enabled: true,
+  trustedAgents: [{
+    url: 'https://agent.example/jwks.json',
+    keys: { keys: [{
+      kty: 'OKP', crv: 'Ed25519', x: 'REPLACE_WITH_AGENT_PUBLIC_KEY_BASE64URL',
+    }] },
+  }],
+};
+// Replace x with the agent's public key; pass webBotAuth into createAgentGuard or createWebGuard.
+```
+
+根入口和 `/web` 均匯出 `WebBotAuthVerifier` 與可選的 `acceptSignatureHeader({ label?, legacy? })` 輔助函式。後者回傳 `Accept-Signature` 值，絕不會自動加入任何回應。見[設定、限制與重放邊界](../edge.md#web-bot-auth-configuration)。
 
 ## Express
 

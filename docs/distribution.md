@@ -1,6 +1,6 @@
 # 零代码入口：面向防护者与运维者
 
-> 状态：2026-11-23（HKT），v0.5b E-1 / E-2 / E-3 / E-4 已实现，**unreleased**。E-2 仅为本地源码模板，无已发布镜像；E-5 Workers 模板 / Helm 仍未实现。零运行时依赖，Node ≥20。
+> 状态：2026-11-23（HKT），v0.5b E-1 / E-2 / E-3 / E-4 已实现，**unreleased**。E-2 仅为本地源码模板，无已发布镜像；v0.5c E-5 Workers 本地源码模板已实现（unreleased，仅 git，不部署或发布）；Helm 仍 planned。零运行时依赖，Node ≥20。
 > 从源码构建后使用 `node dist/cli/main.js`（或 `npx tsx src/cli/main.ts`）。只有 npm 发布后才可使用 `npx @imwyvern/agent-guard`；发布仍需 Dan 单独批准，当前没有 npm 发布或 tag。
 
 ## 1. 入口与状态
@@ -11,9 +11,10 @@
 | **E-2 Docker 镜像及配置片段** | 已实现 / unreleased，本地模板 | [Docker / Compose 与 nginx / Caddy / Traefik](../deploy/README.md)；非 root、只读、宿主机默认回环；本机 SBOM，不发布镜像 |
 | **E-3 init 接入向导** | 已实现 / unreleased | 检测 Express/Fastify/Koa/Hono/Next；无匹配时使用 Node HTTP；默认只打印补丁 |
 | **E-4 HTTP access-log watch** | 已实现 / unreleased | 只读 combined/common/JSON，检测已注册诱饵路径及路径/查询里的 canary；与 Linux 读取日志模式互斥 |
-| **E-5 Workers 模板 / Helm** | planned / 未实现 | 已有 Web core / Edge adapters 与 [接入文档](edge.md)，不代表模板与 chart 已交付 |
+| **E-5 Workers 本地源码模板** | 已实现 / unreleased | [deploy/workers/](../deploy/workers/README.md)，仅 git、不进 npm 包，固定 detect-only，无已部署 Worker 或已发布产物；无默认 StateStore / 告警目的地 |
+| **E-5 Helm chart** | planned / 未实现 | Workers 模板不代表 Helm chart 已交付 |
 
-真实 AI agent 评测也仍 planned，模型预算未设定，迷宫模拟字节比仍为 1:1。见 [实施规划](plan-v0.5-v0.7.md)。
+真实 AI agent 评测（#11）尚未运行、预算待定，迷宫模拟字节比仍为 1:1。见 [实施规划](plan-v0.5-v0.7.md)。
 
 ## 2. proxy：固定上游、默认回环、fail-open
 
@@ -119,4 +120,12 @@ node dist/cli/main.js watch --log ./access.jsonl --format json --config ./agent-
 
 E-2 构建和运行命令见 [deploy/README.md](../deploy/README.md)。容器内 `--listen 0.0.0.0:8080 --allow-public-bind` 只针对容器网络命名空间，宿主机暴露由 `ports:` 决定；默认 `127.0.0.1:8080:8080`，运营者若去掉回环前缀须自担暴露风险。Compose 通过运营者的 `deploy/.env` 注入运行时绑定，不挂载密钥目录；只读根文件系统不能依赖 `--init-secrets` 写入。示例 upstream 不发布端口，普通业务转发与 `AGENT_GUARD=off` 纯透传语义不变；detect / alert-only，不启用 trap / block。网关终止 TLS 后转发给 guard，不改诱饵响应和 noindex / robots 头，crawler 豁免由 guard 处理。
 
-不提供 `curl | sh`，源码构建不要求 root（Docker 权限由运营者环境决定）。本地模板与 SBOM **不是已发布产物**：不向 Docker Hub / GHCR / registry 发布镜像，不提交 SBOM、不附到 release、不替运营者部署。后续正式 npm/provenance/SBOM 发布仍依照 [release checklist](release-checklist.md) 由 Dan 单独批准；Workers 模板 / Helm 与真实 AI agent 评测仍 planned。
+不提供 `curl | sh`，源码构建不要求 root（Docker 权限由运营者环境决定）。本地模板与 SBOM **不是已发布产物**：不向 Docker Hub / GHCR / registry 发布镜像，不提交 SBOM、不附到 release、不替运营者部署。后续正式 npm/provenance/SBOM 发布仍依照 [release checklist](release-checklist.md) 由 Dan 单独批准；Workers 模板已在 v0.5c 实现为本地源码模板（unreleased）；Helm 仍 planned，真实 AI agent 评测 #11 尚未运行、预算待定。
+
+## 7. E-5 Workers 本地源码模板（v0.5c，unreleased）
+
+[deploy/workers/README.md](../deploy/workers/README.md) 提供源码构建、独立安装 Wrangler、本地 `wrangler dev` 与 secrets 注入步骤。模板使用 `fromEnv` / `withAgentGuard`，模块级惰性初始化并在 isolate 内复用，固定 detect-only（不因 AG_MODE 变更进入 trap）。普通 `/` 到示例 handler，`/.env` 为 inert、noindex/no-store 诱饵。模板无默认事件 sink 或出站告警，事件进入 isolate metrics；无 StateStore 的降级与 IP 头信任见 [edge.md](edge.md#workers-local-source-template)。
+
+本地秘密值仅放在被忽略的 `.dev.vars`；运营者管理的环境通过 `wrangler secret put AG_CANARY_SECRET` / `wrangler secret put AG_PROJECT_SEED` 注入，不在 `[vars]` 写秘密值。Wrangler 不是仓库依赖。模板只随 git 提供，npm `files` 不变；没有已部署 Worker、npm 包发布或模板产物发布。Helm 仍 planned。
+
+WT-1～WT-5 证据为 [模板验收测试](../test/unit/workers-template.test.ts)（配置、空绑定、类型检查、本地 miniflare 冒烟及 pack 边界）；此处描述代码与测试，不声称替运营者部署。Web Bot Auth 的 opt-in 配置需要另用 `createWebGuard`，模板没有自动启用；见 [配置](edge.md#web-bot-auth-configuration)。

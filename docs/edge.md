@@ -1,6 +1,6 @@
 # Edge / Web operator guide
 
-Status: v0.4b implemented, **unreleased**, 2026-11-11 (HKT). The package is not published to npm. Zero runtime dependencies; no deployment templates or managed StateStore adapters are shipped. This guide covers the Web-standard core and its thin host adapters. See the [README](../README.md#edge--web-runtimes), [design](design.md), and [threat model](threat-model.md).
+Status: v0.4b Web core and v0.5c Workers local template / Web Bot Auth implemented, **unreleased**, 2026-11-23 (HKT). The package is not published to npm. Zero runtime dependencies; the Workers template is source in git only, with no deployed Worker or published artifact. Managed StateStore adapters are not supplied. This guide covers the Web-standard core and its thin host adapters. See the [README](../README.md#edge--web-runtimes), [design](design.md), and [threat model](threat-model.md).
 
 ## Install and choose an entry
 
@@ -8,7 +8,7 @@ Use a git/source checkout: run `npm run build`, then `npm pack` and install the 
 
 | Import | API / host |
 | --- | --- |
-| `@imwyvern/agent-guard/web` | `createWebGuard`, `memoryStore`, `StateStore` / `WebGuard` types, Web fetch alert adapters |
+| `@imwyvern/agent-guard/web` | `createWebGuard`, `memoryStore`, `WebBotAuthVerifier`, `acceptSignatureHeader`, `StateStore` / `WebGuard` / `WebBotAuthOptions` types, Web fetch alert adapters |
 | `@imwyvern/agent-guard/workers` | `fromEnv(env)`, `withAgentGuard(guard, handler)` around `{ fetch }` |
 | `@imwyvern/agent-guard/next` | `agentGuardMiddleware(guard)` for Next.js middleware / Vercel Edge; no `next` import |
 | `@imwyvern/agent-guard/deno` | `denoHandler(guard, next)` for `Deno.serve` |
@@ -23,6 +23,53 @@ Import Web alert adapters from `/web`, not the root Node entry. Install host fra
 Create one guard per isolate/configuration and reuse it. Configure `project`, `env`, `projectSeed`, and `canary.secret`/an in-memory `canary.registry` object. `mode` defaults to `detect`; the examples state it explicitly. Keep secret bindings in the host's secret manager. Empty registries generate inert canaries in memory; canary IDs are random, so supply a stable registry object when placements must survive restarts.
 
 `fromEnv(env)` requires nonempty `AG_CANARY_SECRET` **and** `AG_PROJECT_SEED`; missing bindings throw and no default secret exists. Optional bindings are `AG_PROJECT` (default `default`), `AG_ENV` (`production`), `AG_MODE` (`detect`), and `AG_IP_HEADER` (`CF-Connecting-IP`). It creates a guard without a StateStore or alert destinations; use `createWebGuard` for those configurations. It does not cache the guard for you.
+
+## Workers local source template
+
+The [Workers template and local instructions](../deploy/workers/README.md) in `deploy/workers/` implement E-5 in the unreleased source tree. It is supplied only in git, excluded from npm packaging, and is neither a deployed Worker nor a published template artifact. Helm remains planned. Build the library from source before using the package self-reference; an operator installs Wrangler separately for local `wrangler dev --local --ip 127.0.0.1`.
+
+The template wraps a small example handler with `fromEnv` / `withAgentGuard`, lazily initializes a module-level guard and reuses it per isolate. It forces `mode: 'detect'` even if `AG_MODE` changes; no trap or automatic blocking is enabled. It configures no StateStore, event sink or alert destination: events contribute to isolate metrics, and the stateful capabilities in the degradation table below are off with one warning. Ordinary `/` requests reach the example handler; `/.env` is an inert decoy with noindex/no-store. This does not provide persistence or cross-isolate coordination.
+
+For local development, copy `.dev.vars.example` to ignored `.dev.vars` and fill in your own nonempty bindings. For an operator-managed environment, use `wrangler secret put AG_CANARY_SECRET` and `wrangler secret put AG_PROJECT_SEED`; these configure remote secrets and are separate from the local-only development workflow. Never put secret values in `[vars]`. The example configuration has a pinned compatibility date, no account ID or active routes, and only commented KV / Durable Object bindings. `CF-Connecting-IP` is trusted by `fromEnv` only because ingress must overwrite it; direct local callers can spoof it. See [IP header trust](#ip-header-trust).
+
+## Web Bot Auth configuration
+
+The verifier follows `draft-ietf-webbotauth-httpsig-protocol-01` / RFC 9421 and accepts both Dictionary `Signature-Agent` (label mapped directly to an HTTPS JWKS URL) and the legacy bare sf-string. It uses only `globalThis.crypto.subtle`; Ed25519 is the supported verification algorithm and is required in the host WebCrypto implementation. Missing WebCrypto or Ed25519 support yields `unsupported`, without a trust bypass or an exception to the host. Node and all Web adapters use the same verifier; Node crawler DNS and Web's existing UA/custom policies continue to apply independently.
+
+Set `webBotAuth.enabled: true` on `createWebGuard` or `createAgentGuard`. The default is false, with no signature parsing, cryptography or key discovery. `fromEnv` exposes no Web Bot Auth environment binding; use `createWebGuard` for this configuration. For static keys, pass this option alongside your usual project, canary and secret configuration:
+
+```ts
+import type { WebBotAuthOptions, JsonWebKeySet } from '@imwyvern/agent-guard/web';
+
+export function staticAgentAuth(keys: JsonWebKeySet): WebBotAuthOptions {
+  return {
+    enabled: true,
+    trustedAgents: [{ url: 'https://agent.example/jwks.json', keys }],
+  };
+}
+```
+
+Supply the agent's public Ed25519 JWKS. Only a valid signature **and** a URL in `trustedAgents` grants trust. The guard emits debug `crawler_bypass` with `ua_class: 'verified_crawler'` and `web_bot_auth: { agent_url, keyid, verified: true, trusted: true }`. It bypasses decoy bodies, maze and every trap action; reserved decoy/maze routes follow crawler missing-route behavior, while ordinary routes continue to the host. This grants no application authentication or authorization. Untrusted/self-signed, invalid, expired or unsupported signatures produce the same decisions as unsigned requests, apart from observational metadata on existing events; they do not independently increase severity or block. A valid fetched key for an unlisted URL can yield `verified: true, trusted: false` and still grants no bypass. Signature bytes are never recorded.
+
+| Option under `webBotAuth` | Default | Validated guard configuration / behavior |
+| --- | --- | --- |
+| `enabled` | `false` | Explicit opt-in only |
+| `trustedAgents` | Empty | Each `{ url, keys? }` binds one normalized HTTPS agent URL to its own public JWKS; 1–64 keys per supplied set. No key lookup by `keyid` alone |
+| `clockSkewSeconds` | 60 | Safe integer 0–86400; tolerates future creation / expired timestamps within skew |
+| `maxSignatureAgeSeconds` | 86400 (24 h) | Safe integer 1–`Number.MAX_SAFE_INTEGER`; bounds both `expires - created` and age since creation (with skew) |
+| `fetchKeys` | Absent | No outbound fetch by default; static keys take precedence for that URL; no startup prefetch |
+| `fetchKeys.fetcher` | None | Required operator callback `(url, { signal, headers, redirect: 'manual' }) => Promise<Response>` |
+| `fetchKeys.allowHosts` | Required with fetcher | Exact case-insensitive hostnames; no wildcard or subdomain matching; empty list means no fetch |
+| `fetchKeys.timeoutMs` | 2000 | Safe integer 1–5000 ms; includes cache read, fetch and streamed body read |
+| `fetchKeys.maxBytes` | 65536 (64 KiB) | Safe integer 1–262144 (256 KiB); checks Content-Length and actual streamed bytes |
+| `fetchKeys.maxTtlSeconds` | 86400 | Safe integer 0–86400; caps positive cache lifetime, respects Cache-Control max-age / no-cache / no-store and Age |
+| `fetchKeys.cache` | Absent | Optional operator StateStore; local LRU remains bounded at 256 URLs, failures cached for 30 s, at most 32 pending lookups per verifier |
+
+Agent URLs are at most 2048 characters, HTTPS only, with no credentials, fragments, backslashes, whitespace or non-default ports. Lookup uses the complete normalized URL, with no well-known-path discovery. An injected fetcher receives `redirect: 'manual'`; 3xx, redirected responses, mismatched final URLs and non-200 responses are rejected. Accepted media types are `application/json`, `application/jwk-set+json` and `application/http-message-signatures-directory+json`, each carrying a direct public JWKS, not a nested directory traversal. Invalid UTF-8/JSON/JWKS, timeouts and oversized responses grant no trust and get bounded negative caching. The operator must honor redirect/cancellation settings and restrict DNS/egress for allowed hosts; host matching alone does not prevent DNS rebinding or access to private addresses. External cache capacity and integrity are also the operator's responsibility; see the [threat model](threat-model.md).
+
+Signatures must include `created`, `expires`, a SHA-256 JWK-thumbprint `keyid`, `tag="web-bot-auth"`, `@authority`, and coverage of the matching `"signature-agent";key="<label>"` member (the whole bare-string field for legacy form). Other tags are ignored. There is **no nonce store**: replay remains possible within `expires` plus clock skew and within the covered components. Signing only the required authority/agent components does not bind method, path, query or body; agents should cover the request-specific components they need. This is signature verification, not proof of benign intent.
+
+The root Node entry and `/web` export `WebBotAuthVerifier`, `acceptSignatureHeader`, `signatureBase`, `verifyEd25519` and `jwkThumbprint`, with types including `WebBotAuthOptions`, `JsonWebKeySet` and `WebBotAuthResult`. The standalone verifier also defaults to disabled. `acceptSignatureHeader({ label?, legacy? })` returns an `Accept-Signature` value covering authority and the agent field, tagged `web-bot-auth` (default label `sig1`, Dictionary form). An operator may attach it to their own normal/403 response; the guard **never adds it automatically**, including to decoys. The cryptographic helpers alone do not enforce agent trust policy.
 
 ## Full support and degradation table
 
@@ -41,6 +88,7 @@ All six Web entries (`/web`, `/workers`, `/next`, `/deno`, `/bun`, `/hono-web`) 
 | SMTP/email | Unavailable; never import the Node transport into the Web graph | Unavailable | Node-only |
 | Prometheus | Single isolate / guard view; host must mount/protect endpoint | Still a single isolate view, even with persistent state | Per-process view |
 | Search crawler policy | Default `ua-bypass`, unverified; `custom` alternative; no DNS or DoH | Same | Node DNS or configured policy |
+| Web Bot Auth | Opt-in, default-off, WebCrypto Ed25519; trusted URL + valid signature bypasses decoy/maze/trap; no store required for static keys | Same; `fetchKeys.cache` is a separate optional key-cache setting | Same verifier, independent of crawler DNS |
 | `trap.delay` | Default-off; current decoy delay path needs store-backed admission | Default-off, explicit opt-in, capped at 3000 ms; discouraged on edge (wall-time billing) | Default-off opt-in trap delay |
 | Registry files / `crawler.ipRangesFile` / DNS resolver options | Rejected: use an in-memory registry, `ua-bypass` or `custom` | Same | Node filesystem/DNS options available |
 | Node robots/HTML/llms response transforms and `prometheusHandler` | Not exposed by the Web guard; host owns response integration and metrics routing | Same | Node integration APIs available |

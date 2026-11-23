@@ -70,7 +70,34 @@ node dist/cli/main.js watch --log ./access.log --format combined
 
 `init`는 프레임워크를 감지하고 기본적으로 unified diff만 출력합니다. `--write`는 설정과 연결 예제만 새로 만들며 기존 파일, 앱 소스, hooks를 수정하지 않습니다. 로그 모드에는 환경 변수 `AG_CANARY_SECRET`, `AG_PROJECT_SEED` 또는 `--config`를 지정하세요. `watch --log`는 combined/common/JSON 로그 끝에서 시작하고(`--from-start`로 과거 기록 읽기), 경로와 쿼리의 디코이 접근 및 canary 재사용을 감지합니다. 로그에는 보통 헤더와 본문이 없어 Bearer/헤더/본문 재사용은 볼 수 없습니다. 크롤러 UA는 미검증으로 표시하고 DNS는 사용하지 않습니다. 로그 모드는 trap/block을 실행하지 않습니다. [설정 및 제한](../distribution.md)을 참고하세요.
 
-Docker / Compose와 nginx / Caddy / Traefik 설정 예제를 **로컬 소스 템플릿(unreleased)**으로 제공합니다. 비 root 사용자, 읽기 전용 루트 파일 시스템을 사용하고 호스트 포트는 기본적으로 `127.0.0.1`에만 바인딩하며 detect / alert-only를 유지합니다. 로컬 이미지를 직접 빌드하고 비밀 값은 실행 시 주입하세요. 공식 이미지는 게시되지 않았습니다. [로컬 배포 및 SBOM 가이드](../../deploy/README.md)를 참고하세요. 실제 AI agent 평가와 Workers 템플릿 / Helm은 계속 **planned**입니다.
+Docker / Compose와 nginx / Caddy / Traefik 설정 예제를 **로컬 소스 템플릿(unreleased)**으로 제공합니다. 비 root 사용자, 읽기 전용 루트 파일 시스템을 사용하고 호스트 포트는 기본적으로 `127.0.0.1`에만 바인딩하며 detect / alert-only를 유지합니다. 로컬 이미지를 직접 빌드하고 비밀 값은 실행 시 주입하세요. 공식 이미지는 게시되지 않았습니다. [로컬 배포 및 SBOM 가이드](../../deploy/README.md)를 참고하세요. Helm은 계속 **planned**입니다. 실제 AI agent 평가(#11)는 **아직 실행하지 않았으며 예산 대기 중**입니다.
+
+[Workers 템플릿](../../deploy/workers/README.md)은 `deploy/workers/`에 구현된 **로컬 소스 템플릿(v0.5c, unreleased)**입니다. git으로만 제공하며 npm 패키지에는 포함하지 않습니다. detect-only를 고정하고 isolate 안에서 guard를 지연 초기화해 재사용합니다. 알림 대상이나 StateStore는 설정하지 않습니다. 이 저장소는 Worker를 배포하거나 게시하지 않았고 템플릿 산출물도 게시하지 않았습니다. 소스에서 빌드한 뒤 `wrangler dev`로 로컬 개발하세요. 로컬 비밀 값은 무시되는 `.dev.vars`에 두고, 운영자가 관리하는 환경에서는 `wrangler secret put AG_CANARY_SECRET` / `wrangler secret put AG_PROJECT_SEED`를 사용하세요. Wrangler `[vars]`에는 비밀 값을 넣지 마세요.
+
+## Web Bot Auth (v0.5c, unreleased)
+
+Web Bot Auth 검증기는 **구현되었으며 미릴리스**입니다. `webBotAuth.enabled`로 명시적으로 켭니다(기본 `false`, 꺼져 있으면 서명 파싱 없음). `draft-ietf-webbotauth-httpsig-protocol-01` / RFC 9421에 기반하며 Dictionary `Signature-Agent`와 이전 bare-string 형식을 모두 받습니다. Ed25519를 지원하는 WebCrypto가 필요하며 검증에는 WebCrypto만 사용합니다. 지원하지 않는 알고리즘에는 신뢰를 부여하지 않습니다. Node와 모든 Web 어댑터가 이 검증 경로를 공유하며 기존 크롤러 정책도 적용됩니다.
+
+기본값은 신뢰하는 agent별 정적 JWKS로, **외부 fetch가 없습니다**. 선택적 `fetchKeys`에는 운영자가 제공하는 `fetcher`와 대소문자를 구분하지 않는 정확한 `allowHosts`가 필요합니다(와일드카드나 하위 도메인 일치 없음). URL은 HTTPS만 허용하고 자격 증명, fragment, 비기본 포트를 금지하며 리디렉션을 거부합니다. fetch 제한 시간은 기본 2000 ms, 최대 5000이며 body는 기본 64 KiB, 최대 256 KiB입니다. 유한 캐시는 최대 256개 URL, 성공 TTL 최대 24 h, 실패 TTL 30 s입니다. 선택적 운영자 StateStore로 키 캐시를 공유할 수 있습니다.
+
+유효한 서명이고 `Signature-Agent` URL이 `trustedAgents`에 등록되어야만 verified-agent 신뢰를 얻고 디코이, maze와 모든 trap 동작을 우회합니다. 신뢰하지 않거나 유효하지 않거나 만료되었거나 지원하지 않는 서명은 판단 시 서명 없는 요청과 완전히 동일하게 처리합니다. 관측용 `web_bot_auth` 메타데이터만 다를 수 있습니다. 아래 공개 키 자리표시자를 신뢰하는 agent의 Ed25519 공개 키로 바꾸세요:
+
+```ts
+import type { WebBotAuthOptions } from '@imwyvern/agent-guard/web';
+
+const webBotAuth: WebBotAuthOptions = {
+  enabled: true,
+  trustedAgents: [{
+    url: 'https://agent.example/jwks.json',
+    keys: { keys: [{
+      kty: 'OKP', crv: 'Ed25519', x: 'REPLACE_WITH_AGENT_PUBLIC_KEY_BASE64URL',
+    }] },
+  }],
+};
+// Replace x with the agent's public key; pass webBotAuth into createAgentGuard or createWebGuard.
+```
+
+루트와 `/web`에서 `WebBotAuthVerifier` 및 선택적 `acceptSignatureHeader({ label?, legacy? })` 헬퍼를 내보냅니다. 헬퍼는 `Accept-Signature` 값을 반환하며 어떤 응답에도 자동으로 추가하지 않습니다. [설정, 제한과 재전송 경계](../edge.md#web-bot-auth-configuration)를 참고하세요.
 
 ## Express
 

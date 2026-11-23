@@ -2,7 +2,7 @@
 
 This page states what agent-guard is for, what it ships today, and what it does not claim. It is the honest companion to the README.
 
-Status: 2026-11-23 (HKT), v0.5b two-batch entry-point unreleased source tree; no npm publication, version tag, or published container image. Author: agent-guard maintainers.
+Status: 2026-11-23 (HKT), v0.5c Workers template / Web Bot Auth unreleased source tree; no npm publication, version tag, or published container image. Author: agent-guard maintainers.
 
 ## The pitch
 
@@ -26,6 +26,7 @@ Parts of that pitch are the direction of travel, not present-tense capability. T
 - Adapters ship for Express, Node `http`, Hono, Fastify, and Koa on Node; v0.4b adds `/web`, Workers, Next.js middleware / Vercel Edge, Deno, Bun, and Hono-web in the unreleased tree. Zero runtime dependencies; not published to npm. Default `mode: 'detect'` is alert-only.
 - v0.5a adds optional inert host honeyfiles (`seed`) and a Linux-only, read-only parser of operator-provided auditd/inotifywait access logs (`watch`); the guard cannot observe reads itself. It also ships the incident CLI/timeline, Node file log and summaries, plus default-off Node escalation/reminders and response hooks. See [seed.md](seed.md) and [incident-response.md](incident-response.md).
 - v0.5b adds the detect-only proxy, init wizard, HTTP access-log watch, and [local Docker / Compose / TLS gateway templates](../deploy/README.md): non-root, read-only root filesystem, host port bound to 127.0.0.1 by default, runtime-injected secrets, and a local gitignored SBOM. Templates are supplied in git only; no official image is published.
+- v0.5c adds a [Workers local source template](../deploy/workers/README.md) (detect-only, git only, excluded from npm, no deployed/published Worker) and opt-in Web Bot Auth verification. The verifier follows draft -01 with legacy bare-string compatibility, uses WebCrypto Ed25519, defaults off with static JWKS and no outbound fetch, and grants trust only to valid signatures for operator-listed agent URLs. See [configuration and limits](edge.md#web-bot-auth-configuration).
 - Opt-in, default-off `mode: 'trap'` can delay, rate-limit, or block a confirmed client, and offers an experimental bounded maze. Verified crawlers and allowlists are never trapped. See [trap-mode.md](trap-mode.md).
 - Canaries are always inert. The library never uses real vendor credentials, never performs reverse prompt injection or counter-injection (E4), and never probes outbound. Operator-configured alert adapters are the only outbound notification exception.
 
@@ -53,10 +54,12 @@ Parts of that pitch are the direction of travel, not present-tense capability. T
 | Incident timeline, bounded log, summaries, incident CLI, escalation/reminders and response hooks | **Shipped in this unreleased v0.5a tree**; file log/escalation/hooks are Node-only, opt-in | [incident CLI](../src/cli/incident.ts), [log](../src/log/file.ts), [escalation](../src/incident/escalation.ts), [hooks](../src/hooks/runner.ts), [guide](incident-response.md): first touch/first successful alert/event dwell, no path/UA/IP labels, same-file ack visibility, capped reminders; no shell, fresh five-key env, execution caps, failures isolated from inspect |
 | Zero-code proxy, init wizard and read-only HTTP access-log watch | **Implemented, unreleased v0.5b first batch** | [Entry-point guide](distribution.md), [proxy tests](../test/integration/proxy.test.ts), [init tests](../test/unit/init.test.ts), [log tests](../test/unit/access-log.test.ts): fixed upstream, fail-open, loopback default, diff-only init, no header/body visibility in logs; detect / alert-only, no new DNS |
 | Docker / Compose / nginx / Caddy / Traefik templates and local SBOM | **Implemented, unreleased v0.5b second batch; local source templates only** | [Deployment guide](../deploy/README.md), [DI-8a–e tests](../test/unit/deploy.test.ts): UID 65532, read-only root, dropped capabilities, no-new-privileges, host loopback, runtime env_file, npm CycloneDX in gitignored output; [DI-8f](../test/integration/docker.test.ts) explicitly skips without Docker. No registry/release upload or automatic blocking |
-| Workers templates / Helm | **Planned**, not shipped | E-5 in [distribution.md](distribution.md); existing edge adapters do not deliver templates or charts |
+| Workers local source template | **Implemented, unreleased v0.5c; source in git only** | [Template guide](../deploy/workers/README.md), [WT tests](../test/unit/workers-template.test.ts): detect-only, lazy per-isolate guard, secrets via wrangler secret put, no default store/alert destination, no deployed Worker or published artifact; excluded from npm |
+| Web Bot Auth verifier and Node/Web trust wiring | **Implemented, unreleased v0.5c; opt-in, default off** | [Operator guide](edge.md#web-bot-auth-configuration), [guard tests](../test/unit/web-bot-auth-guards.test.ts): draft-ietf-webbotauth-httpsig-protocol-01 plus legacy bare-string; WebCrypto Ed25519, static JWKS/no default fetch, bounded optional fetcher; valid signature + trustedAgents URL required for decoy/maze/trap bypass; untrusted/invalid signatures retain unsigned decisions; helper never attached automatically |
+| Helm chart | **Planned**, not shipped | E-5 in [distribution.md](distribution.md) |
 | Isolated decoy host, separate from the production application process | **Planned**, not shipped | Programs/templates only are planned; operators deploy; [distribution.md](distribution.md) |
 | Edge adapters (Workers, Next.js / Vercel Edge, Deno, Bun, Hono-web) and a Web-standard core | **Implemented, unreleased v0.4b**; state/crawler/transport degradation applies | [Operator guide](edge.md); golden vectors, 63 differentials, Web AC, and local smoke scripts (`smoke:workers`, `smoke:bun`, `smoke:deno`; skipped when a runtime binary is absent) |
-| Real-agent token-cost evaluation before anyone should enable the maze | **Planned**, not shipped | No model budget set; required by [exhaust.md](exhaust.md) and [trap-mode.md](trap-mode.md) |
+| Real-agent token-cost evaluation before anyone should enable the maze | **Not yet run; budget pending (#11)** | Required by [exhaust.md](exhaust.md) and [trap-mode.md](trap-mode.md) |
 | Blocks attacks / replaces a WAF, patching, or least privilege | **Will not claim** | Out of scope; last-line tripwire only |
 | Reverse prompt injection, outbound probing, or use of real credentials | **Will not do** | Charter / non-goals in [roadmap.md](roadmap.md#6-明确不做non-goals延续-charter) |
 
@@ -68,7 +71,7 @@ The short list in the README, expanded in [roadmap.md](roadmap.md):
 2. Fake-success environment — planned; safety assessment and separate approval required
 3. Response time window / timeline, metrics, incident CLI and optional Node hooks — shipped, unreleased v0.5a
 4. Isolated decoy host — planned programs/templates, no deployment by this project
-5. Real-agent token-cost evaluation — planned, budget unset; token drain not demonstrated
+5. Real-agent token-cost evaluation (#11) — not yet run; budget pending; token drain not demonstrated
 6. Edge adapters (v0.4b) — implemented, unreleased; future work follows the [v0.5–v0.7 plan](plan-v0.5-v0.7.md)
 
 ## Related documents

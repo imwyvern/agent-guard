@@ -1,8 +1,8 @@
-# agent-guard 威胁模型（MVP 背景与 v0.5a 边界）
+# agent-guard 威胁模型（MVP 背景与 v0.5c 边界）
 
-- 日期：初稿 2026-11-10；v0.5a unreleased 更新 2026-11-11（HKT, UTC+8）
+- 日期：初稿 2026-11-10；v0.5c unreleased 更新 2026-11-23（HKT, UTC+8）
 - 来源：`/workspace/security/bla-server-anti-ai-assessment-2026-11-10.md`（权威起点）
-- 范围：HTTP/API 运行时（Node 与 Web / Edge）及 v0.5a 可选主机 honeyfiles；读取告警仅解析运营者提供的 Linux auditd/inotifywait 日志，guard 不能自行看见读取。v0.5a 为 unreleased 代码树，未发 npm、未打 tag。**不是** WAF、不是 DDoS 防护、不是客户端反逆向（那是 BLA 的本职）。
+- 范围：HTTP/API 运行时（Node 与 Web / Edge）及 v0.5a 可选主机 honeyfiles；读取告警仅解析运营者提供的 Linux auditd/inotifywait 日志，guard 不能自行看见读取。v0.5c 另增默认关闭的 Web Bot Auth 与 Workers 本地源码模板，仍为 unreleased 代码树，未发 npm、未打 tag、无 Worker 部署或发布。**不是** WAF、不是 DDoS 防护、不是客户端反逆向（那是 BLA 的本职）。
 - 性质：纯开源研究项目，本仓库不部署到任何服务器；验证全部在本地 demo app 上进行。
 
 ## 1. 资产（Assets）
@@ -108,4 +108,22 @@ proxy 首次进入请求数据通路，零运行时依赖、固定 HTTP(S) origi
 | 初次密钥泄漏 | 配置只有环境引用；显式 --init-secrets 且配置不存在时才创建 0600 .env，不覆盖、不打印 secret；不执行 dotenv shell 内容 |
 | HTTP 日志伪造 / 过量输入 / 可见性不足 | 行长/每 tick 字节/事件速率有界；轮转/截断/畸形行安全处理；事件 source: access_log；日志不等于可信身份或实时检测，头/body/Bearer 不可见、UA 未验证，无 DNS |
 
-代理仅向固定的运营者上游发送业务请求。proxy 与 HTTP-log 入口的其他出站仅限显式配置的告警 adapter。诱饵始终 inert、noindex/no-store，不认证、不调用业务服务。Docker 与真实 agent 评测未交付。
+代理仅向固定的运营者上游发送业务请求。默认 proxy 与 HTTP-log 入口的其他出站仅限显式配置的告警 adapter；v0.5c 的库验签路径另有下述显式 key fetch 边界。诱饵始终 inert、noindex/no-store，不认证、不调用业务服务。Docker / Workers 已有本地源码模板（unreleased，无部署/发布），Helm 仍 planned，真实 agent 评测 #11 尚未运行、预算待定。
+
+## 10. v0.5c Web Bot Auth 与 Workers 模板（2026-11-23 HKT，unreleased）
+
+Web Bot Auth 基于 `draft-ietf-webbotauth-httpsig-protocol-01` / RFC 9421，兼容 Dictionary 与 legacy bare-string `Signature-Agent`。这是正向验签路径，不证明 agent 良性，也不替代宿主认证。`webBotAuth.enabled` 默认 false，关闭时不解析签名、不做密码运算或 key discovery；默认使用每个可信 agent 的静态 public JWKS，无出站请求。仅 WebCrypto Ed25519；缺失运行时支持、解析错误、无效/过期签名均不给信任，不独立升级严重级别或阻断宿主。
+
+| 攻击面 | 缓解与剩余边界 |
+| --- | --- |
+| 自签 agent / keyid 混淆 | 请求声明的 Signature-Agent URL 本身不可信。密钥查找绑定 **(完整规范化 agent URL, key)**，再比较 SHA-256 JWK thumbprint 与 keyid，绝不按 keyid 跨 agent 搜索。只有签名有效且 URL 列入运营者 `trustedAgents` 才获 trust；可抓取的 host 不等于可信 agent。有效但 untrusted / 自签请求在决策上与未签名请求一致 |
+| JWKS fetch SSRF | 默认无 fetcher、无出站，也不在启动时抓取。只有显式注入 `fetchKeys.fetcher` 且精确、不区分大小写匹配 `allowHosts` 才抓取；无通配符或子域匹配，空表不抓取。URL 最长 2048 字符，仅 HTTPS、无凭据/fragment/空白/反斜线/非默认端口；不做 well-known 路径发现。可抓取的未信任 URL 同样可能触发 I/O，故 allowHosts 必须最小化 |
+| 重定向 / 恶意响应 | fetcher 接收 `redirect: 'manual'`，只接受 200，拒绝 3xx、redirected 或最终 URL 不匹配。仅接受三种 JSON/JWKS 媒体类型及直接 public JWKS（1–64 keys，无私钥字段）；不递归跟目录。Content-Length 与流式读取都检查大小，默认 64 KiB、最大 256 KiB；无效 UTF-8/JSON/JWKS 不获信任 |
+| DNS rebinding / 私网目的地 | 精确 host / HTTPS 检查不解析或钉住 IP，不自动排除私网/回环地址。运营者 fetcher / DNS / 出站网络策略必须限制实际目标、遵守 manual redirect 与 AbortSignal。任意注入代码可以忽略约束；它属于可信配置，不能被 JavaScript 安全抢占 |
+| 抓取与缓存资源耗尽 / 缓存投毒 | 默认 2 s、最大 5 s 的 deadline 包含外部 cache 读取、fetch 与 body；每个 verifier 的本地 LRU 最多 256 个完整 URL、最多 32 个 pending lookup，同 URL 并发合并。正结果尊重 Cache-Control / Age、TTL 最长 24 h；负结果 30 s。可选 StateStore 仍检验期限/JWKS，容量/访问控制/完整性由运营者保证；能篡改可信 agent 缓存者可替换验证 key。超时仅限制等待，无法强制终止忽略取消的 fetcher |
+| 签名重放 / 组件覆盖不足 | 要求 created / expires / tag / keyid，覆盖 @authority 与对应 signature-agent 成员（legacy 覆盖整个字段）；默认 clock skew 60 s、最大年龄/签名有效跨度 24 h。**无 nonce store**，重放边界仅为 **expires（含 skew）+ 覆盖组件**，不是单次使用。最低覆盖不绑定 method/path/query/body；未覆盖的内容仍可替换，应用与签名方须明确额外覆盖与内容完整性验证 |
+| 解析成本 / 观测泄漏 | RFC 8941 有限状态解析与 RFC 9421 signature base 构造均有边界；重复字典 key/参数/组件拒绝，unsupported transformation 不获 trust。guard 先做有界请求快照；独立 verifier 调用者仍须限制原始输入。事件只附 web_bot_auth 的 agent_url/keyid/verified/trusted/reason，不记录签名字节；URL/keyid 仍可能是敏感标识，避免在 agent URL 中存放 secret |
+
+验签成功且 trusted 的请求获得 `crawler_bypass` / `ua_class: verified_crawler`，绕过 decoy、maze 与全部 trap；保留 crawler 路由缺失响应语义，普通请求进入宿主。未信任或无效签名在决策上与未签名请求完全相同，仅现有事件可附观测元数据；独立的既有 UA/DNS/custom crawler 或 allowlist 仍可生效。`acceptSignatureHeader` 仅为显式辅助函数，不自动出现在普通或诱饵响应中。配置见 [edge.md](edge.md#web-bot-auth-configuration)。
+
+[Workers 模板](../deploy/workers/README.md) 仅随 git 提供，不在 npm 包内；本仓库未部署或发布 Worker。模板固定 detect-only，guard 在 isolate 内惰性复用，无默认 StateStore/告警目的地；无 store 的功能降级不代表全局防护。`CF-Connecting-IP` 仅在可信 ingress 覆盖该头时可信，本地直连可伪造。秘密值由本地 ignored `.dev.vars` 或运营者 `wrangler secret put` 注入，不写入 `[vars]`。canary inert、诱饵 noindex/no-store 的边界不变。
