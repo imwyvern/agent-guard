@@ -5,6 +5,7 @@
 ## [Unreleased]
 
 ### Changed
+- 2026-11-23 (HKT)：延迟门禁改为多次运行中位数：`bench:latency:hr` 按 `HR_OUTER_RUNS`（默认 3，每次重启服务器）次独立外层运行的 Δ 中位数判定并报告最小–最大范围与每次取值，任一外层运行有错误即失败；`bench:latency:web` 的运行次数可由 `WEB_RUNS`（默认 5）配置并报告范围。阈值不变（Δp50 ≤200 µs、Δp99 ≤1000 µs、heap ≤10 MB）。新增 [docs/bench-gate.md](docs/bench-gate.md) 及 README / 五语译本说明。
 - 2026-11-23 (HKT)：`.github/dependabot.yml` 忽略 `typescript` 与 `graphql` 的 semver-major 更新（需单独评审迁移）；dev-dependencies 分组仅合并 minor / patch，其余 major 更新单独成 PR。关闭捆绑 TypeScript 7 / graphql 17 的 Dependabot PR #14（未合并）。非 CI 工作流，未新增 GitHub Actions。
 - 2026-11-23 (HKT)，v0.5b 第二批（unreleased）：同步 README 与五语译本、distribution、plan、roadmap、positioning 与 community 的 E-2 / DI-8 状态与证据；区分本地源码模板与已发布产物，注明容器绑定和宿主机回环端口边界、只读根文件系统不依赖 --init-secrets、网关保留 noindex / robots 与 crawler 豁免。Workers 模板 / Helm、真实 agent 评测仍 planned；无运行时改动，未发布镜像/npm、未打 tag、无新增 CI。
 - 2026-11-16 (HKT)，v0.5b 第一批（unreleased）：同步 README/五语译本、distribution、plan、roadmap、positioning、threat model 与 community；明确代理进入数据通路的固定目标/头处理/有界 body/绑定边界、日志缺少头/body 与未验证 UA。E-1/E-3/E-4 已实现；Docker、Workers 模板/Helm 与真实 agent 评测仍 planned。未发 npm、未打 tag、无新增 CI。

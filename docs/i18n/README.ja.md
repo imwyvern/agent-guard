@@ -454,7 +454,7 @@ curl -s -H "Authorization: Bearer $TOKEN" http://127.0.0.1:3000/api/internal/adm
 
 デモのターミナルは 1 行の JSON イベントとコンソールアラートを表示します。すべてのトークンは不活性な `AG-CANARY-` 文字列であり、何も解除しません。
 
-v0.2 以降、Express、Node、Hono の主要な AC-10 測定は `npm run bench:latency:hr` です。隔離された keep-alive のクライアント/サーバー、µs 分解能の計測、100/10 connections での 3 回の交互実行、およびコア inspect の ns/op（約 3 分）です。しきい値はこれまでどおり Δp50 ≤200 µs、Δp99 ≤1000 µs、50k-client heap ≤10 MB で、レイテンシの合否は 100-connection の行だけが決めます。[v0.2 の結果と設定](../bench-v0.2.md) を参照してください。生 JSON は `bench/results/latency-hr.json` で、過去の autocannon による二次的証拠も含みます。もともとの `bench` コマンドは、v0.1 の autocannon ゲートを維持しています。
+v0.2 以降、Express、Node、Hono の主要な AC-10 測定は `npm run bench:latency:hr` です。隔離された keep-alive のクライアント/サーバー、µs 分解能の計測、100/10 connections での 3 回の交互実行、およびコア inspect の ns/op（約 3 分）です。しきい値はこれまでどおり Δp50 ≤200 µs、Δp99 ≤1000 µs、50k-client heap ≤10 MB で、レイテンシの合否は 100-connection の行だけが決めます。[v0.2 の結果と設定](../bench-v0.2.md) を参照してください。生 JSON は `bench/results/latency-hr.json` で、過去の autocannon による二次的証拠も含みます。もともとの `bench` コマンドは、v0.1 の autocannon ゲートを維持しています。v0.5c からは、合否を **`HR_OUTER_RUNS`（既定 3）回の独立した外側実行（毎回サーバーを再起動）の中央値**で判定し、最小〜最大の範囲も報告します。`bench:latency:web` も `WEB_RUNS`（既定 5）回の中央値で判定し、範囲を報告します。しきい値は変更していません。[レイテンシゲートの方法](../bench-gate.md) を参照してください。
 
 測定ゲートの失敗は、ベンチマークを非ゼロ終了にします。`bench:latency` は各デモサーバーを専用の子プロセスで起動し、autocannon で負荷をかけます（100 connections、30 s、3 回実行の中央値）。ゲート対象外の固定レート実行と、スループットから導出したリクエストあたりオーバーヘッドの見積もりも記録します。Lighthouse のフルマトリックスには約 35 分かかります。サンドボックスがローカルソケットを禁じている場合、研究用ハーネスはメモリ上の Duplex ストリーム越しに実際の HTTP リクエスト/レスポンスオブジェクトを使います。TCP レイテンシは **未検証** のままです。Chrome の起動失敗は合格ではなく **スキップ** です。正確な環境上の制約は [ベンチマークレポート](../bench-v0.1.md) と [実装ノート](../implementation-notes.md) を参照してください。このライブラリにこのハーネスは含まれません。
 

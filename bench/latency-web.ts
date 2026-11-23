@@ -4,7 +4,10 @@ import { webCrypto } from '../src/crypto/web.js';
 import type { AGRequest } from '../src/types.js';
 import { MicrosecondHistogram } from './latency-hr.js';
 
-const warmup = 3000, samples = 20000, replayWarmup = 200, replaySamples = 2000, runCount = 5;
+const warmup = 3000, samples = 20000, replayWarmup = 200, replaySamples = 2000;
+// Gate on the median of WEB_RUNS (default 5, minimum 3) independent runs, never one run.
+const runCount = Number(process.env.WEB_RUNS ?? 5);
+if (!Number.isInteger(runCount) || runCount < 3) throw new Error('WEB_RUNS must be an integer >= 3');
 const guard = createWebGuard({ project: 'web-latency', env: 'bench', projectSeed: 'web-latency-fixed-seed',
     canary: { secret: 'web-latency-test-secret', registry: { version: 1, prefix: 'AG-CANARY-', canaries: [] } },
 });
@@ -43,9 +46,12 @@ try {
     }
     const medians = { delta: { p50: median(runs.map(r => r.delta.p50)), p99: median(runs.map(r => r.delta.p99)) },
         replay: { p50: median(runs.map(r => r.replay.p50)), p99: median(runs.map(r => r.replay.p99)) } };
+    const range = (values: number[]) => ({ min: Math.min(...values), max: Math.max(...values) });
+    const ranges = { delta: { p50: range(runs.map(r => r.delta.p50)), p99: range(runs.map(r => r.delta.p99)) } };
     const thresholds = { deltaP50: 200, deltaP99: 1000 };
     const passed = medians.delta.p50 <= thresholds.deltaP50 && medians.delta.p99 <= thresholds.deltaP99;
     console.log(JSON.stringify({ unit: 'microseconds', histogram: 'integer us rounded up; nearest rank ceil(q*n)',
-        warmup, samples, replayWarmup, replaySamples, runCount, runs, medians, thresholds, passed }, null, 2));
+        warmup, samples, replayWarmup, replaySamples, runCount,
+        gate: 'median of per-run deltas across runCount runs; min-max reported; thresholds unchanged', runs, medians, ranges, thresholds, passed }, null, 2));
     if (!passed) process.exitCode = 1;
 } finally { await guard.close(); }

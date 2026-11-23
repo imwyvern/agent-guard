@@ -33,7 +33,7 @@
 | **Lighthouse 无回归** | 见 §3 | 分数差 ≤ 2 |
 | **SEO 结构性无回归** | 见 §4 | 全部通过 |
 
-基准受机器影响，报告必须记录：CPU 型号、核数、Node 版本、OS，以及 3 次运行的中位数。
+基准受机器影响，报告必须记录：CPU 型号、核数、Node 版本、OS，以及 3 次运行的中位数。自 v0.5c（2026-11-23 HKT）起，`bench:latency:hr` 的通过与否按 `HR_OUTER_RUNS`（默认 3，每次重启服务器）次独立外层运行的 Δ 中位数判定，并报告最小–最大范围；`bench:latency:web` 按 `WEB_RUNS`（默认 5）次运行的 Δ 中位数判定并报告范围。阈值不变，见 [bench-gate.md](bench-gate.md)。
 
 ## 3. Lighthouse 检查（针对 demo app）
 

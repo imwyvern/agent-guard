@@ -454,7 +454,7 @@ curl -s -H "Authorization: Bearer $TOKEN" http://127.0.0.1:3000/api/internal/adm
 
 演示终端会打印单行 JSON 事件和控制台告警。所有令牌都是惰性的 `AG-CANARY-` 字符串，不能解锁任何内容。
 
-自 v0.2 起，`npm run bench:latency:hr` 是 Express、Node 和 Hono 的主要 AC-10 测量方式：隔离的 keep-alive 客户端/服务器、微秒级计时、在 100/10 connections 下交错三次运行，以及核心 inspect 的 ns/op（约 3 分钟）。阈值仍为 Δp50 ≤200 µs、Δp99 ≤1000 µs，以及 50k-client heap ≤10 MB；只有 100-connection 那一行决定延迟是否通过。见 [v0.2 结果与配置](../bench-v0.2.md)；原始 JSON 为 `bench/results/latency-hr.json`，其中包含历史 autocannon 的次要证据。原来的 `bench` 命令仍保留其 v0.1 的 autocannon 门禁。
+自 v0.2 起，`npm run bench:latency:hr` 是 Express、Node 和 Hono 的主要 AC-10 测量方式：隔离的 keep-alive 客户端/服务器、微秒级计时、在 100/10 connections 下交错三次运行，以及核心 inspect 的 ns/op（约 3 分钟）。阈值仍为 Δp50 ≤200 µs、Δp99 ≤1000 µs，以及 50k-client heap ≤10 MB；只有 100-connection 那一行决定延迟是否通过。见 [v0.2 结果与配置](../bench-v0.2.md)；原始 JSON 为 `bench/results/latency-hr.json`，其中包含历史 autocannon 的次要证据。原来的 `bench` 命令仍保留其 v0.1 的 autocannon 门禁。自 v0.5c 起，通过与否按 **`HR_OUTER_RUNS`（默认 3）次独立外层运行（每次重启服务器）的中位数**判定，并报告最小–最大范围；`bench:latency:web` 同样按 `WEB_RUNS`（默认 5）次运行的中位数判定并报告范围。阈值不变；见 [延迟门禁方法](../bench-gate.md)。
 
 测量门禁失败会使基准测试以非零退出码退出。`bench:latency` 在各自的子进程中运行每个演示服务器，并用 autocannon 驱动（100 connections，30 s，3 次运行的中位数）；它还会记录一次非门禁的固定速率运行，以及由吞吐量推导的每请求开销估计。完整矩阵的 Lighthouse 大约需要 35 分钟。若沙箱禁止本地套接字，研究工具会在内存 Duplex 流上使用实际的 HTTP 请求/响应对象；TCP 延迟仍为 **未验证**。Chrome 启动失败会被 **跳过**，而不是记为通过。确切的环境限制见 [基准测试报告](../bench-v0.1.md) 和 [实现说明](../implementation-notes.md)。本库不包含该测试工具。
 

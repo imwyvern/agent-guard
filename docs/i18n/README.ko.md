@@ -454,7 +454,7 @@ curl -s -H "Authorization: Bearer $TOKEN" http://127.0.0.1:3000/api/internal/adm
 
 데모 터미널은 한 줄 JSON 이벤트와 콘솔 알림을 출력합니다. 모든 토큰은 아무것도 잠금 해제하지 않는 비활성 `AG-CANARY-` 문자열입니다.
 
-v0.2부터 Express, Node, Hono의 기본 AC-10 측정은 `npm run bench:latency:hr`입니다. 격리된 keep-alive 클라이언트/서버, µs 해상도 타이밍, 100/10 connections에서 세 번의 교차 실행, 그리고 코어 inspect ns/op(약 3분)입니다. 임계값은 그대로 Δp50 ≤200 µs, Δp99 ≤1000 µs, 50k-client heap ≤10 MB이며, 지연 합부는 100-connection 행만 결정합니다. [v0.2 결과 및 구성](../bench-v0.2.md)을 참고하세요. 원본 JSON은 `bench/results/latency-hr.json`이며, 과거의 autocannon 보조 증거도 포함합니다. 원래 `bench` 명령은 v0.1 autocannon 게이트를 유지합니다.
+v0.2부터 Express, Node, Hono의 기본 AC-10 측정은 `npm run bench:latency:hr`입니다. 격리된 keep-alive 클라이언트/서버, µs 해상도 타이밍, 100/10 connections에서 세 번의 교차 실행, 그리고 코어 inspect ns/op(약 3분)입니다. 임계값은 그대로 Δp50 ≤200 µs, Δp99 ≤1000 µs, 50k-client heap ≤10 MB이며, 지연 합부는 100-connection 행만 결정합니다. [v0.2 결과 및 구성](../bench-v0.2.md)을 참고하세요. 원본 JSON은 `bench/results/latency-hr.json`이며, 과거의 autocannon 보조 증거도 포함합니다. 원래 `bench` 명령은 v0.1 autocannon 게이트를 유지합니다. v0.5c부터 합부 판정은 **`HR_OUTER_RUNS`(기본 3)회의 독립 외부 실행(매번 서버 재시작) 중앙값**을 사용하고 최소–최대 범위를 보고합니다. `bench:latency:web`도 `WEB_RUNS`(기본 5)회 실행의 중앙값으로 판정하고 범위를 보고합니다. 임계값은 바뀌지 않았습니다. [지연 게이트 방법](../bench-gate.md)을 참고하세요.
 
 측정 게이트 실패는 벤치마크를 0이 아닌 종료 코드로 끝냅니다. `bench:latency`는 각 데모 서버를 자체 자식 프로세스에서 실행하고 autocannon으로 구동합니다(100 connections, 30 s, 3회 실행의 중앙값). 게이트 대상이 아닌 고정 속도 실행과 처리량에서 유도한 요청당 오버헤드 추정치도 기록합니다. Lighthouse 전체 매트릭스에는 약 35분이 필요합니다. 샌드박스가 로컬 소켓을 금지하면, 연구용 하네스는 메모리 Duplex 스트림 위로 실제 HTTP 요청/응답 객체를 사용합니다. TCP 지연은 **검증되지 않음**으로 남습니다. Chrome 시작 실패는 통과가 아니라 **건너뜀**입니다. 정확한 환경 제한은 [벤치마크 보고서](../bench-v0.1.md)와 [구현 노트](../implementation-notes.md)를 참고하세요. 이 라이브러리는 해당 하네스를 포함하지 않습니다.
 

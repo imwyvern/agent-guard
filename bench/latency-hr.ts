@@ -166,42 +166,69 @@ async function microbenchmark(runs: number) {
         warmupIterations: 20000, iterations, runs, samplesNsPerOp, medianNsPerOp: median(samplesNsPerOp) };
 }
 
+/** Median plus min–max range of one statistic across independent outer runs. */
+export interface Spread { median: number; min: number; max: number; values: number[] }
+export function spread(values: number[]): Spread {
+    if (!values.length) throw new Error('spread of empty sample');
+    return { median: median(values), min: Math.min(...values), max: Math.max(...values), values: [...values] };
+}
+/**
+ * Gate on the median of per-outer-run deltas (not on any single run). A row passes
+ * when its median Δp50 / Δp99 are within the unchanged thresholds and every outer
+ * run was error-free; min–max is reported so run-to-run noise is visible.
+ */
+export function outerVerdict(deltas: Array<{ p50: number; p99: number }>, clean: boolean[]) {
+    const p50 = spread(deltas.map(d => d.p50)), p99 = spread(deltas.map(d => d.p99));
+    return { deltaP50Us: p50, deltaP99Us: p99, clean: clean.every(Boolean),
+        latencyPassed: latencyGate({ p50: p50.median / 1000, p99: p99.median / 1000 }, 0) };
+}
+
 export async function latencyHr() {
     mkdirSync('bench/results', { recursive: true });
     const began = process.hrtime.bigint(), generatedAt = new Date().toISOString();
     const runs = positive('HR_RUNS', 3, true);
     if (runs < 3) throw new Error('HR_RUNS must be >= 3');
+    const outerRuns = positive('HR_OUTER_RUNS', 3, true);
+    if (outerRuns < 3) throw new Error('HR_OUTER_RUNS must be >= 3');
     const connections = [...new Set([positive('HR_CONNECTIONS', 100, true), positive('HR_LOW_CONNECTIONS', 10, true)])];
     const durationSeconds = positive('HR_DURATION', 3), warmupSeconds = positive('HR_WARMUP', 1);
-    const rows: Row[] = [];
-    for (const demo of ['express', 'node', 'hono'] as const) {
-        const servers: Partial<Record<Mode, Awaited<ReturnType<typeof server>>>> = {};
-        try {
-            servers.off = await server(demo, 'off');
-            servers.on = await server(demo, 'on');
-            for (const concurrency of connections) {
-                const samples: Record<Mode, Measurement[]> = { off: [], on: [] };
-                const order: Mode[] = [];
-                for (let run = 0; run < runs; run++) {
-                    for (const mode of run % 2 ? ['on', 'off'] as const : ['off', 'on'] as const) {
-                        const config: WorkerConfig = { url: servers[mode]!.url, connections: concurrency, durationSeconds, warmupSeconds };
-                        const stem = `bench/results/hr-${demo}-${concurrency}-${run}-${mode}`;
-                        writeFileSync(stem + '-config.json', JSON.stringify(config));
-                        const proc = startChild(['--import', 'tsx', 'bench/latency-hr.ts', '--worker', stem + '-config.json', stem + '.json'], stem + '.log', (durationSeconds + warmupSeconds + 15) * 1000);
-                        await proc.done;
-                        samples[mode].push(JSON.parse(readFileSync(stem + '.json', 'utf8')) as Measurement);
-                        order.push(mode);
+    const rows: Array<Row & { outer: number }> = [];
+    for (let outer = 0; outer < outerRuns; outer++) {
+        // Each outer run restarts every server process so process-level noise is sampled too.
+        for (const demo of ['express', 'node', 'hono'] as const) {
+            const servers: Partial<Record<Mode, Awaited<ReturnType<typeof server>>>> = {};
+            try {
+                servers.off = await server(demo, 'off');
+                servers.on = await server(demo, 'on');
+                for (const concurrency of connections) {
+                    const samples: Record<Mode, Measurement[]> = { off: [], on: [] };
+                    const order: Mode[] = [];
+                    for (let run = 0; run < runs; run++) {
+                        for (const mode of run % 2 ? ['on', 'off'] as const : ['off', 'on'] as const) {
+                            const config: WorkerConfig = { url: servers[mode]!.url, connections: concurrency, durationSeconds, warmupSeconds };
+                            const stem = `bench/results/hr-${demo}-${concurrency}-o${outer}-${run}-${mode}`;
+                            writeFileSync(stem + '-config.json', JSON.stringify(config));
+                            const proc = startChild(['--import', 'tsx', 'bench/latency-hr.ts', '--worker', stem + '-config.json', stem + '.json'], stem + '.log', (durationSeconds + warmupSeconds + 15) * 1000);
+                            await proc.done;
+                            samples[mode].push(JSON.parse(readFileSync(stem + '.json', 'utf8')) as Measurement);
+                            order.push(mode);
+                        }
                     }
+                    const off = summarize(samples.off), on = summarize(samples.on);
+                    const deltaUs = Object.fromEntries(percentiles.map(p => [p, on.latencyUs[p] - off.latencyUs[p]])) as Record<typeof percentiles[number], number>;
+                    const row = { outer, demo, connections: concurrency, primary: concurrency === 100, order, serverPids: { off: servers.off.pid, on: servers.on.pid },
+                        samples, off, on, deltaUs, latencyPassed: latencyGate({ p50: deltaUs.p50 / 1000, p99: deltaUs.p99 / 1000 }, 0), clean: off.errors + on.errors === 0 };
+                    rows.push(row);
+                    console.log(JSON.stringify({ outer, demo, connections: concurrency, deltaUs, offRps: off.requestsPerSecond, onRps: on.requestsPerSecond, errors: off.errors + on.errors }));
                 }
-                const off = summarize(samples.off), on = summarize(samples.on);
-                const deltaUs = Object.fromEntries(percentiles.map(p => [p, on.latencyUs[p] - off.latencyUs[p]])) as Record<typeof percentiles[number], number>;
-                const row = { demo, connections: concurrency, primary: concurrency === 100, order, serverPids: { off: servers.off.pid, on: servers.on.pid },
-                    samples, off, on, deltaUs, latencyPassed: latencyGate({ p50: deltaUs.p50 / 1000, p99: deltaUs.p99 / 1000 }, 0), clean: off.errors + on.errors === 0 };
-                rows.push(row);
-                console.log(JSON.stringify({ demo, connections: concurrency, deltaUs, offRps: off.requestsPerSecond, onRps: on.requestsPerSecond, errors: off.errors + on.errors }));
-            }
-        } finally { await Promise.all(Object.values(servers).map(s => s.close())); }
+            } finally { await Promise.all(Object.values(servers).map(s => s.close())); }
+        }
     }
+    const aggregates = (['express', 'node', 'hono'] as const).flatMap(demo => connections.map(concurrency => {
+        const outerRows = rows.filter(row => row.demo === demo && row.connections === concurrency);
+        return { demo, connections: concurrency, primary: concurrency === 100, outerRuns: outerRows.length,
+            ...outerVerdict(outerRows.map(row => row.deltaUs), outerRows.map(row => row.clean)) };
+    }));
     const memoryFile = 'bench/results/hr-memory.json';
     await startChild(['--expose-gc', '--import', 'tsx', 'bench/memory.ts'], memoryFile, 30000).done;
     const memory = JSON.parse(readFileSync(memoryFile, 'utf8')) as { clients: number; heapDeltaBytes: number; gc: boolean };
@@ -210,16 +237,19 @@ export async function latencyHr() {
     const autocannonSecondary = existsSync(autocannonFile) ? { source: autocannonFile, fileModifiedAt: statSync(autocannonFile).mtime.toISOString(),
         historical: true, note: 'Previously recorded, unchanged autocannon run; not rerun by this command.', result: JSON.parse(readFileSync(autocannonFile, 'utf8')) as unknown } : { source: 'docs/bench-v0.1.md', historical: true, note: 'No raw autocannon JSON present; see the committed v0.1 report.' };
     const verdicts = (['express', 'node', 'hono'] as const).map(demo => {
-        const primary = rows.find(row => row.demo === demo && row.primary);
-        return { demo, verdict: !primary ? 'UNVALIDATED' : primary.clean && primary.latencyPassed && memory.clients === 50000 && memory.gc && memory.heapDeltaBytes <= 10000000 ? 'PASS' : 'FAIL' };
+        const primary = aggregates.find(row => row.demo === demo && row.primary);
+        return { demo, verdict: !primary ? 'UNVALIDATED' : primary.clean && primary.latencyPassed && memory.clients === 50000 && memory.gc && memory.heapDeltaBytes <= 10000000 ? 'PASS' : 'FAIL',
+            ...(primary ? { deltaP50Us: { median: primary.deltaP50Us.median, min: primary.deltaP50Us.min, max: primary.deltaP50Us.max },
+                deltaP99Us: { median: primary.deltaP99Us.median, min: primary.deltaP99Us.min, max: primary.deltaP99Us.max } } : {}) };
     });
     const result = { generatedAt, status: verdicts.every(v => v.verdict === 'PASS') ? 'passed' : 'failed',
         environment: { node: process.version, platform: platform(), release: release(), arch: arch(), cpus: cpus().map(c => ({ model: c.model, speedMHz: c.speed })), totalMemoryBytes: totalmem(), freeMemoryBytes: freemem(), loadAverage: loadavg() },
-        method: { transport: '127.0.0.1 HTTP/1.1 keep-alive; server and load generator in separate child processes', runs, connections, durationSeconds, warmupSeconds,
-            load: 'closed-loop, one in-flight request per connection, no rate limit or pipelining', histogram: 'integer µs rounded up; sorted array; nearest rank ceil(q*n); per-mode median of run percentiles; delta = on median - off median',
+        method: { transport: '127.0.0.1 HTTP/1.1 keep-alive; server and load generator in separate child processes', runs, outerRuns, connections, durationSeconds, warmupSeconds,
+            load: 'closed-loop, one in-flight request per connection, no rate limit or pipelining', histogram: 'integer µs rounded up; sorted array; nearest rank ceil(q*n); per-mode median of run percentiles; delta = on median - off median (per outer run)',
+            gate: 'v0.5c: median of the per-outer-run deltas across HR_OUTER_RUNS (default 3) independent server restarts; min–max reported; every outer run must be error-free; thresholds unchanged',
             boundary: 'requests started before deadline are drained and included; throughput denominator includes drain; warmup uses the same Agent, separate histogram',
             thresholds: { p50DeltaUs: 200, p99DeltaUs: 1000, heapDeltaBytes: 10000000, clients: 50000 }, primaryConnections: 100 },
-        rows, memory, microbenchmark: micro, autocannonSecondary, verdicts, wallSeconds: Number(process.hrtime.bigint() - began) / 1e9 };
+        rows, aggregates, memory, microbenchmark: micro, autocannonSecondary, verdicts, wallSeconds: Number(process.hrtime.bigint() - began) / 1e9 };
     save('latency-hr', result);
     return result;
 }
