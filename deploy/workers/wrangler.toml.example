@@ -1,0 +1,27 @@
+name = "agent-guard-local-example"
+main = "src/index.ts"
+compatibility_date = "2026-04-01"
+workers_dev = false
+
+# Inject secrets separately; never put them under [vars]:
+# wrangler secret put AG_CANARY_SECRET
+# wrangler secret put AG_PROJECT_SEED
+
+# Optional routing placeholders only; configure these outside this local example:
+# routes = [{ pattern = "replace-me", zone_name = "replace-me" }]
+
+# Optional storage bindings require an operator-provided StateStore adapter.
+# [[kv_namespaces]]
+# binding = "AG_STATE"
+# id = "replace-me"
+# [[durable_objects.bindings]]
+# name = "AG_COORDINATOR"
+# class_name = "ReplaceMe"
+
+[vars]
+AG_MODE = "detect"
+AG_PROJECT = "workers-example"
+AG_ENV = "development"
+
+[dev]
+ip = "127.0.0.1"
