@@ -1,6 +1,6 @@
-# agent-guard Roadmap（v0.5b 第一批已实现，后续规划）
+# agent-guard Roadmap（v0.5b 两批入口已实现，后续规划）
 
-> 状态：v0.4a / v0.4b / v0.5a 已实现（unreleased，未发 npm、未打 tag），v0.5b proxy/init/HTTP-log watch 第一批也已实现（unreleased），文档状态更新于 2026-11-16（HKT）；v0.5+ 见 [plan-v0.5-v0.7.md](plan-v0.5-v0.7.md)。作者：agent-guard 维护者。
+> 状态：v0.4a / v0.4b / v0.5a 已实现（unreleased，未发 npm、未打 tag），v0.5b proxy/init/HTTP-log watch 与第二批 Docker/Compose/网关本地模板、本地 SBOM 也已实现（unreleased，无公开镜像），文档状态更新于 2026-11-23（HKT）；v0.5+ 见 [plan-v0.5-v0.7.md](plan-v0.5-v0.7.md)。作者：agent-guard 维护者。
 > 范围约束不变：**detect + alert only** 为默认；canary 永远 inert；decoy 永远 `noindex`；verified crawler 永远不进 decoy；任何 blocking / budget trap 只能 opt-in 且默认关闭；不做生产环境 reverse prompt injection、不做全站 tarpit、不攻击任何第三方系统；不 fork、不复制其他项目代码（尤其 GPL 的 Beelzebub，只借鉴思路）。
 > 定位与诚实声明见 [positioning.md](positioning.md)：这是服务器层面的**最后一道行程绊线与早期预警 / 延迟层**，不能替代补丁、WAF 或最小权限。
 
@@ -21,9 +21,11 @@
 
 README 六个语言版本的顶部都有同一份短列表。贡献入口见 [community.md](community.md) 的 roadmap / good first issue 说明。
 
-> **v0.5b 第一批已实现 / unreleased**：E-1 固定上游 proxy（fail-open、默认回环、detect）、E-3 默认 diff 的 init、E-4 只读 HTTP access-log watch（路径/query 检测，无头/body、无 DNS）。DI-1～DI-7 已有本地测试；Docker/Compose/反向代理配置片段、Workers 模板/Helm 与真实 agent 评测仍 planned。用法见 [distribution.md](distribution.md)，验证见 [bench-v0.5b.md](bench-v0.5b.md)。
+> **v0.5b 两批入口已实现 / unreleased**：E-1 固定上游 proxy（fail-open、默认回环、detect）、E-3 默认 diff 的 init、E-4 只读 HTTP access-log watch（路径/query 检测，无头/body、无 DNS）；E-2 [Docker/Compose/网关本地模板与本地 SBOM](../deploy/README.md)（非 root、只读、宿主机只绑 127.0.0.1，无发布镜像）。DI-1～DI-8e 已有本地测试，DI-8f 无 Docker 时明确 skip。Workers 模板/Helm 与真实 agent 评测仍 planned。用法与证据见 [distribution.md](distribution.md)，第一批验证见 [bench-v0.5b.md](bench-v0.5b.md)。
 
 ## 1. 现状扫描（Landscape，2026-11）
+
+2026-11-23（HKT）同类动态：Beelzebub 仓库现位于 [beelzebub-labs/beelzebub](https://github.com/beelzebub-labs/beelzebub)（GPL-3.0），本周主要为 mcp-go 与文档依赖更新，无新功能需跟进；仅借鉴思路，不复制代码。Web Bot Auth 正式草案仍是 `draft-ietf-webbotauth-httpsig-protocol-01`（2026-10-29），编辑稿日期 2026-11-15，尚无 -02；本批不实现验证器。
 
 | 项目 / 机制 | 定位 | 对 agent-guard 的启发 | 我们不做的部分 |
 | --- | --- | --- | --- |

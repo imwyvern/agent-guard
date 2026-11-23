@@ -68,7 +68,9 @@ node dist/cli/main.js watch --log ./access.log --format combined
 
 `proxy`는 detect / alert-only이며 기본 주소는 `127.0.0.1:8080`입니다. 검사가 실패하거나 50 ms 계산 예산을 넘으면 fail-open으로 전달합니다. 16 KiB 검사 창만 보관하고 큰 본문은 스트리밍합니다. 업스트림 연결 실패는 502, 시간 초과는 504입니다. 공개 바인딩은 `--allow-public-bind`가 필요합니다. D5의 기존 로그인 지연은 계산 예산에서 제외됩니다. 설정이 없을 때 `--init-secrets`는 옆에 0600 `.env`를 만들며 덮어쓰거나 비밀 값을 출력하지 않습니다.
 
-`init`는 프레임워크를 감지하고 기본적으로 unified diff만 출력합니다. `--write`는 설정과 연결 예제만 새로 만들며 기존 파일, 앱 소스, hooks를 수정하지 않습니다. 로그 모드에는 환경 변수 `AG_CANARY_SECRET`, `AG_PROJECT_SEED` 또는 `--config`를 지정하세요. `watch --log`는 combined/common/JSON 로그 끝에서 시작하고(`--from-start`로 과거 기록 읽기), 경로와 쿼리의 디코이 접근 및 canary 재사용을 감지합니다. 로그에는 보통 헤더와 본문이 없어 Bearer/헤더/본문 재사용은 볼 수 없습니다. 크롤러 UA는 미검증으로 표시하고 DNS는 사용하지 않습니다. 로그 모드는 trap/block을 실행하지 않습니다. Docker와 실제 agent 평가는 **planned**입니다. [설정 및 제한](../distribution.md)을 참고하세요.
+`init`는 프레임워크를 감지하고 기본적으로 unified diff만 출력합니다. `--write`는 설정과 연결 예제만 새로 만들며 기존 파일, 앱 소스, hooks를 수정하지 않습니다. 로그 모드에는 환경 변수 `AG_CANARY_SECRET`, `AG_PROJECT_SEED` 또는 `--config`를 지정하세요. `watch --log`는 combined/common/JSON 로그 끝에서 시작하고(`--from-start`로 과거 기록 읽기), 경로와 쿼리의 디코이 접근 및 canary 재사용을 감지합니다. 로그에는 보통 헤더와 본문이 없어 Bearer/헤더/본문 재사용은 볼 수 없습니다. 크롤러 UA는 미검증으로 표시하고 DNS는 사용하지 않습니다. 로그 모드는 trap/block을 실행하지 않습니다. [설정 및 제한](../distribution.md)을 참고하세요.
+
+Docker / Compose와 nginx / Caddy / Traefik 설정 예제를 **로컬 소스 템플릿(unreleased)**으로 제공합니다. 비 root 사용자, 읽기 전용 루트 파일 시스템을 사용하고 호스트 포트는 기본적으로 `127.0.0.1`에만 바인딩하며 detect / alert-only를 유지합니다. 로컬 이미지를 직접 빌드하고 비밀 값은 실행 시 주입하세요. 공식 이미지는 게시되지 않았습니다. [로컬 배포 및 SBOM 가이드](../../deploy/README.md)를 참고하세요. 실제 AI agent 평가와 Workers 템플릿 / Helm은 계속 **planned**입니다.
 
 ## Express
 

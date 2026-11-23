@@ -86,6 +86,6 @@ nginx、Caddy、Traefik 三个示例都遵循同一模式：**网关终止 TLS�
   - DI-8f（可选）：若本机有 Docker 守护进程，则 `docker build` 后以 Compose 默认配置启动，curl 普通页面与 `/.env` 诱饵（noindex + 告警），再拆除容器；**没有 Docker 时必须显式 skip**，不得假装通过。
 - 现有 proxy / init / watch 行为不变；默认配置延迟门槛不得被改；本批不要求重跑饱和延迟门槛，也不为变绿而改门槛。
 - `npm audit --omit=dev` 为 0；`npm pack --dry-run` 仍不含密钥，也不把 `deploy/` 强行塞进包（保持现有 `files`）；对已排除的外部品牌名做全仓扫描，结果为 0（扫描词不要写进仓库文件）；六份 README 代码块一致、相对链接无失效（沿用 `test/unit/entry-docs.test.ts`，必要时扩展）；不新增 `.github/workflows`。
-- 不做对第三方的探测或攻击，不碰练答服务器，不在生产环境做 reverse prompt injection。
+- 不做对第三方的探测或攻击，不接触任何第三方服务器，不在生产环境做 reverse prompt injection。
 
 验收由维护者在 Codex 交卷后独立重跑，通过后再正常 push 到 `main`。

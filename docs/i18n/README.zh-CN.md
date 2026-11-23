@@ -68,7 +68,9 @@ node dist/cli/main.js watch --log ./access.log --format combined
 
 `proxy` 仅 detect / alert-only，默认绑定 `127.0.0.1:8080`；检查失败或超过 50 ms 计算预算时 fail-open。只保留 16 KiB 检查窗口，大请求体流式转发；上游不可达返回 502，超时返回 504。公开绑定需 `--allow-public-bind`。D5 原有登录延迟不计入计算预算。配置不存在时，`--init-secrets` 在旁边创建 0600 `.env`，不覆盖、不打印密钥。
 
-`init` 自动识别框架，默认只打印 unified diff；`--write` 仅新增配置与接入片段，不覆盖文件，不改应用源码或 hooks。日志模式通过环境变量提供 `AG_CANARY_SECRET` 和 `AG_PROJECT_SEED`，或使用 `--config`。`watch --log` 从文件末尾读取 combined/common/JSON（`--from-start` 才读历史），检测路径/查询中的诱饵命中与 canary 回放。日志通常没有头与 body，无法看见 Bearer/头/body 回放；爬虫 UA 只标为未验证，不做 DNS。日志模式不触发 trap/block。Docker 与真实 agent 评测仍为 **planned**。见[入口配置与限制](../distribution.md)。
+`init` 自动识别框架，默认只打印 unified diff；`--write` 仅新增配置与接入片段，不覆盖文件，不改应用源码或 hooks。日志模式通过环境变量提供 `AG_CANARY_SECRET` 和 `AG_PROJECT_SEED`，或使用 `--config`。`watch --log` 从文件末尾读取 combined/common/JSON（`--from-start` 才读历史），检测路径/查询中的诱饵命中与 canary 回放。日志通常没有头与 body，无法看见 Bearer/头/body 回放；爬虫 UA 只标为未验证，不做 DNS。日志模式不触发 trap/block。见[入口配置与限制](../distribution.md)。
+
+Docker / Compose 与 nginx / Caddy / Traefik 片段已作为**本地源码模板（unreleased）**提供：非 root、只读根文件系统，宿主机端口默认只绑定 `127.0.0.1`，detect / alert-only。请自行构建本地镜像并在运行时注入密钥；未发布官方镜像。见[本地部署与 SBOM 指南](../../deploy/README.md)。真实 AI agent 评测与 Workers 模板 / Helm 仍为 **planned**。
 
 ## Express
 

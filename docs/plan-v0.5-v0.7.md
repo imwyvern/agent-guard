@@ -1,6 +1,6 @@
 # 下一阶段实施规划：服务器层预警与拖延（v0.4b → v0.7）
 
-> 状态：v0.4b 与拆分后的 v0.5a 已实现于 unreleased 代码树（未发 npm、未打 tag）；v0.5b 第一批 proxy / init / HTTP-log watch 已实现（unreleased），Docker 与真实 agent 评测及 v0.6 / v0.7 仍规划中。更新于 2026-11-16（HKT）。
+> 状态：v0.4b 与拆分后的 v0.5a 已实现于 unreleased 代码树（未发 npm、未打 tag）；v0.5b proxy / init / HTTP-log watch 与第二批 Docker / Compose / 网关片段 / 本地 SBOM 已实现（unreleased，本地源码模板，无公开镜像）。Workers 模板 / Helm、真实 agent 评测及 v0.6 / v0.7 仍规划中。更新于 2026-11-23（HKT）。
 > 起点：Dan 的定位——「放假配置和假密钥，攻击者的 AI 一碰就告警，再拖慢它，给运维留出处置时间」。本文保留版本计划，并以 [seed.md](seed.md)、[incident-response.md](incident-response.md) 与 [positioning.md](positioning.md) 标注当前已实现范围。
 > 范围约束不变：canary 永远 inert、不用任何真实厂商凭据格式、不做生产环境 reverse prompt injection、不做对第三方的外联探测、默认 detect-only、trap 与 deception 全部 opt-in。agent-guard 只提供程序和部署模板，**不替任何人部署**。
 
@@ -10,7 +10,7 @@
 | --- | --- | --- | --- |
 | v0.4b（已实现，unreleased） | Web 标准核心 + Edge 适配器 | Edge 适配器 | 无 |
 | v0.5a（已实现，unreleased） | 服务器层与处置 | ① seed / Linux-log watch ② incident timeline / CLI / log.file / metrics / opt-in escalation 与 Node hooks | v0.4a |
-| v0.5b（第一批已实现，unreleased） | 一键入口与评测 | ③ proxy / init / HTTP-log 模式已实现；Docker 与 ④ 真实 AI 代理评测仍 planned（预算未设定） | v0.5a |
+| v0.5b（两批入口已实现，unreleased） | 一键入口与评测 | ③ proxy / init / HTTP-log 模式与 Docker / Compose / 网关本地模板、本地 SBOM 已实现；Workers 模板 / Helm 与 ④ 真实 AI 代理评测仍 planned（预算未设定） | v0.5a |
 | v0.6 | 欺骗层 | ⑤ 统一人设 + 分层泄露 + 假成功（opt-in） | v0.5 的评测框架（先量化，再启用） |
 | v0.7 | 独立蜜罐机 | ⑥ `decoy-host` 独立进程 / 容器，与真实业务隔离 | v0.5 假文件、v0.6 人设 |
 
@@ -60,9 +60,13 @@
 - IT-3：未配置 hook 时保留 v0.4b 的默认请求决策与响应行为。
 - IT-4：升级提醒每个 incident 有上限，不刷屏。
 
-## 3. 一键入口（v0.5b 第一批已实现 / unreleased，见 [distribution.md](distribution.md)）
+## 3. 一键入口（v0.5b 两批已实现 / unreleased，见 [distribution.md](distribution.md)）
 
-`proxy`（固定 HTTP(S) 上游、检查 fail-open、默认绑 127.0.0.1、16 KiB 检查窗口与流式 body）、`init`（默认只打印补丁、显式 --write 新增文件且不覆盖）与只读 `watch --log`（combined/common/JSON）已实现。DI-1～DI-7 的证据见 [distribution.md](distribution.md) 与 [验证记录](bench-v0.5b.md)。默认 detect / alert-only，不新增自动拦截；HTTP 日志看不到头/body，UA 声明未验证、无 DNS。这些入口和 v0.5a 的 Linux honeyfile 日志模式并列。Docker/Compose/代理配置片段（E-2、DI-8）与 Workers 模板/Helm（E-5）仍未实现。npm 发布仍需 Dan 单独批准；发布前用 `node dist/cli/main.js <cmd>` 或源码运行，`npx @imwyvern/agent-guard` 仅在发布后可用。
+`proxy`（固定 HTTP(S) 上游、检查 fail-open、默认绑 127.0.0.1、16 KiB 检查窗口与流式 body）、`init`（默认只打印补丁、显式 --write 新增文件且不覆盖）与只读 `watch --log`（combined/common/JSON）已实现。DI-1～DI-7 的证据见 [distribution.md](distribution.md) 与 [验证记录](bench-v0.5b.md)。默认 detect / alert-only，不新增自动拦截；HTTP 日志看不到头/body，UA 声明未验证、无 DNS。这些入口和 v0.5a 的 Linux honeyfile 日志模式并列。
+
+第二批 E-2 / DI-8 已提供 [deploy 本地模板](../deploy/README.md)：Node 20.19 slim 多阶段、UID 65532、只读根文件系统、cap_drop ALL、no-new-privileges、宿主机默认只绑定 127.0.0.1、内部 upstream；nginx / Caddy / Traefik 终止 TLS 后转发 guard，保留 noindex 与 crawler 豁免。密钥仅由运营者 env_file 注入，不依赖 --init-secrets。本机 `npm run sbom` 生成 gitignored CycloneDX，不提交或发布。证据为 [DI-8a–e 测试](../test/unit/deploy.test.ts)；[DI-8f](../test/integration/docker.test.ts) 在无 Docker 时明确 skip。本项目不发布镜像或代部署，npm 包 files 不变。
+
+Workers 模板 / Helm（E-5）与真实 agent 评测仍 planned。npm 发布仍需 Dan 单独批准；发布前用 `node dist/cli/main.js <cmd>` 或源码运行，`npx @imwyvern/agent-guard` 仅在发布后可用。
 
 ## 4. 真实 AI 代理评测框架（v0.5b，规划 / 未实现，`bench/agents`）
 

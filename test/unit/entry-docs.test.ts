@@ -15,3 +15,15 @@ it.each(readmes)('%s keeps identical executable examples and resolving relative 
         expect(existsSync(resolve(dirname(path), decodeURIComponent(target)))).toBe(true);
     }
 });
+
+it.each(readmes)('%s links local deployment templates and keeps future distribution/evaluation scope explicit', path => {
+    const text = readFileSync(path, 'utf8');
+    const section = text.split('## Zero-code entry points (unreleased)')[1]!.split('\n## ')[0]!;
+    expect(section).toContain('Docker / Compose');
+    expect(section).toContain('127.0.0.1');
+    expect(section).toContain('Workers');
+    expect(section).toContain('Helm');
+    expect(section).toContain('**planned**');
+    expect(section).toContain(path === 'README.md' ? '(deploy/README.md)' : '(../../deploy/README.md)');
+    expect(section).toContain(path === 'README.md' ? '(docs/distribution.md)' : '(../distribution.md)');
+});

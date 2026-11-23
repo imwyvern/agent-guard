@@ -1,6 +1,6 @@
 # 零代码入口：面向防护者与运维者
 
-> 状态：2026-11-16（HKT），v0.5b 第一批 E-1 / E-3 / E-4 已实现，**unreleased**。E-2 Docker 与 E-5 Workers 模板 / Helm 仍未实现。零运行时依赖，Node ≥20。
+> 状态：2026-11-23（HKT），v0.5b E-1 / E-2 / E-3 / E-4 已实现，**unreleased**。E-2 仅为本地源码模板，无已发布镜像；E-5 Workers 模板 / Helm 仍未实现。零运行时依赖，Node ≥20。
 > 从源码构建后使用 `node dist/cli/main.js`（或 `npx tsx src/cli/main.ts`）。只有 npm 发布后才可使用 `npx @imwyvern/agent-guard`；发布仍需 Dan 单独批准，当前没有 npm 发布或 tag。
 
 ## 1. 入口与状态
@@ -8,7 +8,7 @@
 | 入口 | 状态 | 用途与边界 |
 | --- | --- | --- |
 | **E-1 proxy 反向代理 / 边车** | 已实现 / unreleased | 单一固定 HTTP(S) 上游；检测异常 fail-open；默认只监听回环；detect / alert-only |
-| **E-2 Docker 镜像及配置片段** | planned / 未实现 | 镜像、Compose、nginx、Caddy、Traefik 片段留待下一批，DI-8 尚未验收 |
+| **E-2 Docker 镜像及配置片段** | 已实现 / unreleased，本地模板 | [Docker / Compose 与 nginx / Caddy / Traefik](../deploy/README.md)；非 root、只读、宿主机默认回环；本机 SBOM，不发布镜像 |
 | **E-3 init 接入向导** | 已实现 / unreleased | 检测 Express/Fastify/Koa/Hono/Next；无匹配时使用 Node HTTP；默认只打印补丁 |
 | **E-4 HTTP access-log watch** | 已实现 / unreleased | 只读 combined/common/JSON，检测已注册诱饵路径及路径/查询里的 canary；与 Linux 读取日志模式互斥 |
 | **E-5 Workers 模板 / Helm** | planned / 未实现 | 已有 Web core / Edge adapters 与 [接入文档](edge.md)，不代表模板与 chart 已交付 |
@@ -106,6 +106,17 @@ node dist/cli/main.js watch --log ./access.jsonl --format json --config ./agent-
 | DI-5 | 0600 `.env`、不覆盖、stdout/stderr 无 secret 值 |
 | DI-6 | 默认 diff 不写入；显式创建、不覆盖、拒绝穿越/符号链接；接入片段类型检查 |
 | DI-7 | combined/common/JSON 诱饵与 canary、普通零事件、畸形/超长/轮转处理 |
-| DI-8 | **planned**：Docker 非 root、只读根文件系统、SBOM，下一批验收 |
+| DI-8a | [Dockerfile](../deploy/Dockerfile)：Node 20.19 slim 多阶段，最终 UID/GID 65532，仅 dist + package.json，无密钥与生产安装 |
+| DI-8b | [Compose](../deploy/compose.yaml)：127.0.0.1 宿主机端口、read_only、cap_drop ALL、no-new-privileges、非 root 与内部网络 |
+| DI-8c | [deploy/.dockerignore](../deploy/.dockerignore) 与实际根构建上下文 [.dockerignore](../.dockerignore) 一致，排除 .env / PEM / git / node_modules / 测试与基准结果 |
+| DI-8d | 三个 TLS 网关片段转发到本机 guard，保留 noindex / robots 与 guard crawler 豁免，不含私钥 |
+| DI-8e | [SBOM 脚本](../scripts/sbom.mjs)：npm 11 内置 npm sbom，CycloneDX 写入 gitignored bench/results/sbom.json；工具缺失或无效输出明确非零退出 |
+| DI-8f | [Docker 冒烟测试](../test/integration/docker.test.ts)：有守护进程时构建、默认 Compose 启动、curl 普通页及 noindex /.env + 告警并拆除；本 box 无 Docker，明确 skip |
 
-证据：[proxy 测试](../test/integration/proxy.test.ts)、[init 测试](../test/unit/init.test.ts)、[access-log 测试](../test/unit/access-log.test.ts)、[v0.5b 合同](codex-contract-v0.5b.md)。默认配置延迟沿用原门槛；proxy 额外开销仅报告，见 [本轮验证记录](bench-v0.5b.md)。不提供 `curl | sh`，不要求 root；当前不交付镜像、部署或供应链发布产物。后续 npm/provenance/SBOM 仍依照 [release checklist](release-checklist.md) 单独批准。
+证据：[proxy 测试](../test/integration/proxy.test.ts)、[init 测试](../test/unit/init.test.ts)、[access-log 测试](../test/unit/access-log.test.ts)、[DI-8a–e 测试](../test/unit/deploy.test.ts)、[v0.5b 合同](codex-contract-v0.5b.md) 与[第二批合同](codex-contract-v0.5b-2.md)。默认配置延迟沿用原门槛；proxy 额外开销仅报告，见 [第一批验证记录](bench-v0.5b.md)。
+
+2026-11-23（HKT）本机验收（Node 24.22.1 / npm 11.21.1）：`npm run build`、`npm run typecheck`、`npm run lint`、`npm test`、`npm run check:neutral`、`npm run bench:deception-lint` 均通过；1534 passed / 5 skipped（原有 Web-only 三项与缺少 Deno 一项，新增 DI-8f 因缺少 Docker 可执行文件跳过）。deception-lint 140 samples / 0 违规，六份 README 代码块一致且相对链接可解析；`npm run sbom` 实际生成非空 CycloneDX，`npm audit --omit=dev` 为 0，`npm pack --dry-run` 为 68 文件且不含 deploy / SBOM / 密钥文件，外部品牌扫描为 0。运行时代码、现有断言、延迟门槛与 package files 均未改变；未重跑饱和延迟基准，无新增 CI 或任何发布动作。
+
+E-2 构建和运行命令见 [deploy/README.md](../deploy/README.md)。容器内 `--listen 0.0.0.0:8080 --allow-public-bind` 只针对容器网络命名空间，宿主机暴露由 `ports:` 决定；默认 `127.0.0.1:8080:8080`，运营者若去掉回环前缀须自担暴露风险。Compose 通过运营者的 `deploy/.env` 注入运行时绑定，不挂载密钥目录；只读根文件系统不能依赖 `--init-secrets` 写入。示例 upstream 不发布端口，普通业务转发与 `AGENT_GUARD=off` 纯透传语义不变；detect / alert-only，不启用 trap / block。网关终止 TLS 后转发给 guard，不改诱饵响应和 noindex / robots 头，crawler 豁免由 guard 处理。
+
+不提供 `curl | sh`，源码构建不要求 root（Docker 权限由运营者环境决定）。本地模板与 SBOM **不是已发布产物**：不向 Docker Hub / GHCR / registry 发布镜像，不提交 SBOM、不附到 release、不替运营者部署。后续正式 npm/provenance/SBOM 发布仍依照 [release checklist](release-checklist.md) 由 Dan 单独批准；Workers 模板 / Helm 与真实 AI agent 评测仍 planned。

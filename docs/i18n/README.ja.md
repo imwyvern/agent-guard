@@ -68,7 +68,9 @@ node dist/cli/main.js watch --log ./access.log --format combined
 
 `proxy` は detect / alert-only で、既定では `127.0.0.1:8080` にバインドします。検査失敗または 50 ms の計算予算超過時は fail-open です。検査用の 16 KiB だけを保持し、大きい本文はストリーム転送します。上流接続失敗は 502、タイムアウトは 504。公開バインドには `--allow-public-bind` が必要です。D5 の既存ログイン遅延は計算予算の外です。設定が存在しない場合、`--init-secrets` は隣に 0600 の `.env` を作成し、上書きも秘密値の表示もしません。
 
-`init` はフレームワークを検出し、既定では unified diff のみ表示します。`--write` は設定と接続例を新規作成し、既存ファイルやアプリのソース、hooks を変更しません。ログモードでは環境変数 `AG_CANARY_SECRET` と `AG_PROJECT_SEED`、または `--config` を指定します。`watch --log` は combined/common/JSON を末尾から読み（履歴は `--from-start`）、パスとクエリのデコイ到達・canary 再利用を検出します。ログには通常ヘッダーや本文がないため Bearer/ヘッダー/本文の再利用は見えません。クローラー UA は未検証で、DNS は使いません。ログモードは trap/block を行いません。Docker と実 agent 評価は **planned** です。[設定と制限](../distribution.md)を参照してください。
+`init` はフレームワークを検出し、既定では unified diff のみ表示します。`--write` は設定と接続例を新規作成し、既存ファイルやアプリのソース、hooks を変更しません。ログモードでは環境変数 `AG_CANARY_SECRET` と `AG_PROJECT_SEED`、または `--config` を指定します。`watch --log` は combined/common/JSON を末尾から読み（履歴は `--from-start`）、パスとクエリのデコイ到達・canary 再利用を検出します。ログには通常ヘッダーや本文がないため Bearer/ヘッダー/本文の再利用は見えません。クローラー UA は未検証で、DNS は使いません。ログモードは trap/block を行いません。[設定と制限](../distribution.md)を参照してください。
+
+Docker / Compose と nginx / Caddy / Traefik の設定例を**ローカルソースのテンプレート（unreleased）**として提供しています。非 root、読み取り専用のルートファイルシステムで動作し、ホストのポートは既定で `127.0.0.1` のみにバインドします。detect / alert-only を維持します。ローカルでイメージをビルドし、秘密値は実行時に注入してください。公式イメージは未公開です。[ローカル導入と SBOM ガイド](../../deploy/README.md)を参照してください。実 AI agent 評価と Workers テンプレート / Helm は引き続き **planned** です。
 
 ## Express
 

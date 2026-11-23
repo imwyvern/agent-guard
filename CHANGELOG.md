@@ -5,6 +5,7 @@
 ## [Unreleased]
 
 ### Changed
+- 2026-11-23 (HKT)，v0.5b 第二批（unreleased）：同步 README 与五语译本、distribution、plan、roadmap、positioning 与 community 的 E-2 / DI-8 状态与证据；区分本地源码模板与已发布产物，注明容器绑定和宿主机回环端口边界、只读根文件系统不依赖 --init-secrets、网关保留 noindex / robots 与 crawler 豁免。Workers 模板 / Helm、真实 agent 评测仍 planned；无运行时改动，未发布镜像/npm、未打 tag、无新增 CI。
 - 2026-11-16 (HKT)，v0.5b 第一批（unreleased）：同步 README/五语译本、distribution、plan、roadmap、positioning、threat model 与 community；明确代理进入数据通路的固定目标/头处理/有界 body/绑定边界、日志缺少头/body 与未验证 UA。E-1/E-3/E-4 已实现；Docker、Workers 模板/Helm 与真实 agent 评测仍 planned。未发 npm、未打 tag、无新增 CI。
 - 2026-11-11 (HKT)，v0.4b（unreleased）：README 与 zh-CN / zh-TW / ja / ko / es 五语译本加入 Edge 支持/降级矩阵与一致的接入示例；同步路线图、核心分层、威胁模型、社区与分发边界。无 StateStore 时 incident / rateLimit / block / timing / maze 会话准入自动关闭并警告；`memoryStore()` 仅单 isolate；Web 默认 `ua-bypass`（未验证、无 DNS / DoH）、无 SMTP，trap 默认关闭，edge delay 不建议启用且显式启用上限 3000 ms。未发 npm、未打 tag。
 - 2026-11-11 (HKT)：按「服务器层面最后一道行程绊线与早期预警 / 延迟层」重写 README 与五语译本的顶部叙事；补充诚实边界（今日仅为 HTTP/API 层；主机 honeyfile 与「假成功」均为规划中、尚未交付；消耗攻击者 token 尚未得到验证，迷宫模拟字节比 1:1）。新增 [docs/positioning.md](docs/positioning.md) 定位与声明表，同步 [docs/roadmap.md](docs/roadmap.md)、[docs/community.md](docs/community.md) 的后续方向与 good first issue 想法。未改运行时行为，未发 npm，未打 tag。
@@ -12,6 +13,7 @@
 - 2026-11-10 17:10 (HKT)：范围调整为纯开源研究（不部署）。移除特定站点集成内容；验证改为本地 Express / 原生 http demo + 自动化测试 + 流量模拟 benchmark；MVP 告警仅 webhook(HMAC) + console，Slack/Telegram/飞书/email 当时改为 future（已由 v0.4a 的 opt-in adapters 取代）；Fastify/Hono adapter 当时推迟（Hono 已于 v0.2 完成；Fastify/Koa 已于 v0.3a / unreleased 完成）；仓库提案写入工作默认值（imwyvern/agent-guard、@imwyvern/agent-guard、Apache-2.0、个人账号，pending Dan confirmation）；Codex 合同同步修订。
 
 ### Added
+- 2026-11-23 (HKT)，v0.5b 第二批（unreleased）：`deploy/` 本地 Docker / Compose 模板（Node 20.19 slim 多阶段、UID 65532、只读根、cap_drop ALL、no-new-privileges、127.0.0.1 宿主机端口、内部 upstream、运行时 env_file）、nginx / Caddy / Traefik TLS 网关片段与部署指南；根 .dockerignore 配合源码构建上下文排除密钥。零新增依赖的 `npm run sbom` 使用 npm 11 内置命令生成本机 gitignored CycloneDX；新增 DI-8a–e 与 Docker 可用时的 DI-8f 冒烟验收，无 Docker 时明确 skip。默认 detect / alert-only、canary inert、诱饵 noindex、npm files 不变。
 - 2026-11-16 (HKT)，v0.5b 第一批（unreleased）：零运行时依赖的 `proxy`（固定 HTTP(S) 上游、默认回环、fail-open 检查、有界 16 KiB 检查与流式转发、502/504、显式可信代理、0600 首次 secrets 与 5 s 退出）、`init`（框架识别、默认 unified diff、安全 0644 新文件且不覆盖）、只读 `watch --log` combined/common/JSON（共享诱饵/registry/canary scanner、source: access_log、有界/轮转/速率）。默认 detect / alert-only，无新自动拦截，canary inert、诱饵 noindex；新增 DI-1～DI-7 与 CLI/片段/schema 测试。
 - 2026-11-11 (HKT)，v0.5a（unreleased）：`agent-guard seed` 的 node/python/k8s/generic 惰性 honeyfiles、默认 dry-run、显式 `--write`（0600、不覆盖、不跟随不安全路径/符号链接）与只读 `--verify`；内容由运营者 seed 等输入确定性生成，不使用真实厂商凭据格式/前缀，callback 仅指向运营者自托管端点。
 - 2026-11-11 (HKT)，v0.5a（unreleased）：可选、仅 Linux、只读的 `watch --auditd|--inotify-log`，解析运营者配置的访问日志，输出 medium `honeyfile_read`，不触发 trap/block；guard 不自行观测文件读取，不配置审计工具、不出站探测。

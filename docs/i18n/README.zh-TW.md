@@ -68,7 +68,9 @@ node dist/cli/main.js watch --log ./access.log --format combined
 
 `proxy` 僅 detect / alert-only，預設綁定 `127.0.0.1:8080`；檢查失敗或超過 50 ms 計算預算時 fail-open。只保留 16 KiB 檢查視窗，大請求本文以串流轉送；上游無法連線回傳 502，逾時回傳 504。公開綁定需 `--allow-public-bind`。D5 原有登入延遲不計入計算預算。設定檔不存在時，`--init-secrets` 在旁邊建立 0600 `.env`，不覆寫、不列印密鑰。
 
-`init` 自動辨識框架，預設只列印 unified diff；`--write` 僅新增設定與接入片段，不覆寫檔案，不改應用程式原始碼或 hooks。日誌模式透過環境變數提供 `AG_CANARY_SECRET` 與 `AG_PROJECT_SEED`，或使用 `--config`。`watch --log` 從檔案末尾讀取 combined/common/JSON（`--from-start` 才讀歷史），偵測路徑/查詢中的誘餌命中與 canary 重播。日誌通常沒有標頭與本文，無法看見 Bearer/標頭/本文重播；爬蟲 UA 僅標為未驗證，不做 DNS。日誌模式不觸發 trap/block。Docker 與真實 agent 評測仍為 **planned**。見[入口設定與限制](../distribution.md)。
+`init` 自動辨識框架，預設只列印 unified diff；`--write` 僅新增設定與接入片段，不覆寫檔案，不改應用程式原始碼或 hooks。日誌模式透過環境變數提供 `AG_CANARY_SECRET` 與 `AG_PROJECT_SEED`，或使用 `--config`。`watch --log` 從檔案末尾讀取 combined/common/JSON（`--from-start` 才讀歷史），偵測路徑/查詢中的誘餌命中與 canary 重播。日誌通常沒有標頭與本文，無法看見 Bearer/標頭/本文重播；爬蟲 UA 僅標為未驗證，不做 DNS。日誌模式不觸發 trap/block。見[入口設定與限制](../distribution.md)。
+
+Docker / Compose 與 nginx / Caddy / Traefik 片段已作為**本機原始碼範本（unreleased）**提供：非 root、唯讀根檔案系統，主機連接埠預設只繫結 `127.0.0.1`，detect / alert-only。請自行建置本機映像並在執行時注入密鑰；尚未發佈官方映像。見[本機部署與 SBOM 指南](../../deploy/README.md)。真實 AI agent 評測與 Workers 範本 / Helm 仍為 **planned**。
 
 ## Express
 
