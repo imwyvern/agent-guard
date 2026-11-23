@@ -3,3 +3,6 @@ dist/
 coverage/
 bench/results/
 .lighthouseci/
+.env
+.env.*
+!.env.example

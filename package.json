@@ -190,6 +190,7 @@
   },
   "scripts": {
     "build": "tsx scripts/build.ts",
+    "sbom": "node scripts/sbom.mjs",
     "check:neutral": "tsx scripts/check-neutral.ts",
     "typecheck": "tsc --noEmit",
     "lint": "tsc --noEmit --noUnusedLocals --noUnusedParameters",

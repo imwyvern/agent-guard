@@ -1,0 +1,16 @@
+.env
+**/.env
+.env.*
+**/.env.*
+**/*.pem
+.git
+**/.git
+node_modules
+**/node_modules
+dist
+test
+coverage
+bench
+.lighthouseci
+docs
+deploy

@@ -1,0 +1,24 @@
+# Complete dynamic configuration for a gateway on the Docker host.
+# Load with Traefik's file provider; its static configuration must define
+# websecure on :443, for example:
+# traefik --entrypoints.websecure.address=:443 --providers.file.filename=/etc/traefik/dynamic.yaml
+# Save this fragment at that file-provider path. No API/dashboard is enabled.
+# Replace example.com and the operator-managed TLS certificate paths.
+# Guard handles verified-crawler exemptions. Preserve decoy bodies and
+# noindex / robots headers; do not add error middleware or response rewriting.
+http:
+  routers:
+    guard:
+      rule: Host(`example.com`)
+      entryPoints: [websecure]
+      tls: {}
+      service: guard
+  services:
+    guard:
+      loadBalancer:
+        servers:
+          - url: http://127.0.0.1:8080
+tls:
+  certificates:
+    - certFile: /etc/traefik/tls/fullchain.pem
+      keyFile: /etc/traefik/tls/privkey.pem

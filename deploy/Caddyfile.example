@@ -1,0 +1,10 @@
+# Complete Caddyfile for a gateway on the Docker host. Replace example.com
+# with your domain. Caddy manages TLS; no certificate secrets belong here.
+# Guard handles verified-crawler exemptions. Preserve decoy bodies and
+# noindex / robots headers; do not add response rewriting.
+{
+    admin 127.0.0.1:2019
+}
+example.com {
+    reverse_proxy 127.0.0.1:8080
+}

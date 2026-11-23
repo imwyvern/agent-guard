@@ -1,0 +1,28 @@
+# Local source template. See README.md before starting.
+services:
+  guard:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    image: agent-guard-local:dev
+    command: ["--upstream", "http://upstream:3000"]
+    user: "65532:65532"
+    env_file: .env
+    ports: ["127.0.0.1:8080:8080"]
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    networks: [internal]
+    depends_on: [upstream]
+  # Optional example origin: replace/remove it and set guard's --upstream.
+  upstream:
+    image: node:20.19-slim
+    user: "65532:65532"
+    command: ["node", "-e", "require('node:http').createServer((_req, res) => { res.setHeader('Content-Type', 'text/plain'); res.end('local upstream\\n'); }).listen(3000, '0.0.0.0')"]
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    networks: [internal]
+networks:
+  internal:
+    internal: true
