@@ -1,4 +1,5 @@
 import type { AgentGuard, AgentGuardConfig } from './types.js';
+import { agentUrl, isJwks } from './crawler/web-bot-auth-keys.js';
 export class AgentGuardConfigError extends Error {
     override name = 'AgentGuardConfigError';
 }
@@ -7,6 +8,7 @@ export function validateConfig(c: AgentGuardConfig): void {
         throw new AgentGuardConfigError('mode must be "detect" or "trap"');
     validateTrap(c.trap);
     validateHooks(c.hooks);
+    validateWebBotAuth(c.webBotAuth);
     if (c.log?.file !== undefined && (typeof c.log.file !== 'string' || !c.log.file.trim() || c.log.file.includes('\0')))
         throw new AgentGuardConfigError('log.file must be a nonempty path');
     for (const [name, value, minimum, maximum] of [
@@ -62,6 +64,43 @@ export const hookLimits = {
     maxPerHour: { default: 10, min: 1, max: 100 },
     maxConcurrent: { default: 2, min: 1, max: 8 },
 } as const;
+
+function validateWebBotAuth(options: AgentGuardConfig['webBotAuth']): void {
+    if (options === undefined) return;
+    const object = (value: unknown): boolean => typeof value === 'object' && value !== null && !Array.isArray(value);
+    if (!object(options)) throw new AgentGuardConfigError('webBotAuth must be an object');
+    if (options.enabled !== undefined && typeof options.enabled !== 'boolean')
+        throw new AgentGuardConfigError('webBotAuth.enabled must be boolean');
+    if (options.trustedAgents !== undefined) {
+        if (!Array.isArray(options.trustedAgents)) throw new AgentGuardConfigError('webBotAuth.trustedAgents must be an array');
+        for (const agent of options.trustedAgents)
+            if (!object(agent) || typeof agent.url !== 'string' || !agentUrl(agent.url) || agent.keys !== undefined && !isJwks(agent.keys))
+                throw new AgentGuardConfigError('webBotAuth.trustedAgents requires HTTPS URLs and optional public JWKS (1–64 keys)');
+    }
+    const fetch = options.fetchKeys;
+    if (fetch !== undefined) {
+        if (!object(fetch) || typeof fetch.fetcher !== 'function' || !Array.isArray(fetch.allowHosts))
+            throw new AgentGuardConfigError('webBotAuth.fetchKeys requires fetcher and allowHosts');
+        for (const host of fetch.allowHosts) {
+            try {
+                if (typeof host !== 'string' || !host || host.includes('*')) throw new Error();
+                const parsed = new URL('https://' + host);
+                if (parsed.hostname.toLowerCase() !== host.toLowerCase() || parsed.port || parsed.username || parsed.password || parsed.pathname !== '/' || parsed.search || parsed.hash) throw new Error();
+            } catch { throw new AgentGuardConfigError('webBotAuth.fetchKeys.allowHosts must contain exact hostnames'); }
+        }
+        if (fetch.cache !== undefined && (!object(fetch.cache) || !['get', 'set', 'delete'].every(method => typeof (fetch.cache as unknown as Record<string, unknown>)[method] === 'function')))
+            throw new AgentGuardConfigError('webBotAuth.fetchKeys.cache must implement get, set and delete');
+    }
+    for (const [name, value, min, max] of [
+        ['clockSkewSeconds', options.clockSkewSeconds, 0, 86400],
+        ['maxSignatureAgeSeconds', options.maxSignatureAgeSeconds, 1, Number.MAX_SAFE_INTEGER],
+        ['fetchKeys.timeoutMs', fetch?.timeoutMs, 1, 5000],
+        ['fetchKeys.maxBytes', fetch?.maxBytes, 1, 262144],
+        ['fetchKeys.maxTtlSeconds', fetch?.maxTtlSeconds, 0, 86400],
+    ] as const)
+        if (value !== undefined && (!Number.isSafeInteger(value) || value < min || value > max))
+            throw new AgentGuardConfigError(`webBotAuth.${name} must be a safe integer between ${min} and ${max}`);
+}
 
 export function validateHooks(hooks: AgentGuardConfig['hooks']): void {
     if (hooks === undefined) return;

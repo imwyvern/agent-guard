@@ -67,13 +67,13 @@ export class WebBotAuthKeys {
                         } catch { /* Store failures fall back to bounded local memory. */ }
                     }
                     if (controller.signal.aborted) throw new Error('Key lookup timed out');
-                    const response = await options.fetcher(url, { signal: controller.signal, redirect: 'manual', headers: { Accept: 'application/jwk-set+json, application/json' } });
+                    const response = await options.fetcher(url, { signal: controller.signal, redirect: 'manual', headers: { Accept: 'application/jwk-set+json, application/json, application/http-message-signatures-directory+json' } });
                     if (response.status !== 200 || response.redirected || response.url && agentUrl(response.url) !== url) {
                         void response.body?.cancel().catch(() => {});
                         throw new Error('Key response rejected');
                     }
                     const mediaType = response.headers.get('content-type')?.split(';', 1)[0]?.trim().toLowerCase();
-                    if (mediaType !== 'application/json' && mediaType !== 'application/jwk-set+json') {
+                    if (mediaType !== 'application/json' && mediaType !== 'application/jwk-set+json' && mediaType !== 'application/http-message-signatures-directory+json') {
                         void response.body?.cancel().catch(() => {});
                         throw new Error('Key media type rejected');
                     }

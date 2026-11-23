@@ -136,7 +136,7 @@ describe('WBA-5 bounded positive/negative caches and concurrent discovery', () =
         const req = await signedRequest();
         for (let i = 0; i < 2; i++) expect(await verifier.verify(req, now)).toMatchObject({ verified: true, trusted: true });
         expect(fetcher).toHaveBeenCalledTimes(1); expect(globalFetch).not.toHaveBeenCalled();
-        expect(fetcher.mock.calls[0]?.[1]).toMatchObject({ redirect: 'manual', headers: { Accept: 'application/jwk-set+json, application/json' } });
+        expect(fetcher.mock.calls[0]?.[1]).toMatchObject({ redirect: 'manual', headers: { Accept: 'application/jwk-set+json, application/json, application/http-message-signatures-directory+json' } });
         expect(fetcher.mock.calls[0]?.[1].signal).toBeInstanceOf(AbortSignal);
     });
     it.each([

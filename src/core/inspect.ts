@@ -13,6 +13,8 @@ import { Maze, mazeNotFound } from './maze.js';
 import { matchesPath, scanRequest } from '../canary/scan.js';
 import { Decoys } from '../decoys/index.js';
 import { CrawlerVerifier } from '../crawler/verify.js';
+import { WebBotAuthVerifier } from '../crawler/web-bot-auth.js';
+import { inspectWebBotAuth } from '../crawler/web-bot-auth-inspect.js';
 import { claimedCrawler, classifyUA } from '../crawler/ua.js';
 import { clientKey, inCidr } from './client-key.js';
 import { pathSignal, weights } from './signals.js';
@@ -64,6 +66,7 @@ export function createAgentGuard(config: AgentGuardConfig): AgentGuard {
     const uaPatterns = (config.allowlist?.uaPatterns ?? []).filter(boundedUAPattern);
     const registry = new Registry(config.canary.registry, config.canary.secret, config.canary.prefix ?? 'AG-CANARY-');
     const decoys = new Decoys(config, registry), crawler = new CrawlerVerifier(config.crawler), clients = new Clients(), metrics = new Metrics();
+    const webBotAuth = config.webBotAuth?.enabled === true ? new WebBotAuthVerifier(config.webBotAuth) : undefined;
     const incidents = new Incidents(config.incident?.windowMs), tracing = new CanaryTracing(), timing = new Timing();
     const trap = new Trap(config.mode, config.trap);
     const maze = config.mode === 'trap' && config.trap?.maze?.enabled ? new Maze(config) : undefined;
@@ -128,6 +131,14 @@ export function createAgentGuard(config: AgentGuardConfig): AgentGuard {
                     signals.push('ua_automation');
                 const id = context?.mcp ? 'MCP' : context?.graphql ? 'GQL' : pathTruncated ? undefined : decoys.match(req.path, req.method), probe = pathSignal(req.path);
                 const mazePath = !context?.mcp && !context?.graphql && !pathTruncated && !!maze?.matches(req.path);
+                const auth = webBotAuth ? pathTruncated ? { verified: false, trusted: false, reason: 'invalid_components' } as const : await inspectWebBotAuth(webBotAuth, req, input) : undefined;
+                if (auth?.verified && auth.trusted) {
+                    const event = sanitizeEvent({ v: 1, ts: new Date().toISOString(), event_id: ulid(), event: 'crawler_bypass', severity: 'debug', project: config.project, env: config.env,
+                        req: { method: req.method, path: req.path, query_keys: Object.keys(req.query), ip: req.ip, client_key: key, ua, ua_class: 'verified_crawler', has_session: headers.cookie !== undefined },
+                        score: 0, signals: [], web_bot_auth: auth });
+                    emit(event);
+                    return id || mazePath ? { action: 'respond', response: mazeNotFound(req.method === 'HEAD'), events: [event] } : { action: 'pass', events: [event] };
+                }
                 const decoyHit = id && (id === 'MCP' ? mcpDecoyTools.some(tool => tool.name === context?.mcp?.toolName) : id === 'GQL' ? graphqlDecoys().some(decoy => decoy.field.name === context?.graphql?.fieldName) : true);
                 const scanBody = id === 'MCP' || id === 'GQL' || id === 'D5' || (config.canaryScan?.bodyPaths ?? ['/login', '/api/auth/*']).some(p => matchesPath(req.path, p));
                 const hits = scanRequest(req, registry, config, scanBody);
@@ -150,7 +161,7 @@ export function createAgentGuard(config: AgentGuardConfig): AgentGuard {
                 if ((uaBypass || (customCrawler && verified?.verified)) && claimedCrawler(ua)) {
                     const event = sanitizeEvent({ v: 1, ts: new Date().toISOString(), event_id: ulid(), event: 'crawler_bypass', severity: 'debug', project: config.project, env: config.env,
                         req: { method: req.method, path: req.path, query_keys: Object.keys(req.query), ip: req.ip, client_key: key, ua, ua_class: uaClass, has_session: headers.cookie !== undefined },
-                        score: previousScore, signals: [], crawler: verified ?? { claimed: claimedCrawler(ua)!, verified: false, cache: false } });
+                        score: previousScore, signals: [], crawler: verified ?? { claimed: claimedCrawler(ua)!, verified: false, cache: false }, ...(auth ? { web_bot_auth: auth } : {}) });
                     emit(event);
                     return id || mazePath ? { action: 'respond', response: { status: 404, headers: { 'Content-Type': 'text/plain; charset=utf-8' }, body: 'Not Found\n' }, events: [event] } : { action: 'pass', events: [event] };
                 }
@@ -169,7 +180,7 @@ export function createAgentGuard(config: AgentGuardConfig): AgentGuard {
                 if (req.path === '/robots.txt') incidents.observe(key, 'robots');
                 if (!id && !mazePath && signals.length === 0 && !trap.enabled)
                     return { action: 'pass', events };
-                const make = (event: AgentGuardEvent['event'], severity: Severity): AgentGuardEvent => ({ v: 1, ts: new Date().toISOString(), event_id: ulid(), event, severity, project: config.project, env: config.env, req: { method: req.method, path: req.path, query_keys: Object.keys(req.query), ip: req.ip, client_key: key, ua, ua_class: uaClass, has_session: headers.cookie !== undefined }, score: state.score, signals: [...signals] });
+                const make = (event: AgentGuardEvent['event'], severity: Severity): AgentGuardEvent => ({ v: 1, ts: new Date().toISOString(), event_id: ulid(), event, severity, project: config.project, env: config.env, req: { method: req.method, path: req.path, query_keys: Object.keys(req.query), ip: req.ip, client_key: key, ua, ua_class: uaClass, has_session: headers.cookie !== undefined }, score: state.score, signals: [...signals], ...(auth ? { web_bot_auth: auth } : {}) });
                 const push = (event: AgentGuardEvent): void => {
                     if (automation !== undefined) event.automation_score = automation;
                     const incident = incidents.event(event, true);
@@ -255,12 +266,18 @@ export function createAgentGuard(config: AgentGuardConfig): AgentGuard {
         req.ip = (config.clientIp?.(input) ?? req.ip).slice(0, 128);
         if (allowed(req)) return true;
         const ua = String(req.headers['user-agent'] ?? '').slice(0, 512), claimed = claimedCrawler(ua);
+        const auth = webBotAuth ? await inspectWebBotAuth(webBotAuth, req, input) : undefined;
+        if (auth?.verified && auth.trusted) {
+            emit(sanitizeEvent({ v: 1, ts: new Date().toISOString(), event_id: ulid(), event: 'crawler_bypass', severity: 'debug', project: config.project, env: config.env,
+                req: { method: req.method, path: '/ag/cb/' + hit.id, ip: req.ip, client_key: clientKey(req.ip, ua), ua_class: 'verified_crawler' }, web_bot_auth: auth }));
+            return true;
+        }
         if (claimed && (config.crawler?.verify === 'ua-bypass' || (await crawler.verify(req.ip, claimed, ua)).verified)) return true;
         if (closed) return false;
         // Never log the callback token, URL/query, or arbitrary incoming headers.
         const event = sanitizeEvent({ v: 1, ts: new Date().toISOString(), event_id: ulid(), event: 'canary_callback', severity: 'high', project: config.project, env: config.env,
             req: { method: req.method, path: '/ag/cb/' + hit.id, ip: req.ip, client_key: clientKey(req.ip, ua) },
-            canary: { ...hit, env: config.env, found_in: 'path', field: 'callback' } });
+            canary: { ...hit, env: config.env, found_in: 'path', field: 'callback' }, ...(auth ? { web_bot_auth: auth } : {}) });
         emit(event); alerts.enqueue(event);
         return true;
     });

@@ -234,6 +234,18 @@
         }
       }
     },
+    "web_bot_auth": {
+      "type": "object",
+      "required": ["verified", "trusted"],
+      "properties": {
+        "agent_url": { "type": "string" },
+        "keyid": { "type": "string" },
+        "verified": { "type": "boolean" },
+        "trusted": { "type": "boolean" },
+        "reason": { "enum": ["disabled", "unsigned", "ignored", "malformed", "invalid_parameters", "expired", "created_in_future", "signature_too_old", "missing_coverage", "invalid_components", "invalid_agent", "key_not_found", "keyid_mismatch", "key_fetch_failed", "unsupported", "invalid_signature"] }
+      },
+      "additionalProperties": false
+    },
     "alert": {
       "type": "object",
       "properties": {

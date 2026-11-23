@@ -12,6 +12,12 @@ export function toRequest(req: ParsedRequest, config?: AgentGuardConfig): AGRequ
     const limits = inspectionLimits(config);
     const target = req.url ?? '/';
     const base = { method: req.method ?? 'GET', headers: req.headers, ip: req.socket.remoteAddress ?? '', body: req.body };
+    if (config?.webBotAuth?.enabled === true) {
+        const host = req.headers.host;
+        // Use the connection scheme and Host; proxy forwarding needs explicit host normalization.
+        if (typeof host === 'string' && target.startsWith('/') && !target.startsWith('//'))
+            Object.assign(base, { url: ('encrypted' in req.socket && req.socket.encrypted ? 'https://' : 'http://') + host + target });
+    }
     const query = Object.create(null) as AGRequest['query'];
     // Leave overlong targets intact for inspect to mark as truncated; never parse them.
     if (target.length > limits.maxUrlLength || (plainPath.test(target) && !target.startsWith('//')))

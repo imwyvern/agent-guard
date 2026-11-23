@@ -65,6 +65,7 @@ export function agentGuard(configOrGuard: AgentGuard | AgentGuardConfig): Middle
             // headers remain untrusted; clientIp can override this behind a proxy.
             const incoming = c.env?.incoming as IncomingMessage | undefined;
             const request: AGRequest = { method: raw.method, path, query, headers, ip: incoming?.socket.remoteAddress ?? '' };
+            if (config?.webBotAuth?.enabled === true) request.url = url;
             const d5 = config?.decoys?.paths?.D5 ?? (config?.decoys?.basePath ?? '/api/internal') + '/auth/login';
             const scanBody = (Array.isArray(d5) ? d5 : [d5]).includes(path) || (config?.canaryScan?.bodyPaths ?? ['/login', '/api/auth/*']).some(pattern => matchesPath(path, pattern));
             if (scanBody && raw.body && limits.maxBodyBytes > 0) {

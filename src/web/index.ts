@@ -10,6 +10,8 @@ import { sanitizeEvent } from '../core/security-core.js';
 import { ulid } from '../core/ulid-core.js';
 import { claimedCrawler, classifyUA } from '../crawler/ua.js';
 import { customCrawlerVerify } from '../crawler/custom.js';
+import { WebBotAuthVerifier } from '../crawler/web-bot-auth.js';
+import { inspectWebBotAuth } from '../crawler/web-bot-auth-inspect.js';
 import { Metrics } from '../metrics.js';
 import { asciiAlphanumeric, onlyCharacters } from '../alerts/shared.js';
 import { Dispatcher, severityRank } from '../alerts/dispatcher-core.js';
@@ -66,6 +68,7 @@ export function createWebGuard(input: WebGuardConfig): WebGuard {
     validateConfig(config);
     const limits = inspectionLimits(config), registry = new WebRegistry(config.canary.registry as Exclude<AgentGuardConfig['canary']['registry'], string>, config.canary.secret, config.canary.prefix ?? 'AG-CANARY-');
     const decoys = new WebDecoys(config, registry), state = new WebState(input.store, config), trap = new WebTrap(config), metrics = new Metrics();
+    const webBotAuth = config.webBotAuth?.enabled === true ? new WebBotAuthVerifier(config.webBotAuth) : undefined;
     const maze = config.mode === 'trap' && config.trap?.maze?.enabled ? new WebMaze(config, state) : undefined;
     const patterns = (config.allowlist?.uaPatterns ?? []).filter(boundedUAPattern);
     if (!input.store) console.warn('agent-guard Web: incident correlation, trap.rateLimit, trap.block, timing scores and maze session admission are off until a StateStore is provided');
@@ -100,6 +103,15 @@ export function createWebGuard(input: WebGuardConfig): WebGuard {
             let uaClass: UAClass = classifyUA(ua);
             const id = context?.mcp ? 'MCP' : context?.graphql ? 'GQL' : pathTruncated ? undefined : decoys.match(req.path, req.method);
             const mazePath = !context?.mcp && !context?.graphql && !pathTruncated && !!maze?.matches(req.path), probe = pathSignal(req.path);
+            const auth = webBotAuth ? pathTruncated ? { verified: false, trusted: false, reason: 'invalid_components' } as const
+                : await inspectWebBotAuth(webBotAuth, req, { method: inputReq.method, path: inputReq.path, url: inputRequest.url }) : undefined;
+            if (auth?.verified && auth.trusted) {
+                const event = sanitizeEvent({ v: 1, ts: new Date().toISOString(), event_id: ulid(webCrypto), event: 'crawler_bypass', severity: 'debug', project: config.project, env: config.env,
+                    req: { method: req.method, path: req.path, query_keys: Object.keys(req.query), ip: req.ip, client_key: key, ua, ua_class: 'verified_crawler', has_session: req.headers.cookie !== undefined },
+                    score: 0, signals: [], web_bot_auth: auth });
+                emit(event);
+                return id || mazePath ? { action: 'respond', response: notFound(req.method === 'HEAD'), events: [event] } : { action: 'pass', events: [event] };
+            }
             const decoyHit = id && (id === 'MCP' ? mcpDecoyTools.some(tool => tool.name === context?.mcp?.toolName) : id === 'GQL' ? graphqlDecoys().some(decoy => decoy.field.name === context?.graphql?.fieldName) : true);
             const claimed = claimedCrawler(ua);
             let crawler: AgentGuardEvent['crawler'];
@@ -108,7 +120,7 @@ export function createWebGuard(input: WebGuardConfig): WebGuard {
                 crawler = { claimed, verified, cache: false };
                 if (verified || config.crawler?.verify === 'ua-bypass') {
                     const event = sanitizeEvent({ v: 1, ts: new Date().toISOString(), event_id: ulid(webCrypto), event: 'crawler_bypass', severity: 'debug', project: config.project, env: config.env,
-                        req: { method: req.method, path: req.path, query_keys: Object.keys(req.query), ip: req.ip, client_key: key, ua, ua_class: verified ? 'verified_crawler' : uaClass, has_session: req.headers.cookie !== undefined }, score: 0, signals: [], crawler });
+                        req: { method: req.method, path: req.path, query_keys: Object.keys(req.query), ip: req.ip, client_key: key, ua, ua_class: verified ? 'verified_crawler' : uaClass, has_session: req.headers.cookie !== undefined }, score: 0, signals: [], crawler, ...(auth ? { web_bot_auth: auth } : {}) });
                     emit(event);
                     return id || mazePath ? { action: 'respond', response: notFound(req.method === 'HEAD'), events: [event] } : { action: 'pass', events: [event] };
                 }
@@ -120,7 +132,7 @@ export function createWebGuard(input: WebGuardConfig): WebGuard {
             const callback = await decoys.callback(req.path);
             if (hits.length) signals.push('canary_replay');
             const make = (event: AgentGuardEvent['event'], severity: Severity, score: number): AgentGuardEvent => ({ v: 1, ts: new Date().toISOString(), event_id: ulid(webCrypto), event, severity, project: config.project, env: config.env,
-                req: { method: req.method, path: req.path, query_keys: Object.keys(req.query), ip: req.ip, client_key: key, ua, ua_class: uaClass, has_session: req.headers.cookie !== undefined }, score, signals: [...signals] });
+                req: { method: req.method, path: req.path, query_keys: Object.keys(req.query), ip: req.ip, client_key: key, ua, ua_class: uaClass, has_session: req.headers.cookie !== undefined }, score, signals: [...signals], ...(auth ? { web_bot_auth: auth } : {}) });
             const result = await state.run(key, async client => {
                 const previous = client.score, now = Date.now(), automation = state.timing(client);
                 if (id) {

@@ -1,3 +1,5 @@
+import type { WebBotAuthOptions, WebBotAuthReason } from './crawler/web-bot-auth-types.js';
+
 export type Severity = 'debug' | 'info' | 'medium' | 'high' | 'critical';
 export type DecoyId = 'D1' | 'D2' | 'D3' | 'D4' | 'D5';
 export type UAClass = 'browser' | 'automation' | 'verified_crawler' | 'spoofed_crawler' | 'declared_ai_crawler' | 'unknown';
@@ -8,6 +10,8 @@ export interface AGRequest {
     headers: Record<string, string | string[] | undefined>;
     ip: string;
     body?: unknown;
+    /** Origin-observed absolute URL for HTTP signatures; never infer it from forwarded headers. */
+    url?: string;
 }
 export interface AGResponse {
     status: number;
@@ -111,6 +115,14 @@ export interface AgentGuardEvent {
         verified: boolean;
         rdns?: string;
         cache: boolean;
+    };
+    /** Observational signature metadata only; signature bytes are never recorded. */
+    web_bot_auth?: {
+        agent_url?: string;
+        keyid?: string;
+        verified: boolean;
+        trusted: boolean;
+        reason?: WebBotAuthReason;
     };
     alert?: {
         channel: string;
@@ -217,6 +229,8 @@ export interface AgentGuardConfig {
         /** Default absent; offline JSON { crawler: [CIDR, ...] }. */ ipRangesFile?: string;
         /** Default node:dns/promises; inject for offline tests. */ resolver?: Resolver;
     };
+    /** Disabled by default, with no signature parsing or outbound discovery. */
+    webBotAuth?: WebBotAuthOptions;
     allowlist?: {
         /** Default empty. */ ips?: string[];
         /** Default empty; IPv4 and IPv6 CIDRs. */ cidrs?: string[];
