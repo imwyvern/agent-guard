@@ -1,4 +1,6 @@
 export { createAgentGuard } from './core/inspect.js';
+export { WebBotAuthVerifier, acceptSignatureHeader, signatureBase, verifyEd25519, jwkThumbprint } from './crawler/web-bot-auth.js';
+export type * from './crawler/web-bot-auth.js';
 export { prometheusHandler } from './metrics/prometheus.js';
 export { callbackHandler } from './canary/callback.js';
 export { AgentGuardConfigError } from './config.js';

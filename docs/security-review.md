@@ -171,3 +171,34 @@ Proxy parses only fixed-origin request targets; log tokenization uses a linear c
 | `/^[a-fA-F0-9]{2}$/` | `src/watch/access.ts` | Anchored/disjoint or linear scans; config/project metadata is local; HTTP headers and body windows/log lines are bounded. Covered by unchanged 100k adversarial timing assertions. |
 | `/^(\d{2})\/([A-Za-z]{3})\/(\d{4}):(\d{2}:\d{2}:\d{2}) ([+-]\d{4})$/` | `src/watch/access.ts` | Anchored/disjoint or linear scans; config/project metadata is local; HTTP headers and body windows/log lines are bounded. Covered by unchanged 100k adversarial timing assertions. |
 | `/\r$/` | `src/watch/access.ts` | Anchored/disjoint or linear scans; config/project metadata is local; HTTP headers and body windows/log lines are bounded. Covered by unchanged 100k adversarial timing assertions. |
+
+## v0.5c-1 structured fields and Web Bot Auth (2026-11-23)
+
+The standalone verifier follows `draft-ietf-webbotauth-httpsig-protocol-01` and accepts legacy Signature-Agent strings. It does not change guard decisions. Structured fields are capped at 64 KiB and 128 members, components or parameters; duplicate keys and parameters are rejected. Whitespace and trailing padding use character loops. Only Ed25519 is verified; unsupported algorithms and component transformations fail closed. No nonce database is provided: expiry and covered components bound replay.
+
+Key lookup binds the full HTTPS agent URL to its key set. Static keys take precedence. Discovery requires an injected fetcher and exact allowed hostname; credentials, fragments, non-default ports and redirects are rejected. The timeout includes streamed body reads (default 2 s, maximum 5 s), with a 64 KiB default / 256 KiB maximum response size. The fallback LRU holds at most 256 URL entries, positive TTL is capped at 24 h, negative TTL is 30 s, and at most 32 discoveries run concurrently. Optional StateStore entries receive the same TTL bounds; its capacity is the operator's responsibility. Fetch allowance never grants trust. Only operator-configured agent URLs can be trusted after a valid signature.
+
+| Regex | File | Review |
+| --- | --- | --- |
+| `/[^\x09\x20-\x7e]/` | `src/crawler/http-signatures.ts` | Anchored validation or fixed character scans; bounded protocol inputs. |
+| `/#.*$/` | `src/crawler/http-signatures.ts` | Anchored validation or fixed character scans; bounded protocol inputs. |
+| `/^[a-z0-9!#$%&'*+.^_`\|~-]+$/` | `src/crawler/http-signatures.ts` | Anchored validation or fixed character scans; bounded protocol inputs. |
+| `/^[A-Za-z0-9!#$%&'*+.^_`\|~-]+$/` | `src/crawler/http-signatures.ts` | Anchored validation or fixed character scans; bounded protocol inputs. |
+| `/\+/g` | `src/crawler/http-signatures.ts` | Anchored validation or fixed character scans; bounded protocol inputs. |
+| `/\//g` | `src/crawler/http-signatures.ts` | Anchored validation or fixed character scans; bounded protocol inputs. |
+| `/^[a-z*][a-z0-9_.*-]*$/` | `src/crawler/http-signatures.ts` | Anchored validation or fixed character scans; bounded protocol inputs. |
+| `/[a-z*]/` | `src/crawler/sfv.ts` | Anchored validation or fixed character scans; bounded protocol inputs. |
+| `/[a-z0-9_.*-]/` | `src/crawler/sfv.ts` | Anchored validation or fixed character scans; bounded protocol inputs. |
+| `/[A-Za-z*]/` | `src/crawler/sfv.ts` | Anchored validation or fixed character scans; bounded protocol inputs. |
+| `/[A-Za-z0-9!#$%&'*+.^_`\|~:/-]/` | `src/crawler/sfv.ts` | Anchored validation or fixed character scans; bounded protocol inputs. |
+| `/^[A-Za-z0-9+/]*={0,2}$/` | `src/crawler/sfv.ts` | Anchored validation or fixed character scans; bounded protocol inputs. |
+| `/[0-9]/` | `src/crawler/sfv.ts` | Anchored validation or fixed character scans; bounded protocol inputs. |
+| `/[^\x20-\x7e]/` | `src/crawler/sfv.ts` | Anchored validation or fixed character scans; bounded protocol inputs. |
+| `/["\\]/g` | `src/crawler/sfv.ts` | Anchored validation or fixed character scans; bounded protocol inputs. |
+| `/^[A-Za-z*][A-Za-z0-9!#$%&'*+.^_`\|~:/-]*$/` | `src/crawler/sfv.ts` | Anchored validation or fixed character scans; bounded protocol inputs. |
+| `/^[a-z*][a-z0-9_.*-]*$/` | `src/crawler/sfv.ts` | Anchored validation or fixed character scans; bounded protocol inputs. |
+| `/[\s\\#]/` | `src/crawler/web-bot-auth-keys.ts` | Anchored validation or fixed character scans; bounded protocol inputs. |
+| `/^https:\/\/[^/?]*@/i` | `src/crawler/web-bot-auth-keys.ts` | Anchored validation or fixed character scans; bounded protocol inputs. |
+| `/(?:^\|,)\s*max-age\s*=\s*"?(\d+)"?\s*(?:,\|$)/i` | `src/crawler/web-bot-auth-keys.ts` | Anchored validation or fixed character scans; bounded protocol inputs. |
+| `/(?:^\|,)\s*(?:no-store\|no-cache)\s*(?:,\|$)/i` | `src/crawler/web-bot-auth-keys.ts` | Anchored validation or fixed character scans; bounded protocol inputs. |
+| `/^\d+$/` | `src/crawler/web-bot-auth-keys.ts` | Anchored validation or fixed character scans; bounded protocol inputs. |

@@ -26,6 +26,8 @@ import { graphqlDecoys, graphqlForbiddenResponse } from '../scenarios/graphql.js
 import { decoyHeaders } from '../decoys/headers.js';
 
 export { memoryStore } from '../state/store.js';
+export { WebBotAuthVerifier, acceptSignatureHeader, signatureBase, verifyEd25519, jwkThumbprint } from '../crawler/web-bot-auth.js';
+export type * from '../crawler/web-bot-auth.js';
 export type { StateStore } from '../state/store.js';
 export { webhookAdapter, slackAdapter, telegramAdapter, feishuAdapter } from './alerts.js';
 export interface WebGuardConfig extends Omit<AgentGuardConfig, 'mode'> {
